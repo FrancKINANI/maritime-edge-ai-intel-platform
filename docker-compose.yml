@@ -1,0 +1,154 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: maritime-redis
+    networks:
+      - maritime-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  data-ingestor:
+    build:
+      context: ./services/data-ingestor
+    container_name: maritime-data-ingestor
+    ports:
+      - "8001:8001"
+    environment:
+      - CDSE_USERNAME=${CDSE_USERNAME}
+      - CDSE_PASSWORD=${CDSE_PASSWORD}
+      - REDIS_URL=${REDIS_URL}
+      - DATABASE_URL=${DATABASE_URL}
+      - MOROCCO_BBOX=${MOROCCO_BBOX}
+    volumes:
+      - tiles-volume:/data/tiles
+      - scenes-volume:/data/scenes
+      - ./shared:/app/shared
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - maritime-net
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8001/health\")'"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  sentinel-preprocessor:
+    build:
+      context: ./services/sentinel-preprocessor
+    container_name: maritime-sentinel-preprocessor
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_URL=${REDIS_URL}
+    volumes:
+      - tiles-volume:/data/tiles
+      - scenes-volume:/data/scenes
+      - ./shared:/app/shared
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - maritime-net
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/health\")'"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  detector:
+    build:
+      context: ./services/detector
+    container_name: maritime-detector
+    ports:
+      - "8003:8000"
+    environment:
+      - REDIS_URL=${REDIS_URL}
+    volumes:
+      - tiles-volume:/data/tiles
+      - ./shared:/app/shared
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - maritime-net
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/health\")'"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  satellite-monitor:
+    build:
+      context: ./services/satellite-monitor
+    container_name: maritime-satellite-monitor
+    ports:
+      - "8004:8000"
+    environment:
+      - SENTINEL_HUB_CLIENT_ID=${SENTINEL_HUB_CLIENT_ID}
+      - SENTINEL_HUB_CLIENT_SECRET=${SENTINEL_HUB_CLIENT_SECRET}
+    volumes:
+      - ./shared:/app/shared
+    networks:
+      - maritime-net
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/health\")'"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  aggregator:
+    build:
+      context: ./services/aggregator
+    container_name: maritime-aggregator
+    ports:
+      - "8002:8002"
+    environment:
+      - REDIS_URL=${REDIS_URL}
+      - DATABASE_URL=${DATABASE_URL}
+      - GFW_API_TOKEN=${GFW_API_TOKEN}
+    volumes:
+      - ./shared:/app/shared
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - maritime-net
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8002/health\")'"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  ground-dashboard:
+    build:
+      context: ./services/ground-dashboard
+    container_name: maritime-ground-dashboard
+    ports:
+      - "8501:8501"
+    environment:
+      - DATA_INGESTOR_URL=http://data-ingestor:8001
+      - AGGREGATOR_URL=http://aggregator:8002
+    volumes:
+      - ./shared:/app/shared
+    networks:
+      - maritime-net
+    depends_on:
+      aggregator:
+        condition: service_healthy
+      data-ingestor:
+        condition: service_healthy
+
+volumes:
+  tiles-volume:
+  scenes-volume:
+
+networks:
+  maritime-net:
+    driver: bridge

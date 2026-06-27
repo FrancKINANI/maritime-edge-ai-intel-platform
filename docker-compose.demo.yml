@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  detector:
+    build:
+      context: ./services/detector
+    container_name: maritime-detector-demo
+    ports:
+      - "8003:8000"
+    environment:
+      - DEMO_MODE=true
+    volumes:
+      - tiles-volume:/data/tiles
+      - ./shared:/app/shared
+    networks:
+      - maritime-net-demo
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/health\")'"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  aggregator:
+    build:
+      context: ./services/aggregator
+    container_name: maritime-aggregator-demo
+    ports:
+      - "8002:8002"
+    environment:
+      - DATABASE_URL=sqlite:///./maritime_intel_demo.db
+      - DEMO_MODE=true
+    volumes:
+      - ./shared:/app/shared
+    networks:
+      - maritime-net-demo
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8002/health\")'"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  ground-dashboard:
+    build:
+      context: ./services/ground-dashboard
+    container_name: maritime-ground-dashboard-demo
+    ports:
+      - "8501:8501"
+    environment:
+      - AGGREGATOR_URL=http://aggregator:8002
+      - DEMO_MODE=true
+    volumes:
+      - ./shared:/app/shared
+    networks:
+      - maritime-net-demo
+    depends_on:
+      aggregator:
+        condition: service_healthy
+      detector:
+        condition: service_healthy
+
+volumes:
+  tiles-volume:
+
+networks:
+  maritime-net-demo:
+    driver: bridge

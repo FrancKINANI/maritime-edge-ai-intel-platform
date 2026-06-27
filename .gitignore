@@ -1,0 +1,31 @@
+# Ignored data directories (large files)
+phase0/data/scenes/
+phase0/data/tiles/
+
+# Exclude large ONNX model files (to be copied manually or mounted)
+shared/models/*
+!shared/models/.gitkeep
+
+# Python cache files
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+
+# Local environment variables
+.env
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Benchmarking results (except keep examples or structures)
+phase0/data/results/*.csv
+phase0/data/results/*.json
+!phase0/data/results/.gitkeep
+
+# Credentials & token files
+creds_sentinel_hub.txt
+gfw_token.txt
+
