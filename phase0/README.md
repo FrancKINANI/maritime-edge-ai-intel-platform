@@ -126,7 +126,7 @@ python3.12 -m venv .venv
 source .venv/bin/activate
 
 # 3. Install Phase 0 dependencies
-pip install -r phase0/requirements.txt
+uv pip install -r phase0/requirements.txt
 ```
 
 > **GDAL note (Ubuntu/Debian):** If `rasterio` fails to install, first run:
@@ -171,7 +171,14 @@ Both external APIs have been validated against the live production endpoints:
 
 ```bash
 cd phase0
-python download_scenes.py
+# Test de connexion
+uv run phase0/download_scenes.py --test
+
+# Téléchargement complet (10 scènes par défaut)
+uv run phase0/download_scenes.py
+
+# Téléchargement limité
+uv run phase0/download_scenes.py --max-scenes 5
 ```
 
 The script reads `CDSE_USERNAME` and `CDSE_PASSWORD` from `.env`, searches the CDSE catalogue for Sentinel-1 IW GRD scenes over the Moroccan coastline, and downloads up to 2 products to `data/scenes/`. Each `.SAFE` archive (~3 GB) is streamed in 1 MB chunks with a progress bar, then extracted and the zip is removed automatically.

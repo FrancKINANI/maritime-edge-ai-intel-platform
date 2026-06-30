@@ -1,6 +1,7 @@
 # Ignored data directories (large files)
 phase0/data/scenes/
 phase0/data/tiles/
+docs/
 
 # Exclude large ONNX model files (to be copied manually or mounted)
 shared/models/*
@@ -25,7 +26,5 @@ phase0/data/results/*.csv
 phase0/data/results/*.json
 !phase0/data/results/.gitkeep
 
-# Credentials & token files
-creds_sentinel_hub.txt
-gfw_token.txt
-
+phase0/COLAB_INSTRUCTIONS.md
+phase0/colab_preprocessing.ipynb

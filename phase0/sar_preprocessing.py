@@ -14,6 +14,7 @@ Outputs:
     - 512×512 pixel tiles as .npy arrays in phase0/data/tiles/
     - Optional PNG exports for visual inspection
     - Tile metadata (pixel coordinates, geo-bounds)
+    - Diagnostic figures and histograms
 
 Design:
     Each preprocessing stage is an independent function that accepts and
@@ -26,16 +27,19 @@ References:
     - Rasterio documentation (rasterio.readthedocs.io)
 """
 
-import glob
-import json
+import time
 import logging
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
+from scipy.interpolate import RegularGridInterpolator
+from scipy.ndimage import uniform_filter
 
 import numpy as np
 import rasterio
-from scipy.ndimage import uniform_filter
+from rasterio.transform import xy
+import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 # Configure logging
 logging.basicConfig(
@@ -44,90 +48,177 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Constants
+NODATA_THRESHOLD = 0.3  # Ignore tiles with >30% NoData pixels
+DEFAULT_TILE_SIZE = 512
+DEFAULT_OVERLAP = 0.5
+
 # ---------------------------------------------------------------------------
-# SAFE product reader helpers
+# SAFE product parsing
 # ---------------------------------------------------------------------------
 
 
-def find_measurement_tiff(
-    safe_path: str, polarization: str = "vv"
-) -> str:
-    """Locates the measurement GeoTIFF for the requested polarization inside a SAFE product.
+def find_safe_files(safe_path: str, polarization: str = "vv") -> Dict[str, str]:
+    """Finds necessary file paths in a .SAFE directory.
 
     Args:
         safe_path: Path to the .SAFE product directory.
         polarization: Desired polarization channel ('vv' or 'vh').
 
     Returns:
-        Absolute path to the measurement GeoTIFF file.
+        Dict with keys: 'tiff', 'calibration', 'noise'
 
     Raises:
-        FileNotFoundError: If no matching TIFF is found.
+        FileNotFoundError: If required files are not found.
     """
     pol = polarization.lower()
-    pattern = str(Path(safe_path) / "measurement" / f"*-{pol}-*.tiff")
-    matches = glob.glob(pattern)
-    if not matches:
+    safe_dir = Path(safe_path)
+    
+    # Find measurement TIFF (prefer COG variant if available)
+    measurement_dir = safe_dir / "measurement"
+    cog_pattern = f"*-{pol}-*-cog.tiff"
+    standard_pattern = f"*-{pol}-*.tiff"
+    
+    cog_files = list(measurement_dir.glob(cog_pattern))
+    standard_files = list(measurement_dir.glob(standard_pattern))
+    
+    if cog_files:
+        tiff_path = str(cog_files[0])
+        logger.info(f"Found COG measurement TIFF: {tiff_path}")
+    elif standard_files:
+        tiff_path = str(standard_files[0])
+        logger.info(f"Found standard measurement TIFF: {tiff_path}")
+    else:
         raise FileNotFoundError(
             f"No measurement TIFF found for polarization '{pol}' in {safe_path}"
         )
-    logger.info(f"Found measurement TIFF: {matches[0]}")
-    return matches[0]
-
-
-def find_calibration_xml(
-    safe_path: str, polarization: str = "vv"
-) -> str:
-    """Locates the calibration annotation XML for the requested polarization.
-
-    Args:
-        safe_path: Path to the .SAFE product directory.
-        polarization: Desired polarization channel ('vv' or 'vh').
-
-    Returns:
-        Absolute path to the calibration XML file.
-
-    Raises:
-        FileNotFoundError: If no matching calibration XML is found.
-    """
-    pol = polarization.lower()
-    pattern = str(
-        Path(safe_path) / "annotation" / "calibration" / f"calibration-*-{pol}-*.xml"
-    )
-    matches = glob.glob(pattern)
-    if not matches:
+    
+    # Find calibration XML
+    calibration_dir = safe_dir / "annotation" / "calibration"
+    cal_pattern = f"calibration-*-{pol}-*.xml"
+    cal_files = list(calibration_dir.glob(cal_pattern))
+    
+    if not cal_files:
         raise FileNotFoundError(
             f"No calibration XML found for polarization '{pol}' in {safe_path}"
         )
-    logger.info(f"Found calibration XML: {matches[0]}")
-    return matches[0]
+    calibration_path = str(cal_files[0])
+    logger.info(f"Found calibration XML: {calibration_path}")
+    
+    # Find noise XML (optional)
+    noise_dir = safe_dir / "annotation" / "calibration"
+    noise_pattern = f"noise-*-{pol}-*.xml"
+    noise_files = list(noise_dir.glob(noise_pattern))
+    
+    noise_path = str(noise_files[0]) if noise_files else None
+    if noise_path:
+        logger.info(f"Found noise XML: {noise_path}")
+    else:
+        logger.warning(f"No noise XML found for polarization '{pol}'")
+    
+    return {
+        "tiff": tiff_path,
+        "calibration": calibration_path,
+        "noise": noise_path,
+    }
 
 
-def load_measurement(tiff_path: str) -> Tuple[np.ndarray, Dict[str, Any]]:
-    """Reads a Sentinel-1 measurement GeoTIFF and returns the data and profile.
+# ---------------------------------------------------------------------------
+# GeoTIFF reading with memory management
+# ---------------------------------------------------------------------------
+
+
+def read_geotiff(tiff_path: str) -> Tuple[np.ndarray, Dict[str, Any]]:
+    """Reads a Sentinel-1 GeoTIFF with rasterio.
 
     Args:
         tiff_path: Path to the measurement GeoTIFF.
 
     Returns:
-        Tuple of (2D numpy array of DN values as float64, rasterio profile dict).
+        Tuple of (data array as uint16, rasterio profile dict).
+
+    Raises:
+        MemoryError: If image is too large for available RAM.
     """
     with rasterio.open(tiff_path) as src:
-        data = src.read(1).astype(np.float64)
-        profile = dict(src.profile)
+        width = src.width
+        height = src.height
+        dtype = src.dtypes[0]
+        
+        # Check memory requirements
+        # uint16 = 2 bytes per pixel
+        estimated_size_mb = (width * height * 2) / (1024 * 1024)
+        
         logger.info(
-            f"Loaded measurement: shape={data.shape}, dtype={src.dtypes[0]}, "
-            f"CRS={src.crs}"
+            f"GeoTIFF dimensions: {width}×{height}, dtype={dtype}, "
+            f"estimated size: {estimated_size_mb:.1f} MB"
         )
+        
+        # If image is too large (>1.5 GB), read in windows
+        if estimated_size_mb > 1500:
+            logger.warning(f"Large image detected ({estimated_size_mb:.1f} MB). "
+                          "Reading in windows to manage memory.")
+            return read_geotiff_windowed(tiff_path, src)
+        
+        # Read entire image if it fits in memory
+        data = src.read(1)
+        profile = {
+            "transform": src.transform,
+            "crs": src.crs,
+            "width": width,
+            "height": height,
+            "bounds": src.bounds,
+        }
+        
+        logger.info(f"Loaded full image: shape={data.shape}, dtype={data.dtype}")
+        return data, profile
+
+
+def read_geotiff_windowed(tiff_path: str, src: Any) -> Tuple[np.ndarray, Dict[str, Any]]:
+    """Reads a large GeoTIFF in windows to manage memory.
+
+    Args:
+        tiff_path: Path to the measurement GeoTIFF.
+        src: Open rasterio dataset.
+
+    Returns:
+        Tuple of (data array, rasterio profile dict).
+    """
+    height = src.height
+    width = src.width
+    window_height = 10000  # Process 10000 lines at a time
+    
+    # Pre-allocate output array
+    data = np.zeros((height, width), dtype=src.dtypes[0])
+    
+    for i in range(0, height, window_height):
+        window_height_actual = min(window_height, height - i)
+        window = ((i, i + window_height_actual), (0, width))
+        
+        window_data = src.read(1, window=window)
+        data[i:i + window_height_actual, :] = window_data
+        
+        logger.debug(f"Read window {i}-{i + window_height_actual}/{height}")
+    
+    profile = {
+        "transform": src.transform,
+        "crs": src.crs,
+        "width": width,
+        "height": height,
+        "bounds": src.bounds,
+    }
+    
+    logger.info(f"Loaded windowed image: shape={data.shape}, dtype={data.dtype}")
     return data, profile
 
 
-def parse_calibration_lut(calibration_xml_path: str) -> np.ndarray:
-    """Extracts the sigmaNought calibration LUT from Sentinel-1 calibration XML.
+# ---------------------------------------------------------------------------
+# Calibration LUT parsing
+# ---------------------------------------------------------------------------
 
-    The LUT is provided as a sub-sampled vector per line. This function parses
-    all calibration vectors and builds a 2D LUT array that can be used for
-    pixel-level calibration via bi-linear interpolation.
+
+def parse_calibration_lut(calibration_xml_path: str) -> np.ndarray:
+    """Parses Sentinel-1 calibration XML to extract sigmaNought vectors.
 
     Args:
         calibration_xml_path: Path to the calibration annotation XML.
@@ -172,65 +263,204 @@ def parse_calibration_lut(calibration_xml_path: str) -> np.ndarray:
 
     # Stack into 2D array (num_vectors × num_pixel_samples)
     lut_2d = np.array(sigma_values)
-    return lut_2d
+    
+    # Interpolate to full resolution using RegularGridInterpolator
+    # This handles the non-uniform sampling in the XML
+    lines_array = np.array(lines)
+    pixel_array = pixel_indices
+    
+    # Create interpolator
+    interpolator = RegularGridInterpolator(
+        (lines_array, pixel_array),
+        lut_2d,
+        method='linear',
+        bounds_error=False,
+        fill_value=None
+    )
+    
+    # We'll return the raw LUT for now - interpolation will be done
+    # during calibration to match the actual image dimensions
+    return lut_2d, lines_array, pixel_array
 
 
-# ---------------------------------------------------------------------------
-# Atomic preprocessing stages
-# ---------------------------------------------------------------------------
+def parse_noise_lut(noise_xml_path: str) -> np.ndarray:
+    """Parses Sentinel-1 noise XML to extract noise vectors.
 
-
-def calibrate_sigma0(data: np.ndarray, calibration_lut: np.ndarray) -> np.ndarray:
-    """Performs radiometric calibration: DN² / LUT² → σ⁰ (linear power).
-
-    The ESA calibration formula for Sentinel-1 GRD is:
-        σ⁰ = DN² / A_σ²
-
-    where A_σ is the sigmaNought calibration LUT value interpolated to each pixel.
+    Handles both old format (<noiseLut>) and new format (<noiseRangeLut>).
 
     Args:
-        data: 2D array of raw digital numbers (float64).
-        calibration_lut: 2D calibration LUT array (sub-sampled, will be resized).
+        noise_xml_path: Path to the noise annotation XML.
 
     Returns:
-        2D array of σ⁰ values in linear power scale.
+        2D numpy array of noise values.
+
+    Raises:
+        ValueError: If the XML structure is unexpected.
     """
-    from scipy.ndimage import zoom
+    tree = ET.parse(noise_xml_path)
+    root = tree.getroot()
 
-    # Resize LUT to match data dimensions via bilinear interpolation
-    zoom_factors = (
-        data.shape[0] / calibration_lut.shape[0],
-        data.shape[1] / calibration_lut.shape[1],
+    # Try new format first
+    noise_range_vectors = root.findall(".//noiseRangeLut")
+    if noise_range_vectors:
+        logger.info("Found new format noise LUT (noiseRangeLut)")
+        vectors = noise_range_vectors
+    else:
+        # Try old format
+        noise_vectors = root.findall(".//noiseLut")
+        if noise_vectors:
+            logger.info("Found old format noise LUT (noiseLut)")
+            vectors = noise_vectors
+        else:
+            raise ValueError(
+                f"No noise LUT elements found in {noise_xml_path}"
+            )
+
+    # Parse vectors (similar structure to calibration)
+    lines = []
+    noise_values = []
+    pixel_indices = None
+
+    for vec in vectors:
+        line_elem = vec.find("line")
+        if line_elem is not None:
+            line = int(line_elem.text)
+        else:
+            continue
+            
+        pixel_elem = vec.find("pixel")
+        noise_elem = vec.find("noiseLut") if vec.find("noiseLut") is not None else vec.find("noiseRangeLut")
+        
+        if pixel_elem is not None and noise_elem is not None:
+            pixels = np.array([int(p) for p in pixel_elem.text.split()])
+            noise = np.array([float(v) for v in noise_elem.text.split()])
+
+            if pixel_indices is None:
+                pixel_indices = pixels
+            lines.append(line)
+            noise_values.append(noise)
+
+    if not lines:
+        raise ValueError(f"No valid noise vectors found in {noise_xml_path}")
+
+    logger.info(f"Parsed {len(lines)} noise vectors")
+    
+    lut_2d = np.array(noise_values)
+    return lut_2d, np.array(lines), pixel_indices
+
+
+def interpolate_lut_to_image(
+    lut_2d: np.ndarray,
+    lut_lines: np.ndarray,
+    lut_pixels: np.ndarray,
+    image_shape: Tuple[int, int]
+) -> np.ndarray:
+    """Interpolates a sub-sampled LUT to full image resolution.
+
+    Args:
+        lut_2d: 2D LUT array (num_vectors × num_pixel_samples).
+        lut_lines: Array of line indices for each vector.
+        lut_pixels: Array of pixel indices for each sample.
+        image_shape: Target image shape (height, width).
+
+    Returns:
+        2D LUT array interpolated to image dimensions.
+    """
+    height, width = image_shape
+    
+    # Create coordinate grids for the image
+    line_coords = np.arange(height)
+    pixel_coords = np.arange(width)
+    
+    # Create meshgrid for interpolation
+    line_grid, pixel_grid = np.meshgrid(line_coords, pixel_coords, indexing='ij')
+    
+    # Create interpolator
+    interpolator = RegularGridInterpolator(
+        (lut_lines, lut_pixels),
+        lut_2d,
+        method='linear',
+        bounds_error=False,
+        fill_value=None
     )
-    lut_full = zoom(calibration_lut, zoom_factors, order=1)
+    
+    # Interpolate
+    points = np.column_stack([line_grid.ravel(), pixel_grid.ravel()])
+    lut_full = interpolator(points).reshape(image_shape)
+    
+    logger.info(f"Interpolated LUT from {lut_2d.shape} to {image_shape}")
+    return lut_full
 
+
+# ---------------------------------------------------------------------------
+# Radiometric calibration
+# ---------------------------------------------------------------------------
+
+
+def calibrate_sigma0(
+    data: np.ndarray,
+    calibration_lut: np.ndarray,
+    noise_lut: Optional[np.ndarray] = None
+) -> np.ndarray:
+    """Converts DN uint16 → σ0 linear power.
+
+    Formula: σ0 = (DN² - noise) / calibration²
+
+    Args:
+        data: 2D array of raw digital numbers (uint16).
+        calibration_lut: 2D calibration LUT array (full resolution).
+        noise_lut: Optional 2D noise LUT array (full resolution).
+
+    Returns:
+        2D array of σ0 values in linear power scale (float32).
+    """
+    # Convert to float for calculations
+    dn = data.astype(np.float32)
+    
+    # Apply noise subtraction if noise LUT is provided
+    if noise_lut is not None:
+        dn_squared = np.maximum(dn ** 2 - noise_lut, 0)
+    else:
+        dn_squared = dn ** 2
+    
     # Avoid division by zero
-    lut_full = np.where(lut_full == 0, 1e-10, lut_full)
-
-    sigma0 = (data ** 2) / (lut_full ** 2)
+    cal_lut_safe = np.where(calibration_lut == 0, 1e-10, calibration_lut)
+    
+    # Calculate sigma0
+    sigma0 = dn_squared / (cal_lut_safe ** 2)
+    
+    # Clip negative values (physically impossible)
+    sigma0 = np.maximum(sigma0, 0)
+    
     logger.info(
-        f"Calibrated to σ⁰: min={sigma0.min():.6f}, max={sigma0.max():.6f}"
+        f"Calibrated to σ0: min={sigma0.min():.6f}, max={sigma0.max():.6f}, "
+        f"mean={sigma0.mean():.6f}"
     )
     return sigma0
+
+
+# ---------------------------------------------------------------------------
+# Speckle filtering
+# ---------------------------------------------------------------------------
 
 
 def apply_lee_filter(data: np.ndarray, kernel_size: int = 5) -> np.ndarray:
     """Applies an adaptive Lee speckle filter to reduce SAR multiplicative noise.
 
-    The Lee filter estimates the local mean and variance within a sliding
-    window and applies an adaptive weight to balance noise reduction against
-    detail preservation.
-
-    Formula:
-        filtered = mean + k * (pixel - mean)
-        where k = max(0, (var - noise_var)) / max(var, noise_var)
+    Simplified Lee algorithm:
+      1. Calculate local mean μ and local variance σ²
+      2. Estimate coefficient of variation CV = σ/μ
+      3. Calculate weight W = σ²_signal / σ²
+         where σ²_signal = max(0, σ² - σ²_noise)
+         and σ²_noise = mean(σ²) (global speckle variance estimate)
+      4. Filtered pixel = μ + W * (pixel - μ)
 
     Args:
         data: 2D array of SAR backscatter values (linear or dB scale).
         kernel_size: Size of the square sliding window (must be odd).
 
     Returns:
-        Despeckled 2D array.
+        Despeckled 2D array (float32).
 
     Raises:
         ValueError: If kernel_size is not a positive odd integer.
@@ -244,68 +474,128 @@ def apply_lee_filter(data: np.ndarray, kernel_size: int = 5) -> np.ndarray:
     local_mean = uniform_filter(data, size=kernel_size, mode="reflect")
     local_sq_mean = uniform_filter(data ** 2, size=kernel_size, mode="reflect")
     local_var = local_sq_mean - local_mean ** 2
-    local_var = np.maximum(local_var, 0)  # Numerical stability
+    local_var = np.maximum(local_var, 0)  # Ensure non-negative
 
-    # Estimate noise variance from the Equivalent Number of Looks (ENL)
-    # For Sentinel-1 IW GRD, ENL ≈ 4.4 (ESA documentation)
-    enl = 4.4
-    noise_var = local_mean ** 2 / enl
+    # Estimate noise variance (global average of local variance)
+    noise_var = np.mean(local_var)
 
-    # Adaptive weight
-    k = np.where(
-        local_var > 0,
-        np.maximum(0, (local_var - noise_var)) / np.maximum(local_var, 1e-10),
-        0,
-    )
+    # Calculate signal variance
+    signal_var = np.maximum(local_var - noise_var, 0)
 
-    filtered = local_mean + k * (data - local_mean)
-    logger.info(
-        f"Lee filter applied: min={filtered.min():.6f}, max={filtered.max():.6f}"
-    )
-    return filtered
+    # Calculate adaptive weight
+    # Avoid division by zero
+    total_var = np.maximum(local_var, noise_var)
+    weight = signal_var / total_var
+
+    # Apply Lee filter
+    filtered = local_mean + weight * (data - local_mean)
+
+    logger.info(f"Lee filter applied. Noise variance estimate: {noise_var:.6f}")
+    return filtered.astype(np.float32)
 
 
-def convert_to_db(data: np.ndarray) -> np.ndarray:
-    """Converts linear power σ⁰ to logarithmic decibel (dB) scale.
+# ---------------------------------------------------------------------------
+# Logarithmic conversion
+# ---------------------------------------------------------------------------
 
-    Formula: dB = 10 * log10(σ⁰)
 
-    Values ≤ 0 are clamped to a floor of -50 dB to avoid -inf.
+def convert_to_db(data: np.ndarray, epsilon: float = 1e-10) -> np.ndarray:
+    """Converts σ0 linear power → dB.
+
+    Formula: dB = 10 * log10(σ0 + epsilon)
 
     Args:
-        data: 2D array of σ⁰ in linear power scale.
+        data: 2D array of linear power values.
+        epsilon: Small value to avoid log(0).
 
     Returns:
-        2D array in dB scale.
+        2D array in dB scale (float32).
     """
-    # Clamp to avoid log(0)
-    data_safe = np.where(data > 0, data, 1e-10)
-    db = 10.0 * np.log10(data_safe)
+    db = 10 * np.log10(data + epsilon)
+    logger.info(
+        f"Converted to dB: min={db.min():.2f}, max={db.max():.2f}, "
+        f"mean={db.mean():.2f}"
+    )
+    return db.astype(np.float32)
 
-    # Floor at -50 dB
-    db = np.maximum(db, -50.0)
-    logger.info(f"Converted to dB: min={db.min():.2f}, max={db.max():.2f}")
-    return db
+
+# ---------------------------------------------------------------------------
+# Normalization
+# ---------------------------------------------------------------------------
 
 
 def normalize_to_uint8(
-    data: np.ndarray, vmin: float = -30.0, vmax: float = 0.0
+    data: np.ndarray,
+    db_min: float = -30.0,
+    db_max: float = 0.0,
+    method: str = "linear"
 ) -> np.ndarray:
-    """Linearly maps values from [vmin, vmax] to uint8 [0, 255].
-
-    Values outside [vmin, vmax] are clipped.
+    """Normalizes a dB array to uint8 [0, 255].
 
     Args:
-        data: 2D array of values to normalize.
-        vmin: Value mapped to 0.
-        vmax: Value mapped to 255.
+        data: 2D array of dB values.
+        db_min: Minimum dB value for linear normalization.
+        db_max: Maximum dB value for linear normalization.
+        method: Normalization method ('linear', 'percentile', 'equalize').
+
+    Returns:
+        2D uint8 array.
+
+    Raises:
+        ValueError: If method is not recognized.
+    """
+    if method == "linear":
+        # Linear stretch to specified range
+        clipped = np.clip(data, db_min, db_max)
+        normalized = ((clipped - db_min) / (db_max - db_min) * 255.0).astype(np.uint8)
+        logger.info(f"Normalized (linear): range [{db_min}, {db_max}] → [0, 255]")
+        
+    elif method == "percentile":
+        # Percentile-based normalization (more robust to outliers)
+        pmin, pmax = np.percentile(data, [2, 98])
+        clipped = np.clip(data, pmin, pmax)
+        normalized = ((clipped - pmin) / (pmax - pmin) * 255.0).astype(np.uint8)
+        logger.info(f"Normalized (percentile): range [{pmin:.2f}, {pmax:.2f}] → [0, 255]")
+        
+    elif method == "equalize":
+        # Histogram equalization
+        # Convert to uint8 range first
+        data_min, data_max = data.min(), data.max()
+        if data_max > data_min:
+            stretched = ((data - data_min) / (data_max - data_min) * 255).astype(np.uint8)
+        else:
+            stretched = np.zeros_like(data, dtype=np.uint8)
+        
+        # Histogram equalization
+        hist, bins = np.histogram(stretched.flatten(), 256, [0, 256])
+        cdf = hist.cumsum()
+        cdf_normalized = cdf * 255 / cdf[-1]
+        equalized = np.interp(stretched.flatten(), bins[:-1], cdf_normalized)
+        normalized = equalized.reshape(stretched.shape).astype(np.uint8)
+        logger.info("Normalized (equalize): histogram equalization applied")
+        
+    else:
+        raise ValueError(f"Unknown normalization method: {method}")
+
+    return normalized
+
+
+def normalize_raw_to_uint8(data: np.ndarray) -> np.ndarray:
+    """Normalizes raw uint16 → uint8 without calibration.
+
+    Used by Pipeline A (raw baseline). Uses percentile [1, 99] to avoid
+    saturation by extreme values.
+
+    Args:
+        data: 2D array of uint16 values.
 
     Returns:
         2D uint8 array.
     """
-    clipped = np.clip(data, vmin, vmax)
-    normalized = ((clipped - vmin) / (vmax - vmin) * 255.0).astype(np.uint8)
-    logger.info(f"Normalized to uint8: range [{vmin}, {vmax}] → [0, 255]")
+    pmin, pmax = np.percentile(data, [1, 99])
+    clipped = np.clip(data, pmin, pmax)
+    normalized = ((clipped - pmin) / (pmax - pmin) * 255.0).astype(np.uint8)
+    logger.info(f"Normalized raw data: range [{pmin}, {pmax}] → [0, 255]")
     return normalized
 
 
@@ -316,114 +606,73 @@ def normalize_to_uint8(
 
 def tile_image(
     data: np.ndarray,
+    meta: Dict[str, Any],
     tile_size: int = 512,
-    overlap: float = 0.5,
-) -> List[Tuple[np.ndarray, Tuple[int, int, int, int]]]:
-    """Slices a 2D image into overlapping square tiles.
+    overlap: float = 0.5
+) -> List[Dict[str, Any]]:
+    """Slices an image into overlapping square tiles.
 
     Args:
         data: 2D source image array.
+        meta: Metadata dict with 'transform' and 'bounds'.
         tile_size: Side length of each square tile in pixels.
         overlap: Fractional overlap between adjacent tiles (0.0–0.99).
 
     Returns:
-        List of (tile_array, (y_start, x_start, y_end, x_end)) tuples.
-        Tiles that extend beyond the image are zero-padded.
+        List of tile dicts with array, coordinates, and metadata.
     """
     h, w = data.shape
     stride = max(1, int(tile_size * (1 - overlap)))
+    transform = meta["transform"]
 
-    tiles: List[Tuple[np.ndarray, Tuple[int, int, int, int]]] = []
+    tiles: List[Dict[str, Any]] = []
+    tile_count = 0
+    skipped_count = 0
 
     for y in range(0, h, stride):
         for x in range(0, w, stride):
             y_end = min(y + tile_size, h)
             x_end = min(x + tile_size, w)
 
+            # Extract tile
             tile = np.zeros((tile_size, tile_size), dtype=data.dtype)
             tile[: y_end - y, : x_end - x] = data[y:y_end, x:x_end]
 
-            tiles.append((tile, (y, x, y_end, x_end)))
+            # Check for NoData (more than 30% zeros)
+            zero_ratio = np.sum(tile == 0) / tile.size
+            has_data = zero_ratio < NODATA_THRESHOLD
+
+            if not has_data:
+                skipped_count += 1
+                continue
+
+            # Calculate geographic bounds
+            # Use rasterio transform to convert pixel to geo coordinates
+            lon_min, lat_max = xy(transform, x, y)
+            lon_max, lat_min = xy(transform, x_end, y_end)
+
+            tile_id = f"row{y//stride}_col{x//stride}"
+
+            tile_dict = {
+                "array": tile,
+                "tile_id": tile_id,
+                "pixel_bbox": [x, y, x_end, y_end],
+                "geo_bbox": [lat_min, lon_min, lat_max, lon_max],
+                "has_data": has_data,
+            }
+            tiles.append(tile_dict)
+            tile_count += 1
 
     logger.info(
-        f"Generated {len(tiles)} tiles of {tile_size}×{tile_size} "
-        f"(stride={stride}) from image {h}×{w}"
+        f"Generated {tile_count} valid tiles of {tile_size}×{tile_size} "
+        f"(skipped {skipped_count} NoData tiles) from image {h}×{w}"
     )
     return tiles
 
 
-def save_tiles(
-    tiles: List[Tuple[np.ndarray, Tuple[int, int, int, int]]],
-    output_dir: str,
-    scene_id: str,
-    pipeline_label: str,
-    save_png: bool = False,
-) -> List[Dict[str, Any]]:
-    """Saves tiles to disk as .npy files with optional PNG exports.
-
-    Args:
-        tiles: List of (tile_array, bbox) tuples from tile_image().
-        output_dir: Directory to save tiles to.
-        scene_id: Identifier for the source scene (used in filenames).
-        pipeline_label: Pipeline identifier (A, B, C, or D).
-        save_png: If True, also saves PNG previews.
-
-    Returns:
-        List of metadata dicts for each saved tile.
-    """
-    out_path = Path(output_dir)
-    out_path.mkdir(parents=True, exist_ok=True)
-
-    metadata_list = []
-    for idx, (tile, bbox) in enumerate(tiles):
-        tile_id = f"{scene_id}_pipe{pipeline_label}_tile{idx:04d}"
-        npy_file = out_path / f"{tile_id}.npy"
-        np.save(str(npy_file), tile)
-
-        meta = {
-            "tile_id": tile_id,
-            "scene_id": scene_id,
-            "pipeline": pipeline_label,
-            "bbox_pixel": list(bbox),
-            "shape": list(tile.shape),
-            "npy_path": str(npy_file),
-        }
-
-        if save_png:
-            from PIL import Image
-
-            png_file = out_path / f"{tile_id}.png"
-            img = Image.fromarray(tile)
-            img.save(str(png_file))
-            meta["png_path"] = str(png_file)
-
-        metadata_list.append(meta)
-
-    logger.info(f"Saved {len(metadata_list)} tiles to {out_path}")
-    return metadata_list
-
-
 # ---------------------------------------------------------------------------
-# Pipeline orchestrators
+# Pipeline implementations
 # ---------------------------------------------------------------------------
-
-
-def _load_safe_data(
-    safe_path: str, polarization: str = "vv"
-) -> Tuple[np.ndarray, Dict[str, Any], str]:
-    """Common loader for all pipelines — reads measurement + scene ID.
-
-    Args:
-        safe_path: Path to the .SAFE product directory.
-        polarization: Desired polarization channel.
-
-    Returns:
-        Tuple of (data array, rasterio profile, scene_id string).
-    """
-    tiff_path = find_measurement_tiff(safe_path, polarization)
-    data, profile = load_measurement(tiff_path)
-    scene_id = Path(safe_path).stem.replace(".SAFE", "")
-    return data, profile, scene_id
 
 
 def pipeline_A(
@@ -431,37 +680,45 @@ def pipeline_A(
     polarization: str = "vv",
     tile_size: int = 512,
     overlap: float = 0.5,
-    output_dir: Optional[str] = None,
-    save_png: bool = False,
-) -> List[Dict[str, Any]]:
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     """Pipeline A — Raw Baseline: uint16 DN → normalize [0, 255] → tile.
 
     No radiometric calibration. Direct min/max stretch of raw DN values.
+    Serves as lower reference in benchmark.
 
     Args:
         safe_path: Path to the .SAFE product directory.
         polarization: Polarization channel ('vv' or 'vh').
         tile_size: Tile side length in pixels.
         overlap: Tile overlap fraction.
-        output_dir: Directory for tile output (default: phase0/data/tiles/).
-        save_png: Whether to save PNG previews.
 
     Returns:
-        List of tile metadata dicts.
+        Tuple of (tiles list, pipeline metadata dict).
     """
+    start_time = time.perf_counter()
     logger.info("=== Pipeline A: Raw Baseline ===")
-    data, profile, scene_id = _load_safe_data(safe_path, polarization)
+
+    # Load data
+    files = find_safe_files(safe_path, polarization)
+    data, meta = read_geotiff(files["tiff"])
 
     # Direct normalization of raw DN
-    vmin, vmax = float(np.percentile(data, 1)), float(np.percentile(data, 99))
-    normalized = normalize_to_uint8(data, vmin=vmin, vmax=vmax)
+    normalized = normalize_raw_to_uint8(data)
 
-    tiles = tile_image(normalized, tile_size=tile_size, overlap=overlap)
+    # Tile
+    tiles = tile_image(normalized, meta, tile_size=tile_size, overlap=overlap)
 
-    if output_dir is None:
-        output_dir = str(Path(__file__).parent / "data" / "tiles")
+    pipeline_meta = {
+        "pipeline": "A",
+        "polarization": polarization,
+        "tile_size": tile_size,
+        "overlap": overlap,
+        "num_tiles": len(tiles),
+        "processing_time": time.perf_counter() - start_time,
+    }
 
-    return save_tiles(tiles, output_dir, scene_id, "A", save_png=save_png)
+    logger.info(f"Pipeline A completed in {pipeline_meta['processing_time']:.2f}s")
+    return tiles, pipeline_meta
 
 
 def pipeline_B(
@@ -469,136 +726,200 @@ def pipeline_B(
     polarization: str = "vv",
     tile_size: int = 512,
     overlap: float = 0.5,
-    output_dir: Optional[str] = None,
-    save_png: bool = False,
-) -> List[Dict[str, Any]]:
-    """Pipeline B — σ⁰ calibration → normalize [0, 255] → tile.
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    """Pipeline B — σ0 calibration → normalize [0, 255] → tile.
 
     Args:
         safe_path: Path to the .SAFE product directory.
         polarization: Polarization channel ('vv' or 'vh').
         tile_size: Tile side length in pixels.
         overlap: Tile overlap fraction.
-        output_dir: Directory for tile output.
-        save_png: Whether to save PNG previews.
 
     Returns:
-        List of tile metadata dicts.
+        Tuple of (tiles list, pipeline metadata dict).
     """
+    start_time = time.perf_counter()
     logger.info("=== Pipeline B: Sigma0 Calibration ===")
-    data, profile, scene_id = _load_safe_data(safe_path, polarization)
 
-    # Parse calibration LUT from SAFE annotations
-    cal_xml = find_calibration_xml(safe_path, polarization)
-    cal_lut = parse_calibration_lut(cal_xml)
+    # Load data
+    files = find_safe_files(safe_path, polarization)
+    data, meta = read_geotiff(files["tiff"])
+
+    # Parse calibration LUT
+    cal_lut_2d, cal_lines, cal_pixels = parse_calibration_lut(files["calibration"])
+    cal_lut_full = interpolate_lut_to_image(cal_lut_2d, cal_lines, cal_pixels, data.shape)
+
+    # Parse noise LUT if available
+    noise_lut_full = None
+    if files["noise"]:
+        try:
+            noise_lut_2d, noise_lines, noise_pixels = parse_noise_lut(files["noise"])
+            noise_lut_full = interpolate_lut_to_image(
+                noise_lut_2d, noise_lines, noise_pixels, data.shape
+            )
+        except Exception as e:
+            logger.warning(f"Failed to parse noise LUT: {e}")
 
     # Calibrate
-    sigma0 = calibrate_sigma0(data, cal_lut)
+    sigma0 = calibrate_sigma0(data, cal_lut_full, noise_lut_full)
 
-    # Convert to dB for normalization range, then uint8
-    db = convert_to_db(sigma0)
-    normalized = normalize_to_uint8(db, vmin=-30.0, vmax=0.0)
+    # Normalize
+    normalized = normalize_to_uint8(sigma0, method="linear", db_min=-30.0, db_max=0.0)
 
-    tiles = tile_image(normalized, tile_size=tile_size, overlap=overlap)
+    # Tile
+    tiles = tile_image(normalized, meta, tile_size=tile_size, overlap=overlap)
 
-    if output_dir is None:
-        output_dir = str(Path(__file__).parent / "data" / "tiles")
+    pipeline_meta = {
+        "pipeline": "B",
+        "polarization": polarization,
+        "tile_size": tile_size,
+        "overlap": overlap,
+        "num_tiles": len(tiles),
+        "processing_time": time.perf_counter() - start_time,
+    }
 
-    return save_tiles(tiles, output_dir, scene_id, "B", save_png=save_png)
+    logger.info(f"Pipeline B completed in {pipeline_meta['processing_time']:.2f}s")
+    return tiles, pipeline_meta
 
 
 def pipeline_C(
     safe_path: str,
     polarization: str = "vv",
-    kernel_size: int = 5,
     tile_size: int = 512,
     overlap: float = 0.5,
-    output_dir: Optional[str] = None,
-    save_png: bool = False,
-) -> List[Dict[str, Any]]:
-    """Pipeline C — σ⁰ → Lee 5×5 → normalize [0, 255] → tile.
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    """Pipeline C — σ0 calibration → Lee filter → normalize [0, 255] → tile.
 
     Args:
         safe_path: Path to the .SAFE product directory.
         polarization: Polarization channel ('vv' or 'vh').
-        kernel_size: Lee filter kernel size (must be odd).
         tile_size: Tile side length in pixels.
         overlap: Tile overlap fraction.
-        output_dir: Directory for tile output.
-        save_png: Whether to save PNG previews.
 
     Returns:
-        List of tile metadata dicts.
+        Tuple of (tiles list, pipeline metadata dict).
     """
+    start_time = time.perf_counter()
     logger.info("=== Pipeline C: Sigma0 + Lee Filter ===")
-    data, profile, scene_id = _load_safe_data(safe_path, polarization)
 
-    cal_xml = find_calibration_xml(safe_path, polarization)
-    cal_lut = parse_calibration_lut(cal_xml)
+    # Load data
+    files = find_safe_files(safe_path, polarization)
+    data, meta = read_geotiff(files["tiff"])
 
-    sigma0 = calibrate_sigma0(data, cal_lut)
-    filtered = apply_lee_filter(sigma0, kernel_size=kernel_size)
+    # Parse calibration LUT
+    cal_lut_2d, cal_lines, cal_pixels = parse_calibration_lut(files["calibration"])
+    cal_lut_full = interpolate_lut_to_image(cal_lut_2d, cal_lines, cal_pixels, data.shape)
 
-    db = convert_to_db(filtered)
-    normalized = normalize_to_uint8(db, vmin=-30.0, vmax=0.0)
+    # Parse noise LUT if available
+    noise_lut_full = None
+    if files["noise"]:
+        try:
+            noise_lut_2d, noise_lines, noise_pixels = parse_noise_lut(files["noise"])
+            noise_lut_full = interpolate_lut_to_image(
+                noise_lut_2d, noise_lines, noise_pixels, data.shape
+            )
+        except Exception as e:
+            logger.warning(f"Failed to parse noise LUT: {e}")
 
-    tiles = tile_image(normalized, tile_size=tile_size, overlap=overlap)
+    # Calibrate
+    sigma0 = calibrate_sigma0(data, cal_lut_full, noise_lut_full)
 
-    if output_dir is None:
-        output_dir = str(Path(__file__).parent / "data" / "tiles")
+    # Despeckle
+    filtered = apply_lee_filter(sigma0, kernel_size=5)
 
-    return save_tiles(tiles, output_dir, scene_id, "C", save_png=save_png)
+    # Normalize
+    normalized = normalize_to_uint8(filtered, method="linear", db_min=-30.0, db_max=0.0)
+
+    # Tile
+    tiles = tile_image(normalized, meta, tile_size=tile_size, overlap=overlap)
+
+    pipeline_meta = {
+        "pipeline": "C",
+        "polarization": polarization,
+        "tile_size": tile_size,
+        "overlap": overlap,
+        "num_tiles": len(tiles),
+        "processing_time": time.perf_counter() - start_time,
+    }
+
+    logger.info(f"Pipeline C completed in {pipeline_meta['processing_time']:.2f}s")
+    return tiles, pipeline_meta
 
 
 def pipeline_D(
     safe_path: str,
     polarization: str = "vv",
-    kernel_size: int = 5,
     tile_size: int = 512,
     overlap: float = 0.5,
-    output_dir: Optional[str] = None,
-    save_png: bool = False,
-) -> List[Dict[str, Any]]:
-    """Pipeline D — σ⁰ → Lee 5×5 → log(dB) → normalize [0, 255] → tile.
+) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    """Pipeline D — σ0 → Lee filter → log(dB) → equalize → tile.
 
-    This is the recommended pipeline per ESA best practices.
-    The dB conversion is applied after speckle filtering to maximize
-    the signal-to-noise ratio before quantization.
+    Full ESA-recommended preprocessing chain with histogram equalization.
+    Reproduces iVision-MRSSD preprocessing for domain alignment.
 
     Args:
         safe_path: Path to the .SAFE product directory.
         polarization: Polarization channel ('vv' or 'vh').
-        kernel_size: Lee filter kernel size (must be odd).
         tile_size: Tile side length in pixels.
         overlap: Tile overlap fraction.
-        output_dir: Directory for tile output.
-        save_png: Whether to save PNG previews.
 
     Returns:
-        List of tile metadata dicts.
+        Tuple of (tiles list, pipeline metadata dict).
     """
-    logger.info("=== Pipeline D: Sigma0 + Lee + Log dB (Recommended) ===")
-    data, profile, scene_id = _load_safe_data(safe_path, polarization)
+    start_time = time.perf_counter()
+    logger.info("=== Pipeline D: Sigma0 + Lee + Log dB + Equalize ===")
 
-    cal_xml = find_calibration_xml(safe_path, polarization)
-    cal_lut = parse_calibration_lut(cal_xml)
+    # Load data
+    files = find_safe_files(safe_path, polarization)
+    data, meta = read_geotiff(files["tiff"])
 
-    sigma0 = calibrate_sigma0(data, cal_lut)
-    filtered = apply_lee_filter(sigma0, kernel_size=kernel_size)
+    # Parse calibration LUT
+    cal_lut_2d, cal_lines, cal_pixels = parse_calibration_lut(files["calibration"])
+    cal_lut_full = interpolate_lut_to_image(cal_lut_2d, cal_lines, cal_pixels, data.shape)
+
+    # Parse noise LUT if available
+    noise_lut_full = None
+    if files["noise"]:
+        try:
+            noise_lut_2d, noise_lines, noise_pixels = parse_noise_lut(files["noise"])
+            noise_lut_full = interpolate_lut_to_image(
+                noise_lut_2d, noise_lines, noise_pixels, data.shape
+            )
+        except Exception as e:
+            logger.warning(f"Failed to parse noise LUT: {e}")
+
+    # Calibrate
+    sigma0 = calibrate_sigma0(data, cal_lut_full, noise_lut_full)
+
+    # Despeckle
+    filtered = apply_lee_filter(sigma0, kernel_size=5)
+
+    # Convert to dB
     db = convert_to_db(filtered)
-    normalized = normalize_to_uint8(db, vmin=-30.0, vmax=0.0)
 
-    tiles = tile_image(normalized, tile_size=tile_size, overlap=overlap)
+    # Normalize with histogram equalization
+    normalized = normalize_to_uint8(db, method="equalize")
 
-    if output_dir is None:
-        output_dir = str(Path(__file__).parent / "data" / "tiles")
+    # Tile
+    tiles = tile_image(normalized, meta, tile_size=tile_size, overlap=overlap)
 
-    return save_tiles(tiles, output_dir, scene_id, "D", save_png=save_png)
+    pipeline_meta = {
+        "pipeline": "D",
+        "polarization": polarization,
+        "tile_size": tile_size,
+        "overlap": overlap,
+        "num_tiles": len(tiles),
+        "processing_time": time.perf_counter() - start_time,
+    }
+
+    logger.info(f"Pipeline D completed in {pipeline_meta['processing_time']:.2f}s")
+    return tiles, pipeline_meta
 
 
 # ---------------------------------------------------------------------------
 # Pipeline dispatcher
 # ---------------------------------------------------------------------------
+
 
 PIPELINES = {
     "A": pipeline_A,
@@ -609,19 +930,25 @@ PIPELINES = {
 
 
 def run_pipeline(
-    pipeline_name: str,
     safe_path: str,
-    **kwargs: Any,
+    pipeline_name: str,
+    polarization: str = "vv",
+    output_dir: Optional[str] = None,
+    tile_size: int = 512,
+    overlap: float = 0.5,
 ) -> List[Dict[str, Any]]:
     """Dispatches to the requested preprocessing pipeline.
 
     Args:
-        pipeline_name: One of 'A', 'B', 'C', 'D'.
         safe_path: Path to the .SAFE product directory.
-        **kwargs: Additional arguments forwarded to the pipeline function.
+        pipeline_name: One of 'A', 'B', 'C', 'D'.
+        polarization: Polarization channel ('vv' or 'vh').
+        output_dir: Optional directory to save tiles.
+        tile_size: Tile side length in pixels.
+        overlap: Tile overlap fraction.
 
     Returns:
-        List of tile metadata dicts.
+        List of tile dicts (without arrays if output_dir is provided).
 
     Raises:
         ValueError: If pipeline_name is not recognized.
@@ -631,7 +958,202 @@ def run_pipeline(
         raise ValueError(
             f"Unknown pipeline '{name}'. Must be one of {list(PIPELINES.keys())}"
         )
-    return PIPELINES[name](safe_path, **kwargs)
+
+    # Run pipeline
+    tiles, pipeline_meta = PIPELINES[name](
+        safe_path, polarization, tile_size, overlap
+    )
+
+    # Save to disk if output directory is provided
+    if output_dir is not None:
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+
+        scene_id = Path(safe_path).stem.replace(".SAFE", "")
+        pipeline_dir = output_path / scene_id / name
+        pipeline_dir.mkdir(parents=True, exist_ok=True)
+
+        saved_tiles = []
+        for tile_dict in tiles:
+            tile_id = f"{scene_id}_{name}_{tile_dict['tile_id']}"
+            npy_path = pipeline_dir / f"{tile_id}.npy"
+
+            # Save tile array
+            np.save(str(npy_path), tile_dict["array"])
+
+            # Create metadata dict without array (to save RAM)
+            saved_tile = {
+                "tile_id": tile_id,
+                "scene_id": scene_id,
+                "pipeline": name,
+                "pixel_bbox": tile_dict["pixel_bbox"],
+                "geo_bbox": tile_dict["geo_bbox"],
+                "has_data": tile_dict["has_data"],
+                "npy_path": str(npy_path),
+            }
+            saved_tiles.append(saved_tile)
+
+        # Save metadata JSON
+        metadata_path = pipeline_dir / "metadata.json"
+        metadata = {
+            "scene_id": scene_id,
+            "pipeline": name,
+            "polarization": polarization,
+            "tile_size": tile_size,
+            "overlap": overlap,
+            "num_tiles": len(saved_tiles),
+            "pipeline_meta": pipeline_meta,
+            "tiles": saved_tiles,
+        }
+
+        with open(metadata_path, "w") as f:
+            import json
+            json.dump(metadata, f, indent=2)
+
+        logger.info(f"Saved {len(saved_tiles)} tiles to {pipeline_dir}")
+        logger.info(f"Metadata saved to {metadata_path}")
+
+        return saved_tiles
+
+    return tiles
+
+
+# ---------------------------------------------------------------------------
+# Diagnostic functions
+# ---------------------------------------------------------------------------
+
+
+def compute_intensity_histogram(tiles: List[Dict[str, Any]], n_bins: int = 256) -> np.ndarray:
+    """Computes aggregated intensity histogram across all tiles.
+
+    Args:
+        tiles: List of tile dicts with 'array' field.
+        n_bins: Number of histogram bins.
+
+    Returns:
+        Normalized histogram array (sum = 1).
+    """
+    all_pixels = []
+    for tile in tiles:
+        all_pixels.extend(tile["array"].flatten())
+
+    hist, _ = np.histogram(all_pixels, bins=n_bins, range=(0, 256))
+    normalized_hist = hist / hist.sum()
+    return normalized_hist
+
+
+def visualize_pipeline_comparison(
+    safe_path: str,
+    output_path: str,
+    polarization: str = "vv",
+    sample_tile_idx: int = 0,
+) -> None:
+    """Generates a 2×2 figure showing the same tile processed by all 4 pipelines.
+
+    Args:
+        safe_path: Path to the .SAFE product directory.
+        output_path: Path to save the output PNG.
+        polarization: Polarization channel.
+        sample_tile_idx: Index of tile to visualize.
+    """
+    logger.info("Generating pipeline comparison figure...")
+
+    # Run all pipelines
+    pipelines_data = {}
+    for pipeline_name in ["A", "B", "C", "D"]:
+        tiles, _ = run_pipeline(safe_path, pipeline_name, polarization)
+        if tiles and sample_tile_idx < len(tiles):
+            pipelines_data[pipeline_name] = tiles[sample_tile_idx]["array"]
+        else:
+            logger.warning(f"No tile {sample_tile_idx} for pipeline {pipeline_name}")
+
+    # Create figure
+    fig, axes = plt.subplots(2, 2, figsize=(12, 12))
+    axes = axes.flatten()
+
+    pipeline_titles = {
+        "A": "Pipeline A: Raw Baseline",
+        "B": "Pipeline B: σ0 Calibration",
+        "C": "Pipeline C: σ0 + Lee Filter",
+        "D": "Pipeline D: σ0 + Lee + dB + Equalize",
+    }
+
+    for idx, (pipeline_name, ax) in enumerate(zip(["A", "B", "C", "D"], axes)):
+        if pipeline_name in pipelines_data:
+            ax.imshow(pipelines_data[pipeline_name], cmap="gray")
+            ax.set_title(pipeline_titles[pipeline_name])
+        else:
+            ax.text(0.5, 0.5, "No data", ha="center", va="center")
+            ax.set_title(f"{pipeline_titles[pipeline_name]} (N/A)")
+        ax.axis("off")
+
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150, bbox_inches="tight")
+    logger.info(f"Comparison figure saved to {output_path}")
+    plt.close()
+
+
+# ---------------------------------------------------------------------------
+# Test function
+# ---------------------------------------------------------------------------
+
+
+def test_with_first_scene() -> None:
+    """Tests the preprocessing with the first available .SAFE scene.
+
+    Runs Pipeline D on VV and displays statistics.
+    """
+    logger.info("=== Testing with first available scene ===")
+
+    # Find first .SAFE directory
+    scenes_dir = Path(__file__).parent / "data" / "scenes"
+    safe_dirs = list(scenes_dir.glob("*.SAFE"))
+
+    if not safe_dirs:
+        logger.error("No .SAFE directories found in phase0/data/scenes/")
+        return
+
+    safe_path = str(safe_dirs[0])
+    logger.info(f"Using scene: {safe_path}")
+
+    try:
+        # Run Pipeline D
+        start_time = time.perf_counter()
+        tiles, pipeline_meta = pipeline_D(safe_path, polarization="vv")
+        total_time = time.perf_counter() - start_time
+
+        # Display statistics
+        logger.info("=" * 60)
+        logger.info(f"Pipeline D Test Results")
+        logger.info(f"Scene: {Path(safe_path).name}")
+        logger.info(f"Number of tiles generated: {len(tiles)}")
+        logger.info(f"Total processing time: {total_time:.2f}s")
+        logger.info(f"Tile size: {pipeline_meta['tile_size']}×{pipeline_meta['tile_size']}")
+        logger.info(f"Overlap: {pipeline_meta['overlap']}")
+
+        if tiles:
+            sample_tile = tiles[0]["array"]
+            logger.info(f"Sample tile value range: [{sample_tile.min()}, {sample_tile.max()}]")
+            logger.info(f"Sample tile dtype: {sample_tile.dtype}")
+            logger.info(f"Sample tile shape: {sample_tile.shape}")
+
+            # Save 3 example tiles as PNG
+            output_dir = Path(__file__).parent / "data" / "results"
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+            for i in range(min(3, len(tiles))):
+                from PIL import Image
+                tile_array = tiles[i]["array"]
+                img = Image.fromarray(tile_array)
+                output_path = output_dir / f"test_tile_{i}.png"
+                img.save(output_path)
+                logger.info(f"Saved example tile {i} to {output_path}")
+
+        logger.info("=" * 60)
+        logger.info("Test completed successfully!")
+
+    except Exception as e:
+        logger.error(f"Test failed: {e}", exc_info=True)
 
 
 # ---------------------------------------------------------------------------
@@ -640,14 +1162,14 @@ def run_pipeline(
 
 
 def main() -> None:
-    """Command-line entry point for standalone preprocessing."""
+    """Command-line entry point for preprocessing."""
     import argparse
 
     parser = argparse.ArgumentParser(
         description="Sentinel-1 GRD SAR Preprocessing Pipeline"
     )
     parser.add_argument(
-        "--safe", required=True, help="Path to the .SAFE product directory"
+        "--safe", help="Path to the .SAFE product directory (required unless --test)"
     )
     parser.add_argument(
         "--pipeline",
@@ -676,30 +1198,89 @@ def main() -> None:
         help="Output directory for tiles (default: phase0/data/tiles/)",
     )
     parser.add_argument(
-        "--save-png", action="store_true", help="Also save PNG previews of tiles"
+        "--all-pipelines",
+        action="store_true",
+        help="Run all 4 pipelines and generate comparison",
+    )
+    parser.add_argument(
+        "--visualize",
+        action="store_true",
+        help="Generate pipeline comparison figure",
+    )
+    parser.add_argument(
+        "--test",
+        action="store_true",
+        help="Run test with first available scene",
     )
 
     args = parser.parse_args()
 
+    # Handle --test flag (doesn't require --safe)
+    if args.test:
+        test_with_first_scene()
+        return
+
+    # For other operations, --safe is required
+    if not args.safe:
+        parser.error("--safe is required (use --test for automatic scene detection)")
+        return
+
+    if args.all_pipelines:
+        # Run all pipelines
+        logger.info("Running all 4 pipelines...")
+        results_dir = Path(__file__).parent / "data" / "tiles"
+        results_dir.mkdir(parents=True, exist_ok=True)
+
+        all_results = {}
+        for pipeline_name in ["A", "B", "C", "D"]:
+            logger.info(f"Running pipeline {pipeline_name}...")
+            tiles = run_pipeline(
+                args.safe,
+                pipeline_name,
+                args.polarization,
+                str(results_dir),
+                args.tile_size,
+                args.overlap,
+            )
+            all_results[pipeline_name] = tiles
+
+        # Generate comparison figure
+        if args.visualize:
+            output_path = Path(__file__).parent / "data" / "results" / "pipeline_comparison.png"
+            visualize_pipeline_comparison(
+                args.safe, str(output_path), args.polarization
+            )
+
+        # Display summary
+        logger.info("=" * 60)
+        logger.info("All Pipelines Summary")
+        for pipeline_name, tiles in all_results.items():
+            logger.info(f"Pipeline {pipeline_name}: {len(tiles)} tiles")
+        logger.info("=" * 60)
+
+        return
+
+    if args.visualize:
+        # Generate comparison figure only
+        output_path = Path(__file__).parent / "data" / "results" / "pipeline_comparison.png"
+        visualize_pipeline_comparison(args.safe, str(output_path), args.polarization)
+        return
+
+    # Run single pipeline
+    if args.output_dir is None:
+        args.output_dir = str(Path(__file__).parent / "data" / "tiles")
+
     results = run_pipeline(
-        pipeline_name=args.pipeline,
-        safe_path=args.safe,
-        polarization=args.polarization,
-        tile_size=args.tile_size,
-        overlap=args.overlap,
-        output_dir=args.output_dir,
-        save_png=args.save_png,
+        args.safe,
+        args.pipeline,
+        args.polarization,
+        args.output_dir,
+        args.tile_size,
+        args.overlap,
     )
 
-    # Save tile metadata index
-    out_dir = args.output_dir or str(Path(__file__).parent / "data" / "tiles")
-    index_path = Path(out_dir) / f"tile_index_pipe{args.pipeline}.json"
-    with open(index_path, "w") as f:
-        json.dump(results, f, indent=2)
-    logger.info(f"Tile index saved to {index_path}")
-    logger.info(f"Pipeline {args.pipeline} complete: {len(results)} tiles generated.")
+    logger.info(f"Pipeline {args.pipeline} completed. Generated {len(results)} tiles.")
 
 
 if __name__ == "__main__":
     main()
-
