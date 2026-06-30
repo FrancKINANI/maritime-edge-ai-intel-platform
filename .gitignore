@@ -25,6 +25,3 @@ shared/models/*
 phase0/data/results/*.csv
 phase0/data/results/*.json
 !phase0/data/results/.gitkeep
-
-phase0/COLAB_INSTRUCTIONS.md
-phase0/colab_preprocessing.ipynb

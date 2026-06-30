@@ -18,6 +18,7 @@ robust streaming downloads with automatic ZIP extraction, and intelligent scene 
 
 import os
 import zipfile
+import httpx
 import logging
 import json
 import random
@@ -45,15 +46,16 @@ CDSE_DOWNLOAD_URL = "https://zipper.dataspace.copernicus.eu/odata/v1/Products"
 TOKEN_EXPIRY_SECONDS = 600  # CDSE tokens expire after 10 minutes
 
 # Scene selection criteria for diverse dataset
+# These can be customized per region or season
 SELECTION_CRITERIA = [
-    # Zone Z1 — Eaux territoriales (côte atlantique marocaine)
-    {"date_start": "2024-01-01", "date_end": "2024-03-31", "count": 2, "zone": "Z1"},
-    # Zone Z2 — ZEE (large)
-    {"date_start": "2024-04-01", "date_end": "2024-06-30", "count": 2, "zone": "Z2"},
-    # Zone Z3 — Haute mer + détroit de Gibraltar
-    {"date_start": "2024-07-01", "date_end": "2024-09-30", "count": 3, "zone": "Z3"},
-    # Conditions variées — automne/hiver (mer plus agitée)
-    {"date_start": "2024-10-01", "date_end": "2024-12-31", "count": 3, "zone": "Z4"},
+    # Season 1 — Winter/Spring (Jan-Mar) - 2025
+    {"date_start": "2025-01-01", "date_end": "2025-03-31", "count": 2, "season": "Winter/Spring 2025"},
+    # Season 2 — Spring/Summer (Apr-Jun) - 2025
+    {"date_start": "2025-04-01", "date_end": "2025-06-30", "count": 2, "season": "Spring/Summer 2025"},
+    # Season 3 — Summer/Fall (Jul-Sep) - 2025
+    {"date_start": "2025-07-01", "date_end": "2025-09-30", "count": 3, "season": "Summer/Fall 2025"},
+    # Season 4 — Fall/Winter (Oct-Dec) - 2025
+    {"date_start": "2025-10-01", "date_end": "2025-12-31", "count": 3, "season": "Fall/Winter 2025"},
 ]
 
 # Retry configuration
@@ -312,10 +314,19 @@ def download_product(
     
     try:
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            # Debug: list the contents of the zip
+            logger.info(f"ZIP contains {len(zip_ref.namelist())} files. First 10: {zip_ref.namelist()[:10]}")
+            
             zip_ref.extractall(output_path)
-            # Find the .SAFE directory name
+            
+            # Find the .SAFE directory name (should be the top-level directory in the zip)
             safe_dirs = [name for name in zip_ref.namelist() if name.endswith(".SAFE/")]
             safe_dir_name = safe_dirs[0].rstrip("/") if safe_dirs else None
+            
+            # If no .SAFE/ directory found, check for .SAFE without trailing slash
+            if not safe_dir_name:
+                safe_dirs = [name for name in zip_ref.namelist() if name.endswith(".SAFE")]
+                safe_dir_name = safe_dirs[0] if safe_dirs else None
     except zipfile.BadZipFile as e:
         logger.error(f"Corrupted ZIP file: {e}")
         zip_path.unlink()
@@ -330,6 +341,9 @@ def download_product(
         return str(safe_path)
     else:
         logger.warning("No .SAFE directory found in the extracted zip.")
+        # List what was actually extracted
+        extracted_files = list(output_path.iterdir())
+        logger.warning(f"Extracted files: {[f.name for f in extracted_files]}")
         return str(output_path)
 
 
@@ -345,6 +359,42 @@ def is_scene_downloaded(scenes_dir: Path, product_name: str) -> bool:
     """
     safe_path = scenes_dir / f"{product_name}.SAFE"
     return safe_path.exists() and safe_path.is_dir()
+
+
+def get_existing_scene_ids(scenes_dir: Path) -> set:
+    """Gets set of existing scene product IDs (base IDs without COG suffix).
+    
+    This helps avoid downloading duplicate scenes across different regions
+    when a scene might overlap multiple bounding boxes.
+    
+    Args:
+        scenes_dir (Path): Directory containing .SAFE folders.
+    
+    Returns:
+        set: Set of base product IDs (without COG suffix).
+    """
+    existing_ids = set()
+    
+    for safe_dir in scenes_dir.glob("*.SAFE"):
+        if safe_dir.is_dir():
+            # Extract base product ID from directory name
+            # Format: S1A_IW_GRDH_1SDV_20240107T064657_20240107T064719_051997_06488E_B2F9_COG.SAFE
+            # Base ID: 051997_06488E_B2F9 (relative orbit + absolute orbit + mission ID)
+            parts = safe_dir.stem.split("_")
+            if len(parts) >= 7:
+                # The last three parts are: relative orbit, absolute orbit, mission ID
+                # Handle both standard and COG variants
+                if parts[-1] == "COG":
+                    # COG variant: S1A_IW_GRDH_1SDV_20240107T064657_20240107T064719_051997_06488E_B2F9_COG
+                    base_id = f"{parts[-3]}_{parts[-2]}_{parts[-4]}"  # 051997_06488E_B2F9
+                else:
+                    # Standard variant: S1A_IW_GRDH_1SDV_20240107T064657_20240107T064719_051997_06488E_B2F9
+                    base_id = f"{parts[-3]}_{parts[-2]}_{parts[-1]}"  # 051997_06488E_B2F9
+                
+                existing_ids.add(base_id)
+    
+    logger.info(f"Found {len(existing_ids)} existing scene IDs in {scenes_dir}")
+    return existing_ids
 
 
 def select_scenes_for_criteria(
@@ -369,9 +419,9 @@ def select_scenes_for_criteria(
     date_start = criteria["date_start"]
     date_end = criteria["date_end"]
     count = criteria["count"]
-    zone = criteria["zone"]
+    season = criteria["season"]
     
-    logger.info(f"Searching scenes for {zone} ({date_start} to {date_end})...")
+    logger.info(f"Searching scenes for {season} ({date_start} to {date_end})...")
     
     products = search_sentinel1_products(token, bbox, date_start, date_end, max_results=50, prefer_cog=True)
     
@@ -386,11 +436,11 @@ def select_scenes_for_criteria(
         selected = products
         logger.warning(f"Only {len(products)} products available for {zone}, requested {count}")
     
-    # Add zone information to metadata
+    # Add season information to metadata
     for product in selected:
-        product["zone"] = zone
+        product["season"] = season
     
-    logger.info(f"Selected {len(selected)} scenes for {zone}")
+    logger.info(f"Selected {len(selected)} scenes for {season}")
     return selected
 
 
@@ -433,7 +483,13 @@ def test_connection() -> None:
         
         # Test search
         logger.info("Testing product search with COG filtering...")
-        bbox = [-17.0, 27.0, -1.0, 36.0]  # Morocco bbox
+        bbox_str = os.getenv("REGION_BBOX", "-17,27,-1,36")
+        bbox = [float(x) for x in bbox_str.split(",")]
+        region_name = os.getenv("REGION_NAME", "Unknown Region")
+        
+        logger.info(f"Testing for region: {region_name}")
+        logger.info(f"Bounding box: {bbox}")
+        
         products = search_sentinel1_products(token, bbox, "2024-01-01", "2024-01-31", max_results=10, prefer_cog=True)
         
         if products:
@@ -454,6 +510,200 @@ def test_connection() -> None:
         logger.error(f"✗ Test failed: {e}")
 
 
+def download_multi_region(
+    token: str,
+    username: str,
+    password: str,
+    scenes_dir: Path,
+    max_scenes_per_region: int = 3
+) -> Dict[str, Any]:
+    """Downloads scenes from multiple regions defined in .env.
+    
+    Args:
+        token: CDSE authentication token
+        username: CDSE username
+        password: CDSE password
+        scenes_dir: Directory to save scenes
+        max_scenes_per_region: Maximum scenes per region
+    
+    Returns:
+        Summary dict with download results from all regions
+    """
+    regions = {
+        "primary": {
+            "bbox": [float(x) for x in os.getenv("REGION_BBOX", "-17,27,-1,36").split(",")],
+            "name": os.getenv("REGION_NAME", "Unknown Region")
+        }
+    }
+    
+    # Add neighboring regions if defined
+    if os.getenv("ALGERIA_MED_BBOX"):
+        regions["algeria_med"] = {
+            "bbox": [float(x) for x in os.getenv("ALGERIA_MED_BBOX").split(",")],
+            "name": os.getenv("ALGERIA_MED_NAME", "Algeria Mediterranean")
+        }
+    
+    if os.getenv("MAURITANIA_ATL_BBOX"):
+        regions["mauritania_atl"] = {
+            "bbox": [float(x) for x in os.getenv("MAURITANIA_ATL_BBOX").split(",")],
+            "name": os.getenv("MAURITANIA_ATL_NAME", "Mauritania Atlantic")
+        }
+    
+    if os.getenv("SPAIN_MED_BBOX"):
+        regions["spain_med"] = {
+            "bbox": [float(x) for x in os.getenv("SPAIN_MED_BBOX").split(",")],
+            "name": os.getenv("SPAIN_MED_NAME", "Spain Mediterranean")
+        }
+    
+    if os.getenv("PORTUGAL_ATL_BBOX"):
+        regions["portugal_atl"] = {
+            "bbox": [float(x) for x in os.getenv("PORTUGAL_ATL_BBOX").split(",")],
+            "name": os.getenv("PORTUGAL_ATL_NAME", "Portugal Atlantic")
+        }
+    
+    all_results = {}
+    
+    # Get existing scene IDs to avoid duplicates across regions
+    existing_scene_ids = get_existing_scene_ids(scenes_dir)
+    
+    for region_key, region_config in regions.items():
+        # Refresh token before processing each region
+        token, expiry_time = refresh_token_if_needed(token, expiry_time, username, password)
+        
+        logger.info(f"=== Processing region: {region_config['name']} ===")
+        bbox = region_config["bbox"]
+        region_name = region_config["name"]
+        
+        # Use simplified criteria for multi-region (fewer scenes per region)
+        simplified_criteria = [
+            {"date_start": "2025-01-01", "date_end": "2025-12-31", "count": max_scenes_per_region, "season": f"{region_name} 2025"}
+        ]
+        
+        region_scenes = []
+        total_size = 0
+        
+        region_success = False
+        for criteria in simplified_criteria:
+            try:
+                products = search_sentinel1_products(
+                    token, bbox, criteria["date_start"], criteria["date_end"], 
+                    max_results=20, prefer_cog=True
+                )
+                region_success = True
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 403:
+                    logger.warning(f"403 Forbidden for region {region_name} - likely not accessible or invalid bbox")
+                    all_results[region_key] = {
+                        "region_name": region_name,
+                        "bbox": bbox,
+                        "scenes": [],
+                        "total_size_gb": 0,
+                        "successful": 0,
+                        "failed": 0,
+                        "error": "403 Forbidden - region not accessible"
+                    }
+                    region_success = False
+                    break  # Skip this region entirely
+                else:
+                    raise  # Re-raise other HTTP errors
+        
+        if not region_success:
+            continue  # Skip to next region if this one failed
+        
+        if len(products) > criteria["count"]:
+            selected = products[:criteria["count"]]
+        else:
+            selected = products
+        
+        for product in selected:
+            product_id = product["id"]
+            product_name = product["name"]
+            
+            # Extract base product ID for duplicate checking
+            # Product name format: S1A_IW_GRDH_1SDV_20240107T064657_20240107T064719_051997_06488E_B2F9_COG.SAFE
+            # Base ID: 051997_06488E_B2F9 (relative orbit + absolute orbit + mission ID)
+            parts = product_name.split("_")
+            if len(parts) >= 7:
+                if parts[-1] == "COG":
+                    base_id = f"{parts[-3]}_{parts[-2]}_{parts[-4]}"
+                else:
+                    base_id = f"{parts[-3]}_{parts[-2]}_{parts[-1]}"
+                
+                # Check if this base ID already exists
+                if base_id in existing_scene_ids:
+                    logger.info(f"  Scene already exists (base ID: {base_id}): {product_name}")
+                    region_scenes.append({
+                        "name": product_name,
+                        "region": region_name,
+                        "date": product["date"],
+                        "size": product["size"],
+                        "status": "already_downloaded"
+                    })
+                    continue
+            
+            # Also check for exact match
+            safe_dir = scenes_dir / f"{product_name}.SAFE"
+            if safe_dir.exists():
+                logger.info(f"  Scene already exists: {product_name}")
+                region_scenes.append({
+                    "name": product_name,
+                    "region": region_name,
+                    "date": product["date"],
+                    "size": product["size"],
+                    "status": "already_downloaded"
+                })
+                continue
+            
+            try:
+                safe_path = download_product(
+                    token, product_id, product_name, str(scenes_dir),
+                    time.time() + 600, username, password
+                )
+                
+                # Add base ID to existing set to avoid duplicates across regions
+                parts = product_name.split("_")
+                if len(parts) >= 7:
+                    if parts[-1] == "COG":
+                        base_id = f"{parts[-3]}_{parts[-2]}_{parts[-4]}"
+                    else:
+                        base_id = f"{parts[-3]}_{parts[-2]}_{parts[-1]}"
+                    existing_scene_ids.add(base_id)
+                
+                region_scenes.append({
+                    "name": product_name,
+                    "region": region_name,
+                    "date": product["date"],
+                    "size": product["size"],
+                    "status": "downloaded",
+                    "path": safe_path
+                })
+                total_size += product["size"]
+                
+            except Exception as e:
+                logger.error(f"  Failed to download {product_name}: {e}")
+                region_scenes.append({
+                    "name": product_name,
+                    "region": region_name,
+                    "date": product["date"],
+                    "size": product["size"],
+                    "status": "failed",
+                    "error": str(e)
+                })
+        
+        all_results[region_key] = {
+            "region_name": region_name,
+            "bbox": bbox,
+            "scenes": region_scenes,
+            "total_size_gb": total_size / (1024**3),
+            "successful": len([s for s in region_scenes if s["status"] in ["downloaded", "already_downloaded"]]),
+            "failed": len([s for s in region_scenes if s["status"] == "failed"])
+        }
+        
+        logger.info(f"Region {region_name}: {all_results[region_key]['successful']} scenes downloaded")
+    
+    return all_results
+
+
 def main() -> None:
     """Main orchestration for downloading diverse scene dataset."""
     import argparse
@@ -461,10 +711,63 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Download diverse Sentinel-1 scenes for Phase 0")
     parser.add_argument("--test", action="store_true", help="Run connection test only")
     parser.add_argument("--max-scenes", type=int, default=10, help="Maximum number of scenes to download")
+    parser.add_argument("--multi-region", action="store_true", help="Download from multiple regions defined in .env")
+    parser.add_argument("--max-scenes-per-region", type=int, default=3, help="Maximum scenes per region (multi-region mode)")
     args = parser.parse_args()
     
     if args.test:
         test_connection()
+        return
+    
+    if args.multi_region:
+        # Multi-region download mode
+        logger.info("=== Multi-Region Download Mode ===")
+        load_dotenv()
+        
+        username = os.getenv("CDSE_USERNAME")
+        password = os.getenv("CDSE_PASSWORD")
+        
+        if not username or not password:
+            logger.error("CDSE_USERNAME and CDSE_PASSWORD must be set")
+            return
+        
+        scenes_dir = Path(__file__).parent / "data" / "scenes"
+        scenes_dir.mkdir(parents=True, exist_ok=True)
+        
+        token, expiry_time = get_cdse_token(username, password)
+        
+        results = download_multi_region(
+            token, username, password, scenes_dir, args.max_scenes_per_region
+        )
+        
+        # Display multi-region summary
+        logger.info("=" * 60)
+        logger.info("Multi-Region Download Summary")
+        logger.info("=" * 60)
+        
+        total_scenes = 0
+        total_size = 0
+        
+        for region_key, region_result in results.items():
+            logger.info(f"\n{region_result['region_name']}:")
+            logger.info(f"  Scenes: {region_result['successful']} (failed: {region_result['failed']})")
+            logger.info(f"  Size: {region_result['total_size_gb']:.2f} GB")
+            
+            total_scenes += region_result['successful']
+            total_size += region_result['total_size_gb']
+        
+        logger.info(f"\nTotal: {total_scenes} scenes, {total_size:.2f} GB")
+        
+        # Save multi-region manifest
+        manifest = {
+            "download_date": datetime.now().isoformat(),
+            "mode": "multi_region",
+            "regions": results,
+            "total_scenes": total_scenes,
+            "total_size_gb": total_size
+        }
+        
+        save_manifest(scenes_dir, manifest)
         return
     
     load_dotenv()
@@ -477,7 +780,13 @@ def main() -> None:
         return
 
     # Configuration
-    bbox = [-17.0, 27.0, -1.0, 36.0]  # Morocco bounding box
+    bbox_str = os.getenv("REGION_BBOX", "-17,27,-1,36")
+    bbox = [float(x) for x in bbox_str.split(",")]
+    region_name = os.getenv("REGION_NAME", "Unknown Region")
+    
+    logger.info(f"Processing region: {region_name}")
+    logger.info(f"Bounding box: {bbox}")
+    
     scenes_dir = Path(__file__).parent / "data" / "scenes"
     scenes_dir.mkdir(parents=True, exist_ok=True)
     
@@ -504,16 +813,16 @@ def main() -> None:
     for product in all_selected_scenes:
         product_id = product["id"]
         product_name = product["name"]
-        zone = product["zone"]
+        season = product["season"]
         
-        logger.info(f"Processing: {product_name} ({zone})")
+        logger.info(f"Processing: {product_name} ({season})")
         
         # Check if already downloaded
         if is_scene_downloaded(scenes_dir, product_name):
             logger.info(f"  Scene already downloaded, skipping")
             downloaded_scenes.append({
                 "name": product_name,
-                "zone": zone,
+                "season": season,
                 "date": product["date"],
                 "size": product["size"],
                 "status": "already_downloaded"
@@ -528,7 +837,7 @@ def main() -> None:
             
             downloaded_scenes.append({
                 "name": product_name,
-                "zone": zone,
+                "season": season,
                 "date": product["date"],
                 "size": product["size"],
                 "status": "downloaded",
@@ -540,7 +849,7 @@ def main() -> None:
             logger.error(f"  Failed to download {product_name}: {e}")
             downloaded_scenes.append({
                 "name": product_name,
-                "zone": zone,
+                "season": season,
                 "date": product["date"],
                 "size": product["size"],
                 "status": "failed",
@@ -553,6 +862,8 @@ def main() -> None:
     
     logger.info("=" * 60)
     logger.info(f"✓ Scènes téléchargées : {len(successful)}/{len(all_selected_scenes)}")
+    logger.info(f"  Région : {region_name}")
+    logger.info(f"  Bounding box : {bbox}")
     logger.info(f"  Dossier : {scenes_dir}")
     logger.info(f"  Taille totale : {total_size / (1024**3):.2f} GB")
     logger.info(f"  Réussis : {len([s for s in downloaded_scenes if s['status'] == 'downloaded'])}")
@@ -562,16 +873,18 @@ def main() -> None:
     if failed:
         logger.warning("Scènes échouées :")
         for scene in failed:
-            logger.warning(f"  - {scene['name']} ({scene['zone']}) : {scene.get('error', 'Unknown error')}")
+            logger.warning(f"  - {scene['name']} ({scene['season']}) : {scene.get('error', 'Unknown error')}")
     
     logger.info("Liste des scènes :")
     for scene in downloaded_scenes:
         status_symbol = "✓" if scene["status"] != "failed" else "✗"
-        logger.info(f"  {status_symbol} {scene['name']} ({scene['zone']})")
+        logger.info(f"  {status_symbol} {scene['name']} ({scene['season']})")
     
     # Save manifest
     manifest = {
         "download_date": datetime.now().isoformat(),
+        "region_name": region_name,
+        "bbox": bbox,
         "total_scenes": len(all_selected_scenes),
         "successful": len(successful),
         "failed": len(failed),
