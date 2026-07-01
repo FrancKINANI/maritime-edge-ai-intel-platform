@@ -45,18 +45,46 @@ CDSE_ODATA_URL = "https://catalogue.dataspace.copernicus.eu/odata/v1/Products"
 CDSE_DOWNLOAD_URL = "https://zipper.dataspace.copernicus.eu/odata/v1/Products"
 TOKEN_EXPIRY_SECONDS = 600  # CDSE tokens expire after 10 minutes
 
-# Scene selection criteria for diverse dataset
-# These can be customized per region or season
+# Scene selection criteria for Morocco 2025 only
+# The dataset should cover Moroccan waters across all four quarters.
+MOROCCO_BBOX = [-17, 27, -1, 36]  # [lon_min, lat_min, lon_max, lat_max]
+
 SELECTION_CRITERIA = [
-    # Season 1 — Winter/Spring (Jan-Mar) - 2025
-    {"date_start": "2025-01-01", "date_end": "2025-03-31", "count": 2, "season": "Winter/Spring 2025"},
-    # Season 2 — Spring/Summer (Apr-Jun) - 2025
-    {"date_start": "2025-04-01", "date_end": "2025-06-30", "count": 2, "season": "Spring/Summer 2025"},
-    # Season 3 — Summer/Fall (Jul-Sep) - 2025
-    {"date_start": "2025-07-01", "date_end": "2025-09-30", "count": 3, "season": "Summer/Fall 2025"},
-    # Season 4 — Fall/Winter (Oct-Dec) - 2025
-    {"date_start": "2025-10-01", "date_end": "2025-12-31", "count": 3, "season": "Fall/Winter 2025"},
+    {
+        "bbox": MOROCCO_BBOX,
+        "date_start": "2025-01-01",
+        "date_end": "2025-03-31",
+        "count": 3,
+        "label": "Morocco_Q1_winter",
+        "season": "Morocco Q1 Winter"
+    },
+    {
+        "bbox": MOROCCO_BBOX,
+        "date_start": "2025-04-01",
+        "date_end": "2025-06-30",
+        "count": 3,
+        "label": "Morocco_Q2_spring",
+        "season": "Morocco Q2 Spring"
+    },
+    {
+        "bbox": MOROCCO_BBOX,
+        "date_start": "2025-07-01",
+        "date_end": "2025-09-30",
+        "count": 3,
+        "label": "Morocco_Q3_summer",
+        "season": "Morocco Q3 Summer"
+    },
+    {
+        "bbox": MOROCCO_BBOX,
+        "date_start": "2025-10-01",
+        "date_end": "2025-12-31",
+        "count": 3,
+        "label": "Morocco_Q4_autumn",
+        "season": "Morocco Q4 Autumn"
+    },
 ]
+# Total target: 12 Morocco 2025 scenes only
+# (replaces previous mixed-region selection)
 
 # Retry configuration
 MAX_RETRIES = 3
@@ -347,16 +375,42 @@ def download_product(
         return str(output_path)
 
 
-def is_scene_downloaded(scenes_dir: Path, product_name: str) -> bool:
+def get_scene_base_id(product_name: str) -> Optional[str]:
+    """Extracts a stable base identifier for a Sentinel-1 scene name.
+
+    The CDSE catalogue can return both standard and COG variants of the same
+    product. We treat them as the same scene by using the orbit/mission suffix.
+    """
+    normalized_name = product_name.rstrip("/").replace(".SAFE", "")
+    parts = normalized_name.split("_")
+
+    if len(parts) >= 7:
+        if parts[-1].upper() == "COG":
+            return f"{parts[-4]}_{parts[-3]}_{parts[-2]}"
+        return f"{parts[-3]}_{parts[-2]}_{parts[-1]}"
+
+    return None
+
+
+def is_scene_downloaded(
+    scenes_dir: Path,
+    product_name: str,
+    existing_scene_ids: Optional[set] = None,
+) -> bool:
     """Checks if a scene has already been downloaded.
 
     Args:
         scenes_dir (Path): Directory containing .SAFE folders.
         product_name (str): Product name to check.
+        existing_scene_ids (Optional[set]): Known scene IDs to avoid duplicates.
 
     Returns:
         bool: True if scene exists, False otherwise.
     """
+    base_id = get_scene_base_id(product_name)
+    if existing_scene_ids is not None and base_id and base_id in existing_scene_ids:
+        return True
+
     safe_path = scenes_dir / f"{product_name}.SAFE"
     return safe_path.exists() and safe_path.is_dir()
 
@@ -377,20 +431,8 @@ def get_existing_scene_ids(scenes_dir: Path) -> set:
     
     for safe_dir in scenes_dir.glob("*.SAFE"):
         if safe_dir.is_dir():
-            # Extract base product ID from directory name
-            # Format: S1A_IW_GRDH_1SDV_20240107T064657_20240107T064719_051997_06488E_B2F9_COG.SAFE
-            # Base ID: 051997_06488E_B2F9 (relative orbit + absolute orbit + mission ID)
-            parts = safe_dir.stem.split("_")
-            if len(parts) >= 7:
-                # The last three parts are: relative orbit, absolute orbit, mission ID
-                # Handle both standard and COG variants
-                if parts[-1] == "COG":
-                    # COG variant: S1A_IW_GRDH_1SDV_20240107T064657_20240107T064719_051997_06488E_B2F9_COG
-                    base_id = f"{parts[-3]}_{parts[-2]}_{parts[-4]}"  # 051997_06488E_B2F9
-                else:
-                    # Standard variant: S1A_IW_GRDH_1SDV_20240107T064657_20240107T064719_051997_06488E_B2F9
-                    base_id = f"{parts[-3]}_{parts[-2]}_{parts[-1]}"  # 051997_06488E_B2F9
-                
+            base_id = get_scene_base_id(safe_dir.stem)
+            if base_id:
                 existing_ids.add(base_id)
     
     logger.info(f"Found {len(existing_ids)} existing scene IDs in {scenes_dir}")
@@ -402,7 +444,8 @@ def select_scenes_for_criteria(
     bbox: List[float],
     criteria: Dict[str, Any],
     username: str,
-    password: str
+    password: str,
+    existing_scene_ids: Optional[set] = None,
 ) -> List[Dict[str, Any]]:
     """Selects scenes for a specific criterion with random sampling.
 
@@ -420,28 +463,68 @@ def select_scenes_for_criteria(
     date_end = criteria["date_end"]
     count = criteria["count"]
     season = criteria["season"]
+    label = criteria.get("label", season)
     
-    logger.info(f"Searching scenes for {season} ({date_start} to {date_end})...")
+    logger.info(f"Searching scenes for {label} ({date_start} to {date_end})...")
     
-    products = search_sentinel1_products(token, bbox, date_start, date_end, max_results=50, prefer_cog=True)
+    products = search_sentinel1_products(token, bbox, date_start, date_end, max_results=60, prefer_cog=True)
     
     if not products:
-        logger.warning(f"No products found for {zone}")
+        logger.warning(f"No products found for {season}")
+        return []
+
+    filtered_products = []
+    seen_base_ids = set()
+    for product in products:
+        base_id = get_scene_base_id(product.get("name", ""))
+        if base_id and (base_id in seen_base_ids or (existing_scene_ids is not None and base_id in existing_scene_ids)):
+            continue
+        if base_id:
+            seen_base_ids.add(base_id)
+        filtered_products.append(product)
+
+    if not filtered_products:
+        logger.info(f"All products for {season} were already downloaded or duplicated")
         return []
     
     # Random selection from available products
-    if len(products) > count:
-        selected = random.sample(products, count)
+    if len(filtered_products) > count:
+        selected = random.sample(filtered_products, count)
     else:
-        selected = products
-        logger.warning(f"Only {len(products)} products available for {zone}, requested {count}")
+        selected = filtered_products
+        logger.warning(f"Only {len(filtered_products)} products available for {season}, requested {count}")
     
-    # Add season information to metadata
+# Add selection metadata to each product
     for product in selected:
         product["season"] = season
-    
-    logger.info(f"Selected {len(selected)} scenes for {season}")
+        product["label"] = label
+        product["bbox_used"] = bbox
+        product["date_range"] = f"{date_start}/{date_end}"
+
+    logger.info(f"Selected {len(selected)} scenes for {label}")
     return selected
+
+
+def deduplicate_scenes(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Keeps only the first occurrence of each scene, deduped by base ID.
+
+    This helps avoid duplicate manifest entries when the same product is seen
+    multiple times across regions or repeated runs.
+    """
+    seen_ids = set()
+    deduped = []
+
+    for record in records:
+        name = record.get("name") or record.get("product_name") or ""
+        base_id = get_scene_base_id(name)
+        key = base_id or name
+        if key and key in seen_ids:
+            continue
+        if key:
+            seen_ids.add(key)
+        deduped.append(record)
+
+    return deduped
 
 
 def save_manifest(scenes_dir: Path, manifest: Dict[str, Any]) -> None:
@@ -452,9 +535,69 @@ def save_manifest(scenes_dir: Path, manifest: Dict[str, Any]) -> None:
         manifest (Dict[str, Any]): Manifest data to save.
     """
     manifest_path = scenes_dir / "manifest.json"
+    if "scenes" in manifest:
+        manifest["scenes"] = deduplicate_scenes(manifest["scenes"])
+    if "regions" in manifest:
+        for region in manifest["regions"].values():
+            if isinstance(region, dict) and "scenes" in region:
+                region["scenes"] = deduplicate_scenes(region["scenes"])
     with open(manifest_path, 'w') as f:
         json.dump(manifest, f, indent=2)
     logger.info(f"Manifest saved to {manifest_path}")
+
+
+def clean_non_morocco_scenes(scenes_dir: Path) -> None:
+    """
+    Identifies and archives scenes not labelled as Morocco in the manifest.
+
+    For each manifest entry without a label starting with "Morocco_":
+      - move the .SAFE folder to scenes/archive/
+      - remove the manifest entry
+    """
+    archive_dir = scenes_dir / "archive"
+    archive_dir.mkdir(parents=True, exist_ok=True)
+
+    manifest_path = scenes_dir / "manifest.json"
+    if not manifest_path.exists():
+        logger.warning("No manifest found at %s", manifest_path)
+        return
+
+    with open(manifest_path, 'r', encoding='utf-8') as f:
+        manifest = json.load(f)
+
+    scenes = manifest.get("scenes", [])
+    remaining_scenes = []
+    archived_count = 0
+
+    for scene in scenes:
+        label = scene.get("label", "")
+        if isinstance(label, str) and label.startswith("Morocco_"):
+            remaining_scenes.append(scene)
+            continue
+
+        safe_path_str = scene.get("safe_path") or scene.get("path")
+        if not safe_path_str:
+            logger.warning("Skipping non-Morocco scene without safe_path: %s", scene.get("name"))
+            continue
+
+        safe_path = Path(safe_path_str)
+        if safe_path.exists():
+            destination = archive_dir / safe_path.name
+            try:
+                safe_path.rename(destination)
+                logger.info("Archived non-Morocco scene %s -> %s", safe_path, destination)
+                archived_count += 1
+            except OSError as e:
+                logger.error("Failed to archive %s: %s", safe_path, e)
+                remaining_scenes.append(scene)
+        else:
+            logger.warning("SAFE path does not exist for scene %s: %s", scene.get("name"), safe_path)
+
+    manifest["scenes"] = remaining_scenes
+    with open(manifest_path, 'w', encoding='utf-8') as f:
+        json.dump(manifest, f, indent=2)
+
+    logger.info("Archived %s non-Morocco scenes and updated manifest", archived_count)
 
 
 def test_connection() -> None:
@@ -618,33 +761,10 @@ def download_multi_region(
         for product in selected:
             product_id = product["id"]
             product_name = product["name"]
-            
-            # Extract base product ID for duplicate checking
-            # Product name format: S1A_IW_GRDH_1SDV_20240107T064657_20240107T064719_051997_06488E_B2F9_COG.SAFE
-            # Base ID: 051997_06488E_B2F9 (relative orbit + absolute orbit + mission ID)
-            parts = product_name.split("_")
-            if len(parts) >= 7:
-                if parts[-1] == "COG":
-                    base_id = f"{parts[-3]}_{parts[-2]}_{parts[-4]}"
-                else:
-                    base_id = f"{parts[-3]}_{parts[-2]}_{parts[-1]}"
-                
-                # Check if this base ID already exists
-                if base_id in existing_scene_ids:
-                    logger.info(f"  Scene already exists (base ID: {base_id}): {product_name}")
-                    region_scenes.append({
-                        "name": product_name,
-                        "region": region_name,
-                        "date": product["date"],
-                        "size": product["size"],
-                        "status": "already_downloaded"
-                    })
-                    continue
-            
-            # Also check for exact match
-            safe_dir = scenes_dir / f"{product_name}.SAFE"
-            if safe_dir.exists():
-                logger.info(f"  Scene already exists: {product_name}")
+            base_id = get_scene_base_id(product_name)
+
+            if is_scene_downloaded(scenes_dir, product_name, existing_scene_ids):
+                logger.info(f"  Scene already exists (base ID: {base_id or 'n/a'}): {product_name}")
                 region_scenes.append({
                     "name": product_name,
                     "region": region_name,
@@ -660,13 +780,7 @@ def download_multi_region(
                     time.time() + 600, username, password
                 )
                 
-                # Add base ID to existing set to avoid duplicates across regions
-                parts = product_name.split("_")
-                if len(parts) >= 7:
-                    if parts[-1] == "COG":
-                        base_id = f"{parts[-3]}_{parts[-2]}_{parts[-4]}"
-                    else:
-                        base_id = f"{parts[-3]}_{parts[-2]}_{parts[-1]}"
+                if base_id:
                     existing_scene_ids.add(base_id)
                 
                 region_scenes.append({
@@ -690,6 +804,7 @@ def download_multi_region(
                     "error": str(e)
                 })
         
+        region_scenes = deduplicate_scenes(region_scenes)
         all_results[region_key] = {
             "region_name": region_name,
             "bbox": bbox,
@@ -713,12 +828,18 @@ def main() -> None:
     parser.add_argument("--max-scenes", type=int, default=10, help="Maximum number of scenes to download")
     parser.add_argument("--multi-region", action="store_true", help="Download from multiple regions defined in .env")
     parser.add_argument("--max-scenes-per-region", type=int, default=3, help="Maximum scenes per region (multi-region mode)")
+    parser.add_argument("--clean-non-morocco", action="store_true", help="Archive non-Morocco scenes and remove them from manifest")
     args = parser.parse_args()
     
     if args.test:
         test_connection()
         return
-    
+
+    if args.clean_non_morocco:
+        scenes_dir = Path(__file__).parent / "data" / "scenes"
+        clean_non_morocco_scenes(scenes_dir)
+        return
+
     if args.multi_region:
         # Multi-region download mode
         logger.info("=== Multi-Region Download Mode ===")
@@ -794,9 +915,17 @@ def main() -> None:
     token, expiry_time = get_cdse_token(username, password)
     
     # Select scenes based on criteria
+    existing_scene_ids = get_existing_scene_ids(scenes_dir)
     all_selected_scenes = []
     for criteria in SELECTION_CRITERIA:
-        selected = select_scenes_for_criteria(token, bbox, criteria, username, password)
+        selected = select_scenes_for_criteria(
+            token,
+            criteria["bbox"],
+            criteria,
+            username,
+            password,
+            existing_scene_ids=existing_scene_ids,
+        )
         all_selected_scenes.extend(selected)
     
     # Limit to max scenes if specified
@@ -818,14 +947,19 @@ def main() -> None:
         logger.info(f"Processing: {product_name} ({season})")
         
         # Check if already downloaded
-        if is_scene_downloaded(scenes_dir, product_name):
+        safe_path_existing = str(scenes_dir / f"{product_name}.SAFE")
+        if is_scene_downloaded(scenes_dir, product_name, existing_scene_ids):
             logger.info(f"  Scene already downloaded, skipping")
             downloaded_scenes.append({
                 "name": product_name,
+                "label": product.get("label", season),
                 "season": season,
                 "date": product["date"],
                 "size": product["size"],
-                "status": "already_downloaded"
+                "status": "already_downloaded",
+                "safe_path": safe_path_existing,
+                "bbox_used": product.get("bbox_used", bbox),
+                "date_range": product.get("date_range", f"{product['date']}/{product['date']}")
             })
             continue
         
@@ -835,13 +969,21 @@ def main() -> None:
                 expiry_time, username, password
             )
             
+            base_id = get_scene_base_id(product_name)
+            if base_id:
+                existing_scene_ids.add(base_id)
+
             downloaded_scenes.append({
                 "name": product_name,
+                "label": product.get("label", season),
                 "season": season,
                 "date": product["date"],
                 "size": product["size"],
                 "status": "downloaded",
-                "path": safe_path
+                "safe_path": safe_path,
+                "path": safe_path,
+                "bbox_used": product.get("bbox_used", bbox),
+                "date_range": product.get("date_range", f"{product['date']}/{product['date']}")
             })
             total_size += product["size"]
             
@@ -857,6 +999,7 @@ def main() -> None:
             })
     
     # Generate summary
+    downloaded_scenes = deduplicate_scenes(downloaded_scenes)
     successful = [s for s in downloaded_scenes if s["status"] in ["downloaded", "already_downloaded"]]
     failed = [s for s in downloaded_scenes if s["status"] == "failed"]
     

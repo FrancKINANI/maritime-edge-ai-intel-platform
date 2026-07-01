@@ -1,0 +1,9 @@
+{
+  "scenes": [],
+  "global_counts": {
+    "AIS_confirmed": 0,
+    "visual_only": 0,
+    "dark_vessel_candidate": 0
+  },
+  "total_annotations": 0
+}
