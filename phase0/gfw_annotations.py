@@ -442,7 +442,6 @@ def load_scene_metadata(scene_path: Union[str, Path], polarization: str = "vv") 
 
     tiff_path = tiff_files[0]
     import rasterio
-    from rasterio.transform import rowcol
 
     with rasterio.open(tiff_path) as dataset:
         return {

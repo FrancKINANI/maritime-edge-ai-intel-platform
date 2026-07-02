@@ -18,7 +18,6 @@ robust streaming downloads with automatic ZIP extraction, and intelligent scene 
 
 import os
 import zipfile
-import httpx
 import logging
 import json
 import random
@@ -705,6 +704,7 @@ def download_multi_region(
         }
     
     all_results = {}
+    expiry_time = 0.0
     
     # Get existing scene IDs to avoid duplicates across regions
     existing_scene_ids = get_existing_scene_ids(scenes_dir)
@@ -949,7 +949,7 @@ def main() -> None:
         # Check if already downloaded
         safe_path_existing = str(scenes_dir / f"{product_name}.SAFE")
         if is_scene_downloaded(scenes_dir, product_name, existing_scene_ids):
-            logger.info(f"  Scene already downloaded, skipping")
+            logger.info("  Scene already downloaded, skipping")
             downloaded_scenes.append({
                 "name": product_name,
                 "label": product.get("label", season),

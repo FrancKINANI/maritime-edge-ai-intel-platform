@@ -32,7 +32,7 @@ import logging
 import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 import rasterio
@@ -451,9 +451,6 @@ def process_safe_windowed(
     with rasterio.open(files["tiff"]) as dataset:
         height = dataset.height
         width = dataset.width
-        transform = dataset.transform
-        crs = dataset.crs
-        
         logger.info(f"Scene dimensions: {width}×{height}")
         logger.info(f"RAM after LUT load: {get_ram_mb():.1f} MB")
         
@@ -533,6 +530,7 @@ def process_safe_windowed(
                     tile_uint8 = tile_uint8[y_local_start:y_local_end, x_local_start:x_local_end]
                 
                 # Calculate geographic bounds
+                transform = dataset.transform
                 lon_min, lat_max = xy(transform, x_start, y_start)
                 lon_max, lat_min = xy(transform, x_end, y_end)
                 
@@ -586,7 +584,7 @@ def process_safe_windowed(
     with open(metadata_path, "w") as f:
         json.dump(manifest, f, indent=2)
     
-    logger.info(f"=== Processing Complete ===")
+    logger.info("=== Processing Complete ===")
     logger.info(f"Valid tiles: {valid_count}/{len(tile_grid)}")
     logger.info(f"Skipped (NoData): {skipped_count}")
     logger.info(f"Processing time: {processing_time:.2f}s")
@@ -620,8 +618,7 @@ def benchmark_memory_usage(safe_path: str, n_tiles: int = 10) -> Dict[str, Any]:
     with rasterio.open(files["tiff"]) as dataset:
         height = dataset.height
         width = dataset.width
-        transform = dataset.transform
-        
+
         # Process first n_tiles tiles
         stride = 512  # No overlap for benchmark
         tile_count = 0
@@ -635,8 +632,8 @@ def benchmark_memory_usage(safe_path: str, n_tiles: int = 10) -> Dict[str, Any]:
                 x_end = min(x + 512, width)
                 
                 # Measure RAM before
-                ram_before = get_ram_mb()
-                
+                get_ram_mb()
+
                 # Read window
                 window = dataset.read(1, window=Window(x, y, x_end - x, y_end - y))
                 
@@ -702,8 +699,8 @@ def test_with_first_scene() -> None:
     try:
         # Run memory benchmark first
         logger.info("Running memory benchmark...")
-        benchmark = benchmark_memory_usage(safe_path, n_tiles=10)
-        
+        benchmark_memory_usage(safe_path, n_tiles=10)
+
         # Run full Pipeline D
         logger.info("Running full Pipeline D...")
         output_dir = Path(__file__).parent / "data" / "tiles"
@@ -773,7 +770,7 @@ def main() -> None:
     if args.benchmark_memory:
         if not args.safe:
             parser.error("--safe required for --benchmark-memory")
-        benchmark = benchmark_memory_usage(args.safe, n_tiles=10)
+        benchmark_memory_usage(args.safe, n_tiles=10)
         return
     
     if not args.safe:
