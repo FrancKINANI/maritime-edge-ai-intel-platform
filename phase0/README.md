@@ -174,7 +174,8 @@ cd phase0
 # Test de connexion
 uv run phase0/download_scenes.py --test
 
-# Téléchargement complet (10 scènes par défaut)
+# Téléchargement complet (10 scènes par défaut)clear
+
 uv run phase0/download_scenes.py
 
 # Téléchargement limité

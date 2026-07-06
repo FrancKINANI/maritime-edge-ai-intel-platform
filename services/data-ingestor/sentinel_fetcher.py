@@ -5,30 +5,34 @@ Helper interface containing download and API query functions to fetch files from
 """
 
 from typing import List, Dict, Any
+from phase0.scripts.download_scenes import get_cdse_token, search_sentinel1_products, download_product
+import os
 
 
-def search_cdse_odata(bbox: List[float], date_start: str, date_end: str) -> List[Dict[str, Any]]:
-    """Runs OData query on CDSE catalog.
+def search_cdse_odata(bbox: List[float], date_start: str, date_end: str, username: str = None, password: str = None) -> List[Dict[str, Any]]:
+    """Runs OData query on CDSE catalog by leveraging phase0 implementation.
 
-    Args:
-        bbox (List[float]): Bounding box coordinates.
-        date_start (str): Ingestion start datetime.
-        date_end (str): Ingestion end datetime.
-
-    Returns:
-        List[Dict[str, Any]]: Catalog products list.
+    Requires CDSE credentials provided either as arguments or via environment variables.
     """
-    raise NotImplementedError("CDSE OData search is not implemented.")
+    if username is None or password is None:
+        username = os.getenv("CDSE_USERNAME")
+        password = os.getenv("CDSE_PASSWORD")
+    if not username or not password:
+        raise ValueError("CDSE credentials must be provided via args or environment variables")
+    token, expiry = get_cdse_token(username, password)
+    return search_sentinel1_products(token, bbox, date_start, date_end)
 
 
-def download_safe_product(product_id: str, download_path: str) -> str:
-    """Downloads zip product from CDSE zipper service and unpacks it.
+def download_safe_product(product_id: str, download_path: str, username: str = None, password: str = None) -> str:
+    """Downloads a Sentinel-1 product using CDSE zipper via phase0 helper.
 
-    Args:
-        product_id (str): Copernicus unique UUID.
-        download_path (str): target saving folder.
-
-    Returns:
-        str: absolute path to unpacked SAFE product directory.
+    Returns the path to the extracted .SAFE directory.
     """
-    raise NotImplementedError("CDSE download is not implemented.")
+    if username is None or password is None:
+        username = os.getenv("CDSE_USERNAME")
+        password = os.getenv("CDSE_PASSWORD")
+    if not username or not password:
+        raise ValueError("CDSE credentials must be provided via args or environment variables")
+    token, expiry = get_cdse_token(username, password)
+    # product_id here is the CDSE UUID; we need a product_name for naming – pass product_id as name when unknown
+    return download_product(token, product_id, product_id, download_path, expiry, username, password)

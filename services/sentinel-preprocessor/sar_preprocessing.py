@@ -6,91 +6,91 @@ and tiling routines.
 """
 
 import numpy as np
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple, Dict, Any, Optional
+
+# Reuse the robust windowed pipeline implementation from phase0 when available.
+try:
+    from phase0.scripts.sar_preprocessing import (
+        process_safe_windowed,
+        CalibrationLUT,
+        _lee_filter_windowed,
+    )
+    _HAS_PHASE0 = True
+except Exception:
+    _HAS_PHASE0 = False
 
 
 def calibrate_sigma0(data: np.ndarray, calibration_lut: np.ndarray) -> np.ndarray:
-    """Performs radiometric calibration on raw Digital Numbers (DN) to Sigma0.
+    """Simple radiometric calibration: DN^2 / calibration_lut^2
 
-    Args:
-        data (np.ndarray): 2D array of raw digital numbers (DN) from GeoTIFF.
-        calibration_lut (np.ndarray): Calibration Look-Up Table (LUT).
-
-    Returns:
-        np.ndarray: Radiometrically calibrated Sigma0 backscatter values.
+    The full, memory-efficient CalibrationLUT-based interpolation is available
+    in `phase0.scripts.sar_preprocessing.CalibrationLUT`. This function performs
+    pointwise calibration for already-aligned arrays.
     """
-    raise NotImplementedError("Radiometric calibration is not implemented.")
+    cal_safe = np.where(calibration_lut == 0, 1e-10, calibration_lut)
+    sigma0 = (data.astype(np.float32) ** 2) / (cal_safe.astype(np.float32) ** 2)
+    sigma0 = np.maximum(sigma0, 0.0)
+    return sigma0
 
 
 def apply_lee_filter(data: np.ndarray, kernel_size: int = 5) -> np.ndarray:
-    """Applies the adaptive Lee filter for speckle noise reduction.
-
-    Args:
-        data (np.ndarray): 2D array of calibrated SAR values.
-        kernel_size (int): Size of the filtering window.
-
-    Returns:
-        np.ndarray: Despeckled SAR image.
+    """Apply Lee filter (calls phase0 implementation when available).
+    Falls back to a simple local-mean shrinkage if not present.
     """
-    raise NotImplementedError("Lee speckle filtering is not implemented.")
+    if _HAS_PHASE0:
+        return _lee_filter_windowed(data.astype(np.float32), kernel_size=kernel_size)
+    # Fallback: simple mean filter
+    from scipy.ndimage import uniform_filter
+
+    local_mean = uniform_filter(data.astype(np.float32), size=kernel_size, mode="reflect")
+    return local_mean.astype(np.float32)
 
 
 def convert_to_db(data: np.ndarray) -> np.ndarray:
-    """Converts linear power backscatter coefficients to logarithmic Decibel (dB) scale.
-
-    Args:
-        data (np.ndarray): 2D array of backscatter values.
-
-    Returns:
-        np.ndarray: Log-scaled backscatter values in dB.
-    """
-    raise NotImplementedError("Logarithmic decibel conversion is not implemented.")
+    return 10.0 * np.log10(np.maximum(data.astype(np.float32), 1e-10))
 
 
 def normalize_to_uint8(data: np.ndarray, db_min: float = -30.0, db_max: float = 0.0) -> np.ndarray:
-    """Linearly maps backscatter values from specified dB range to uint8 [0, 255].
-
-    Args:
-        data (np.ndarray): 2D array of dB-scaled SAR values.
-        db_min (float): Minimum dB value.
-        db_max (float): Maximum dB value.
-
-    Returns:
-        np.ndarray: Normalized 8-bit image array.
-    """
-    raise NotImplementedError("Min-Max uint8 normalization is not implemented.")
+    clipped = np.clip(data, db_min, db_max)
+    norm = ((clipped - db_min) / (db_max - db_min) * 255.0).astype(np.uint8)
+    return norm
 
 
 def tile_image(data: np.ndarray, tile_size: int = 512, overlap: float = 0.5) -> List[Tuple[np.ndarray, Tuple[int, int, int, int]]]:
-    """Slices a large SAR image into overlapping sub-tiles for object detection.
+    h, w = data.shape[:2]
+    stride = max(1, int(tile_size * (1 - overlap)))
+    tiles = []
+    for y in range(0, h, stride):
+        for x in range(0, w, stride):
+            y_end = min(y + tile_size, h)
+            x_end = min(x + tile_size, w)
+            tile = data[y:y_end, x:x_end]
+            tiles.append((tile, (y, x, y_end, x_end)))
+    return tiles
 
-    Args:
-        data (np.ndarray): 2D source image.
-        tile_size (int): Size of the square tiles.
-        overlap (float): Overlap percentage.
 
-    Returns:
-        List[Tuple[np.ndarray, Tuple[int, int, int, int]]]: List of tuples containing
-            the 2D tile array and its corresponding pixel bounding box (ymin, xmin, ymax, xmax).
+def pipeline_A(safe_path: str, output_dir: Optional[str] = None) -> Dict[str, Any]:
+    """Pipeline A: baseline using phase0 implementation when available.
+    Returns manifest dictionary with tile metadata.
     """
-    raise NotImplementedError("Image tiling is not implemented.")
+    if _HAS_PHASE0:
+        return process_safe_windowed(safe_path, "A", output_dir or "data/tiles")
+    raise NotImplementedError("phase0 implementation not available in workspace")
 
 
-def pipeline_A(safe_path: str) -> List[Dict[str, Any]]:
-    """Pipeline A: GeoTIFF uint16 -> Direct normalization [0, 255] (Baseline)."""
-    raise NotImplementedError("Pipeline A is not implemented.")
+def pipeline_B(safe_path: str, output_dir: Optional[str] = None) -> Dict[str, Any]:
+    if _HAS_PHASE0:
+        return process_safe_windowed(safe_path, "B", output_dir or "data/tiles")
+    raise NotImplementedError("phase0 implementation not available in workspace")
 
 
-def pipeline_B(safe_path: str) -> List[Dict[str, Any]]:
-    """Pipeline B: Sigma0 calibration -> Normalization [0, 255]."""
-    raise NotImplementedError("Pipeline B is not implemented.")
+def pipeline_C(safe_path: str, output_dir: Optional[str] = None) -> Dict[str, Any]:
+    if _HAS_PHASE0:
+        return process_safe_windowed(safe_path, "C", output_dir or "data/tiles")
+    raise NotImplementedError("phase0 implementation not available in workspace")
 
 
-def pipeline_C(safe_path: str) -> List[Dict[str, Any]]:
-    """Pipeline C: Sigma0 calibration -> Speckle Lee Filter 5x5 -> Normalization [0, 255]."""
-    raise NotImplementedError("Pipeline C is not implemented.")
-
-
-def pipeline_D(safe_path: str) -> List[Dict[str, Any]]:
-    """Pipeline D: Sigma0 calibration -> Speckle Lee Filter 5x5 -> Log dB -> Normalization [0, 255]."""
-    raise NotImplementedError("Pipeline D is not implemented.")
+def pipeline_D(safe_path: str, output_dir: Optional[str] = None) -> Dict[str, Any]:
+    if _HAS_PHASE0:
+        return process_safe_windowed(safe_path, "D", output_dir or "data/tiles")
+    raise NotImplementedError("phase0 implementation not available in workspace")

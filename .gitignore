@@ -1,4 +1,5 @@
 # Ignored data directories (large files)
+models/
 phase0/data/scenes/
 phase0/data/tiles/
 docs/
