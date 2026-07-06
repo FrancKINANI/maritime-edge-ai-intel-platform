@@ -7,16 +7,19 @@ to detect vessels and output raw detection events.
 
 from fastapi import FastAPI, HTTPException, status
 from pydantic import BaseModel
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Tuple
 import time
 import base64
 import io
 import uuid
+import logging
 import numpy as np
 import onnxruntime as ort
 from shared.schemas.events import DetectionEvent, BoundingBox
 from shared.config import constants
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 
 class DetectRequest(BaseModel):
@@ -46,7 +49,7 @@ def load_models():
     segmenter_path = f"{model_dir}/{constants.SEGMENTER_MODEL}"
     try:
         DETECTOR_SESSION = ort.InferenceSession(detector_path, providers=["CPUExecutionProvider"])
-    except Exception as e:
+    except Exception:
         DETECTOR_SESSION = None
     try:
         SEGMENTER_SESSION = ort.InferenceSession(segmenter_path, providers=["CPUExecutionProvider"])
@@ -81,7 +84,7 @@ def preprocess_tile(tile: np.ndarray, target_size: int = constants.MODEL_INPUT_S
     return tile
 
 
-def xywh2xyxy(box):
+def xywh2xyxy(box: Tuple[float, float, float, float]) -> List[float]:
     x, y, w, h = box
     x1 = x - w / 2
     y1 = y - h / 2
@@ -90,7 +93,7 @@ def xywh2xyxy(box):
     return [x1, y1, x2, y2]
 
 
-def nms(boxes, scores, iou_threshold=0.45):
+def nms(boxes: List[List[float]], scores: List[float], iou_threshold: float = 0.45) -> List[int]:
     if len(boxes) == 0:
         return []
     boxes = np.array(boxes)
@@ -144,7 +147,8 @@ async def detect_vessels(req: DetectRequest) -> DetectionEvent:
     try:
         outputs = DETECTOR_SESSION.run(None, {input_name: inp})
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"ONNX runtime error: {e}")
+        logger.error(f"ONNX runtime error during inference: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Model inference error")
     # YOLOv8 style output: (1, n, 85) or list
     preds = outputs[0]
     preds = np.squeeze(preds)

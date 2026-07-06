@@ -10,9 +10,12 @@ from typing import List, Dict, Any, Optional
 from shared.schemas.events import DetectionEvent, BoundingBox
 import sqlite3
 import json
+import logging
 from pathlib import Path
 from datetime import datetime
 from shared.config import constants
+
+logger = logging.getLogger(__name__)
 
 
 DB_PATH = Path(__file__).resolve().parent / "data" / "events.db"
@@ -126,7 +129,8 @@ async def ingest_detection_event(event: DetectionEvent) -> DetectionEvent:
         conn.close()
         return event
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"DB error: {e}")
+        logger.error(f"Database error in ingest_detection_event: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal database error")
 
 
 @app.get("/events", response_model=List[DetectionEvent])

@@ -34,8 +34,22 @@ def calibrate_sigma0(data: np.ndarray, calibration_lut: np.ndarray) -> np.ndarra
 
 
 def apply_lee_filter(data: np.ndarray, kernel_size: int = 5) -> np.ndarray:
-    """Apply Lee filter (calls phase0 implementation when available).
-    Falls back to a simple local-mean shrinkage if not present.
+    """Apply Lee speckle filter to SAR data.
+
+    In SAR imagery, speckle noise is multiplicative and follows a gamma distribution.
+    The Lee filter is an adaptive filter that preserves edges while reducing speckle,
+    which is critical for vessel detection where ship wakes must remain visible.
+
+    This implementation uses the phase0 windowed version when available for memory
+    efficiency on large scenes (25K×16K pixels). Falls back to a simple local-mean
+    filter if phase0 is not present.
+
+    Args:
+        data: Input SAR array (float32)
+        kernel_size: Size of the Lee filter kernel (default 5×5)
+
+    Returns:
+        Filtered SAR array (float32)
     """
     if _HAS_PHASE0:
         return _lee_filter_windowed(data.astype(np.float32), kernel_size=kernel_size)
