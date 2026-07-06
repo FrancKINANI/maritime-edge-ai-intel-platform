@@ -65,7 +65,6 @@ def test_get_sar_detections_422_fallback_to_post(mock_gfw_client):
 
     # First call (GET) raises 422, second call (POST) succeeds
     from httpx import HTTPStatusError
-    import httpx
 
     mock_response_422 = Mock()
     mock_response_422.status_code = 422

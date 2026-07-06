@@ -12,7 +12,6 @@ from typing import List, Tuple, Dict, Any, Optional
 try:
     from phase0.scripts.sar_preprocessing import (
         process_safe_windowed,
-        CalibrationLUT,
         _lee_filter_windowed,
     )
     _HAS_PHASE0 = True

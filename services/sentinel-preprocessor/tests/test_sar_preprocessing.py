@@ -5,7 +5,6 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import numpy as np
-import pytest
 from sar_preprocessing import (
     calibrate_sigma0,
     apply_lee_filter,
