@@ -26,3 +26,6 @@ shared/models/*
 phase0/data/results/*.csv
 phase0/data/results/*.json
 !phase0/data/results/.gitkeep
+
+CODE_REVISION_REPORT.md
+dummy_tile.npy

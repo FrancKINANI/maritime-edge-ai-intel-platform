@@ -14,8 +14,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 FROM python:3.10-slim
 
 RUN apt-get update && apt-get install -y \
-    gdal-bin=3.8.4+ds-1 \
-    libgdal28=3.8.4+ds-1 \
+    gdal-bin \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

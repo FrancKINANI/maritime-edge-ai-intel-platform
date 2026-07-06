@@ -135,6 +135,8 @@ services:
     environment:
       - DATA_INGESTOR_URL=http://data-ingestor:8001
       - AGGREGATOR_URL=http://aggregator:8002
+      - DETECTOR_URL=http://detector:8000
+      - SATMON_URL=http://satellite-monitor:8000
     volumes:
       - ./shared:/app/shared
     networks:
