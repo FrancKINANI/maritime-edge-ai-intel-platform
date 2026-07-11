@@ -10,7 +10,7 @@ NOTE per PH0-CORR-002:
 """
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch, MagicMock
 from phase0.scripts.gfw_annotations import GFWClient, _normalize_response_entries
 
 
@@ -133,8 +133,46 @@ def test_normalize_response_entries_various_formats():
     # Test with None
     assert len(_normalize_response_entries(None)) == 0
 
-    # Test with unrecognized format
+    # Test with unrecognized format (non-dict items in list)
     assert len(_normalize_response_entries({"unknown": [1, 2]})) == 0
+
+    # Test with grouped format {dataset_key: [entries]} — top-level
+    grouped = {
+        "public-global-presence:v4.0": [
+            {"lat": 33.0, "lon": -9.0, "mmsi": "123"},
+            {"lat": 34.0, "lon": -8.0, "mmsi": "456"},
+        ]
+    }
+    assert len(_normalize_response_entries(grouped)) == 2
+    assert _normalize_response_entries(grouped)[0]["mmsi"] == "123"
+
+    # Test with nested grouped format (actual 4wings/report response)
+    # entries = [{dataset_key: [entry, ...]}, ...]
+    nested_grouped = {
+        "entries": [
+            {
+                "public-global-presence:v4.0": [
+                    {"lat": 33.0, "lon": -9.0, "mmsi": "123", "shipName": "HELENA"},
+                    {"lat": 34.0, "lon": -8.0, "mmsi": "456", "shipName": "BOATY"},
+                ]
+            }
+        ]
+    }
+    result = _normalize_response_entries(nested_grouped)
+    assert len(result) == 2
+    assert result[0]["mmsi"] == "123"
+    assert result[1]["shipName"] == "BOATY"
+
+    # Test with standard format (unchanged)
+    standard = {"entries": [{"id": 1}, {"id": 2}]}
+    assert len(_normalize_response_entries(standard)) == 2
+
+    # Test with multiple dataset keys
+    multi_grouped = {
+        "public-global-presence:v4.0": [{"lat": 33.0, "lon": -9.0}],
+        "public-global-presence:v3.0": [{"lat": 34.0, "lon": -8.0}],
+    }
+    assert len(_normalize_response_entries(multi_grouped)) == 2
 
 
 def test_search_vessels(mock_gfw_client):

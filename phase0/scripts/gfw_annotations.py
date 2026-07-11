@@ -129,11 +129,52 @@ def _bbox_polygon(bbox: List[float]) -> Dict[str, Any]:
 
 
 def _normalize_response_entries(response: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Normalize GFW API responses to a flat list of entry dicts.
+
+    Handles these response formats (empirically verified):
+
+    1. Standard flat list:
+       {"entries": [{"lat": 33.0, ...}, {"lat": 34.0, ...}]}
+       Used by /events, /vessels/search.
+
+    2. Nested grouped (4wings/report AIS Presence):
+       {"entries": [{"public-global-presence:v4.0": [{"lat": 33.0, ...}, ...]}]}
+       The top-level "entries" is a list of one dict, where each key is a dataset
+       identifier and the value is the actual list of vessel entries.
+       This function flattens it by collecting all nested lists.
+
+    3. Top-level grouped (less common):
+       {"public-global-presence:v4.0": [{"lat": 33.0, ...}, ...]}
+    """
     if response is None:
         return []
+    # Try standard fields first (entries, results, data, rows, features)
     for field in ("entries", "results", "data", "rows", "features"):
         if field in response and isinstance(response[field], list):
-            return response[field]
+            raw_list = response[field]
+            # Check if this is a nested grouped format:
+            # entries = [{dataset_key: [entry1, entry2, ...]}, ...]
+            # Each element is a dict with a single key whose value is a list of dicts
+            if (len(raw_list) > 0 and isinstance(raw_list[0], dict)
+                    and any(isinstance(v, list) for v in raw_list[0].values())):
+                flattened: List[Dict[str, Any]] = []
+                for wrapper in raw_list:
+                    if not isinstance(wrapper, dict):
+                        continue
+                    for sublist in wrapper.values():
+                        if isinstance(sublist, list):
+                            flattened.extend(sublist)
+                if flattened:
+                    return flattened
+            return raw_list
+    # Fallback: handle top-level grouped format {dataset_key: [entry, ...]}
+    grouped_entries: List[Dict[str, Any]] = []
+    for key, value in response.items():
+        if isinstance(value, list) and len(value) > 0 and isinstance(value[0], dict):
+            grouped_entries.extend(value)
+    if grouped_entries:
+        return grouped_entries
     return []
 
 

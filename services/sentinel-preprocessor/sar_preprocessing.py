@@ -7,7 +7,6 @@ tiling routines, and GCP-based georeferencing for Sentinel-1 GRD products.
 
 import numpy as np
 from typing import List, Tuple, Dict, Any, Optional
-from pathlib import Path
 from scipy.interpolate import RegularGridInterpolator
 
 # Reuse the robust windowed pipeline implementation from phase0 when available.

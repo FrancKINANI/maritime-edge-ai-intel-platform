@@ -79,7 +79,7 @@ def generate_coastal_search_bboxes(full_bbox: List[float], coastal_width_km: flo
     lon_min, lat_min, lon_max, lat_max = full_bbox
     
     # Approximate conversion: 1 degree ≈ 111 km at equator
-    coastal_width_deg = coastal_width_km / 111.0
+    # coastal_width_deg = coastal_width_km / 111.0  # kept for reference
     
     # Generate coastal bands (simplified - actual coastline geometry would be better)
     # Morocco has both Atlantic and Mediterranean coasts
@@ -199,16 +199,16 @@ def check_ais_coverage_before_download(bbox: List[float], date_start: str, date_
             # Check if there are any entries/results
             for field in ("entries", "results", "data", "rows", "features"):
                 if field in data and isinstance(data[field], list) and len(data[field]) > 0:
-                    logger.info(f"AIS coverage confirmed for this zone/date")
+                    logger.info("AIS coverage confirmed for this zone/date")
                     return True
     except Exception as e:
         logger.warning(f"GFW AIS coverage check failed: {e}")
         # On failure, allow download to proceed (conservative approach)
         return True
 
-    logger.warning(f"No GFW AIS coverage for this zone/date -- scene NOT downloaded, invalid test corpus without Ground Truth")
+    logger.warning("No GFW AIS coverage for this zone/date -- scene NOT downloaded, invalid test corpus without Ground Truth")
     logger.warning(f"  Zone: {bbox}, Period: {date_start} to {date_end}")
-    logger.warning(f"  This safeguard saves bandwidth but does NOT solve the root issue if GFW structurally has no coverage")
+    logger.warning("  This safeguard saves bandwidth but does NOT solve the root issue if GFW structurally has no coverage")
     return False
 
 
