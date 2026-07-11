@@ -49,6 +49,7 @@ jobs:
           pip install -r services/sentinel-preprocessor/requirements.txt
           pip install -r services/aggregator/requirements.txt
           pip install -r services/data-ingestor/requirements.txt
+          pip install -r phase0/requirements.txt
           pip install pytest pytest-asyncio
       - name: Run unit tests
         run: |
