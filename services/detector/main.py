@@ -49,11 +49,13 @@ def load_models():
     segmenter_path = f"{model_dir}/{constants.SEGMENTER_MODEL}"
     try:
         DETECTOR_SESSION = ort.InferenceSession(detector_path, providers=["CPUExecutionProvider"])
-    except Exception:
+    except Exception as e:
+        logger.warning("Failed to load detector model %s: %s", detector_path, e)
         DETECTOR_SESSION = None
     try:
         SEGMENTER_SESSION = ort.InferenceSession(segmenter_path, providers=["CPUExecutionProvider"])
-    except Exception:
+    except Exception as e:
+        logger.warning("Failed to load segmenter model %s: %s", segmenter_path, e)
         SEGMENTER_SESSION = None
 
 
@@ -131,13 +133,15 @@ async def detect_vessels(req: DetectRequest) -> DetectionEvent:
         try:
             tile = np.load(req.tile_path)
         except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Unable to load tile from path: {e}")
+            logger.error("Failed to load tile from path %s: %s", req.tile_path, e, exc_info=True)
+            raise HTTPException(status_code=400, detail="Unable to load tile from the provided path. Ensure it is a valid .npy file.")
     elif req.tile_b64:
         try:
             raw = base64.b64decode(req.tile_b64)
             tile = np.load(io.BytesIO(raw))
         except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Unable to decode base64 .npy tile: {e}")
+            logger.error("Failed to decode base64 .npy tile: %s", e, exc_info=True)
+            raise HTTPException(status_code=400, detail="Unable to decode the provided base64 tile. Ensure it is a valid .npy file encoded in base64.")
     else:
         raise HTTPException(status_code=400, detail="Either tile_path or tile_b64 must be provided")
 

@@ -37,7 +37,8 @@ GFW_4WINGS_LAST_REPORT = f"{GFW_BASE_URL}/4wings/last-report"
 GFW_REPORT = GFW_4WINGS_REPORT
 
 AIS_PRESENCE_DATASET = "public-global-presence:latest"
-SAR_VESSEL_DETECTIONS_DATASET = "public-global-sar-vessel-detections:latest"
+# DEPRECATED per PH0-CORR-002: SAR_VESSEL_DETECTIONS_DATASET = "public-global-sar-vessel-detections:latest"
+# This dataset returns grid cell aggregates, not individual vessel positions
 AIS_OFF_DATASET = "public-global-gaps-events:latest"
 FISHING_EVENTS_DATASET = "public-global-fishing-events:latest"
 
@@ -186,188 +187,18 @@ class GFWClient:
 
     def search_vessels(self, query: str, limit: int = 50) -> List[Dict[str, Any]]:
         logger.info("Searching GFW vessels for query=%s", query)
+        # GFW v3 API requires datasets[0] format (bracket notation) for query params
         params = {
             "query": query,
-            "datasets": AIS_PRESENCE_DATASET,
+            "datasets[0]": AIS_PRESENCE_DATASET,
             "limit": min(limit, 50),
         }
         return _request_with_retry("GET", GFW_VESSELS_SEARCH, self.headers, params=params).get("entries", [])
 
-    def get_sar_detections(
-        self,
-        bbox: List[float],
-        start_date: str,
-        end_date: str,
-        limit: int = 500,
-    ) -> List[Dict[str, Any]]:
-        logger.info("Fetching GFW SAR detections for bbox=%s %s->%s", bbox, start_date, end_date)
-        geometry = _bbox_polygon(bbox)
-        all_results: List[Dict[str, Any]] = []
-        offset = 0
-        page_limit = min(limit, 500)
-
-        while True:
-            params: Dict[str, Any] = {
-                "datasets[0]": SAR_VESSEL_DETECTIONS_DATASET,
-                "start-date": start_date,
-                "end-date": end_date,
-                "limit": page_limit,
-                "offset": offset,
-                "geometry": json.dumps(geometry),
-            }
-
-            try:
-                response = _request_with_retry("GET", GFW_EVENTS, self.headers, params=params)
-            except httpx.HTTPStatusError as exc:
-                status = exc.response.status_code
-                if status == 422:
-                    logger.warning("GFW SAR /events GET returned 422, trying POST fallback")
-                    body: Dict[str, Any] = {
-                        "datasets": [SAR_VESSEL_DETECTIONS_DATASET],
-                        "startDate": start_date,
-                        "endDate": end_date,
-                        "geometry": geometry,
-                        "limit": page_limit,
-                        "offset": offset,
-                    }
-                    response = _request_with_retry("POST", GFW_EVENTS, self.headers, json_body=body)
-                else:
-                    raise
-
-            entries = _normalize_response_entries(response)
-            if not entries:
-                break
-
-            parsed = self._parse_sar_response(response)
-            all_results.extend(parsed)
-
-            if len(entries) < page_limit:
-                break
-
-            offset += page_limit
-            time.sleep(REQUEST_DELAY_SECONDS)
-
-        return all_results
-
-    def _parse_sar_response(self, response_json: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """
-        Parse GFW /v3/events response for SAR detections.
-        
-        Filters out infrastructure (oil platforms) and normalizes vessel data.
-        """
-        entries = _normalize_response_entries(response_json)
-        logger.info(f"Raw SAR entries received: {len(entries)}")
-        
-        parsed_detections = []
-        for entry in entries:
-            # Skip infrastructure entries
-            sar_data = entry.get("sar", {})
-            matched_category = sar_data.get("matchedCategory", "unknown")
-            
-            if matched_category == "infrastructure":
-                logger.debug(f"Skipping infrastructure entry: {entry.get('id')}")
-                continue
-            
-            # Extract position
-            lat, lon = _extract_lat_lon(entry)
-            if lat is None or lon is None:
-                logger.debug(f"Skipping entry without position: {entry.get('id')}")
-                continue
-            
-            # Extract vessel info
-            vessel = entry.get("vessel")
-            matched_to_ais = vessel is not None and matched_category == "matched"
-            
-            detection = {
-                "id": entry.get("id", ""),
-                "lat": lat,
-                "lon": lon,
-                "timestamp": entry.get("start") or entry.get("timestamp", ""),
-                "matched_to_ais": matched_to_ais,
-                "vessel_info": vessel if matched_to_ais else None,
-                "confidence": sar_data.get("confidence"),
-                "estimated_length_m": sar_data.get("length"),
-                "label": "AIS_confirmed" if matched_to_ais else "visual_only",
-                "matched_category": matched_category,
-            }
-            parsed_detections.append(detection)
-        
-        logger.info(f"Parsed SAR detections (excluding infrastructure): {len(parsed_detections)}")
-        return parsed_detections
-
-    def _paginate_sar_detections(
-        self,
-        bbox: List[float],
-        start_date: str,
-        end_date: str,
-    ) -> List[Dict[str, Any]]:
-        """
-        Fetch ALL SAR detections with automatic pagination.
-        
-        Required if > 500 vessels in the zone (high traffic areas).
-        """
-        all_results = []
-        offset = 0
-        limit = 500
-        
-        while True:
-            try:
-                batch = self._fetch_sar_page(bbox, start_date, end_date, limit, offset)
-                parsed = self._parse_sar_response(batch)
-                if not parsed:
-                    break
-                all_results.extend(parsed)
-                
-                # Check if we have more results
-                total = batch.get("total", 0)
-                if len(all_results) >= total or len(parsed) < limit:
-                    break
-                    
-                offset += limit
-                time.sleep(REQUEST_DELAY_SECONDS)  # Respect GFW rate limit
-                
-            except Exception as exc:
-                logger.warning(f"Error during SAR pagination at offset {offset}: {exc}")
-                break
-        
-        logger.info(f"Total SAR detections fetched: {len(all_results)}")
-        return all_results
-
-    def _fetch_sar_page(
-        self,
-        bbox: List[float],
-        start_date: str,
-        end_date: str,
-        limit: int,
-        offset: int,
-    ) -> Dict[str, Any]:
-        """Fetch a single page of SAR detections."""
-        geometry = _bbox_polygon(bbox)
-        
-        # Try GET first
-        try:
-            params = {
-                "datasets[0]": SAR_VESSEL_DETECTIONS_DATASET,
-                "start-date": start_date,
-                "end-date": end_date,
-                "limit": limit,
-                "offset": offset,
-                "geometry": json.dumps(geometry),
-            }
-            return _request_with_retry("GET", GFW_EVENTS, self.headers, params=params)
-        except Exception as e1:
-            logger.debug(f"SAR GET page failed ({e1}), trying POST fallback")
-        
-        # Fallback to POST
-        body = {
-            "datasets": [SAR_VESSEL_DETECTIONS_DATASET],
-            "startDate": start_date,
-            "endDate": end_date,
-            "geometry": geometry,
-            "limit": limit,
-            "offset": offset,
-        }
-        return _request_with_retry("POST", GFW_EVENTS, self.headers, json_body=body)
+    # DELETED: get_sar_detections() and related SAR functions per PH0-CORR-002
+    # The SAR Vessel Detections dataset (public-global-sar-presence:latest) returns
+    # grid cell aggregates, not individual vessel positions, making it structurally
+    # unusable for this project. Replaced by AIS Vessel Presence + manual CVAT annotation.
 
     def get_ais_vessels(
         self,
@@ -381,17 +212,104 @@ class GFWClient:
         start_dt = dt - timedelta(hours=window_hours)
         end_dt = dt + timedelta(hours=window_hours)
 
-        payload = {
-            "datasets": [AIS_PRESENCE_DATASET],
+        # GFW v3 /4wings/report POST: datasets[0], date-range, spatial-resolution,
+        # temporal-resolution, and format go as query params. geojson and group-by go in the body.
+        # Verified empirically — see data/QA.md for full verification report.
+        query_params = {
+            "datasets[0]": AIS_PRESENCE_DATASET,
             "date-range": f"{start_dt.date().isoformat()},{end_dt.date().isoformat()}",
-            "geojson": _bbox_polygon(bbox),
             "spatial-resolution": "LOW",
             "temporal-resolution": "HOURLY",
+            "format": "JSON",
+        }
+        body_params = {
+            "geojson": _bbox_polygon(bbox),
             "group-by": "MMSI",
         }
 
-        response = _request_with_retry("POST", GFW_REPORT, self.headers, json_body=payload)
+        response = _request_with_retry("POST", GFW_REPORT, self.headers, params=query_params, json_body=body_params)
         return _normalize_response_entries(response)
+
+    def gfw_get_ais_presence(
+        self,
+        bbox: List[float],
+        date_start: str,
+        date_end: str,
+        limit: int = 500,
+    ) -> List[Dict[str, Any]]:
+        """
+        Fetch AIS Vessel Presence positions via the GFW API.
+
+        NOTE: The exact endpoint for this specific dataset must be verified
+        against the official GFW documentation. Do NOT assume it is the same
+        endpoint as the gaps/AIS-off events endpoint — verify explicitly.
+
+        Each returned position becomes an ANNOTATION SEED, not a final
+        Ground Truth. It will be presented to the human annotator in CVAT
+        as a suggestion to validate, not inserted directly into the final
+        set of bounding boxes.
+
+        Returns a list of dicts:
+        {
+          "lat": float, "lon": float,
+          "timestamp": str,
+          "mmsi": str | None,
+          "vessel_name": str | None,
+          "vessel_type": str | None,
+          "source": "ais_presence_amorce",
+          "requires_human_validation": True,
+        }
+        """
+        logger.info("Fetching GFW AIS Vessel Presence for bbox=%s %s->%s", bbox, date_start, date_end)
+
+        # GFW v3 API requires datasets and date-range as query params, not in POST body
+        # Verified empirically: datasets[0] as query param passes validation
+        # date-range format: YYYY-MM-DD,YYYY-MM-DD (also as query param per official docs)
+        geometry = _bbox_polygon(bbox)
+        # GFW v3 /4wings/report POST: datasets[0], date-range, spatial-resolution,
+        # temporal-resolution, and format go as query params. geojson and limit go in the body.
+        # Verified empirically — see data/QA.md for full verification report.
+        query_params = {
+            "datasets[0]": AIS_PRESENCE_DATASET,
+            "date-range": f"{date_start},{date_end}",
+            "spatial-resolution": "LOW",
+            "temporal-resolution": "DAILY",
+            "format": "JSON",
+        }
+        body_params = {
+            "geojson": geometry,
+            "limit": limit,
+        }
+
+        try:
+            response = _request_with_retry("POST", GFW_REPORT, self.headers, params=query_params, json_body=body_params)
+            entries = _normalize_response_entries(response)
+            
+            # Normalize entries to the expected format
+            normalized = []
+            for entry in entries:
+                lat, lon = _extract_lat_lon(entry)
+                if lat is None or lon is None:
+                    continue
+                    
+                normalized.append({
+                    "lat": lat,
+                    "lon": lon,
+                    "timestamp": entry.get("timestamp") or entry.get("date") or "",
+                    "mmsi": entry.get("mmsi") or entry.get("MMSI"),
+                    "vessel_name": entry.get("vessel_name") or entry.get("name"),
+                    "vessel_type": entry.get("vessel_type") or entry.get("type"),
+                    "source": "ais_presence_amorce",
+                    "requires_human_validation": True,
+                })
+            
+            logger.info(f"Retrieved {len(normalized)} AIS presence entries as annotation seeds")
+            return normalized
+            
+        except Exception as e:
+            logger.error(f"Failed to fetch AIS Vessel Presence: {e}")
+            logger.warning("The endpoint for AIS Vessel Presence may need verification against GFW documentation")
+            return []
 
     def get_dark_vessel_events(
         self,
@@ -764,6 +682,15 @@ def annotate_scene(
     output_dir: Union[str, Path],
     pipeline: str = "D",
 ) -> Dict[str, Any]:
+    """
+    Annotate a scene using the hybrid protocol per PH0-CORR-002:
+    - Level 1: GFW AIS Vessel Presence as annotation seeds (amorce)
+    - Level 2: AIS-off events as dark vessel candidates
+    - All annotations require human validation in CVAT before becoming Ground Truth
+    
+    NOTE: SAR Vessel Detections dataset is NOT used as it returns grid cell
+    aggregates, not individual vessel positions, making it structurally unusable.
+    """
     metadata = load_tile_metadata(metadata_path)
     scene_id = metadata.get("scene_id")
     if not scene_id:
@@ -777,14 +704,14 @@ def annotate_scene(
     date_start = acquisition_time[:10]
     date_end = (datetime.fromisoformat(acquisition_time.rstrip("Z")) + timedelta(days=1)).date().isoformat()
 
-    sar_detections = gfw_client.get_sar_detections(bbox, date_start, date_end)
-    ais_vessels = gfw_client.get_ais_vessels(bbox, acquisition_time)
-    dark_vessels = gfw_client.get_dark_vessel_events(bbox, date_start, date_end)
+    # Per PH0-CORR-002: Replace SAR detections with AIS Vessel Presence (Level 1)
+    ais_presence_seeds = gfw_client.gfw_get_ais_presence(bbox, date_start, date_end)
+    dark_vessel_candidates = gfw_client.get_dark_vessel_events(bbox, date_start, date_end)
 
+    # Combine both sources with distinct labels for CVAT
     detections: List[Dict[str, Any]] = []
-    detections.extend({**event, "source": "sar_detection"} for event in sar_detections)
-    detections.extend({**event, "source": "ais_presence"} for event in ais_vessels)
-    detections.extend({**event, "source": "ais_off"} for event in dark_vessels)
+    detections.extend({**event, "source": "ais_presence_amorce", "label": "ais_presence_amorce"} for event in ais_presence_seeds)
+    detections.extend({**event, "source": "ais_off_candidate", "label": "ais_off_candidate"} for event in dark_vessel_candidates)
 
     tile_size = metadata.get("tile_size", 512)
     tile_annotations = project_detections_to_tiles(detections, metadata.get("tiles", []), tile_size=tile_size)
@@ -802,15 +729,15 @@ def annotate_scene(
         "acquisition_time": acquisition_time,
         "tile_count": len(metadata.get("tiles", [])),
         "annotated_tiles": len([tile_id for tile_id, anns in tile_annotations.items() if anns]),
-        "sar_detections": len(sar_detections),
-        "ais_presence": len(ais_vessels),
-        "dark_vessel_events": len(dark_vessels),
+        "ais_presence_seeds": len(ais_presence_seeds),
+        "dark_vessel_candidates": len(dark_vessel_candidates),
         "total_annotations": sum(len(anns) for anns in tile_annotations.values()),
         "class_counts": {
-            "AIS_confirmed": sum(1 for anns in tile_annotations.values() for ann in anns if ann["label"] == "AIS_confirmed"),
-            "visual_only": sum(1 for anns in tile_annotations.values() for ann in anns if ann["label"] == "visual_only"),
-            "dark_vessel_candidate": sum(1 for anns in tile_annotations.values() for ann in anns if ann["label"] == "dark_vessel_candidate"),
+            "ais_presence_amorce": sum(1 for anns in tile_annotations.values() for ann in anns if ann["label"] == "ais_presence_amorce"),
+            "ais_off_candidate": sum(1 for anns in tile_annotations.values() for ann in anns if ann["label"] == "ais_off_candidate"),
         },
+        "protocol": "PH0-CORR-002_hybrid",
+        "note": "All annotations require human validation in CVAT before becoming Ground Truth",
     }
     report_path = scene_output / "annotation_report.json"
     with open(report_path, "w", encoding="utf-8") as handle:
@@ -829,8 +756,9 @@ def annotate_all_scenes(
     metadata_paths = sorted(tiles_root.glob("**/metadata.json"))
     summary = {
         "scenes": [],
-        "global_counts": {"AIS_confirmed": 0, "visual_only": 0, "dark_vessel_candidate": 0},
+        "global_counts": {"ais_presence_amorce": 0, "ais_off_candidate": 0},
         "total_annotations": 0,
+        "protocol": "PH0-CORR-002_hybrid",
     }
     logger.info("Found %s metadata files under %s", len(metadata_paths), tiles_root)
     for metadata_path in metadata_paths:
@@ -852,56 +780,35 @@ def annotate_all_scenes(
 
 
 def test_gfw_connection(client: GFWClient) -> None:
-    logger.info("Running GFW connectivity test")
+    logger.info("Running GFW connectivity test (PH0-CORR-002 protocol)")
     bbox = [-17.0, 27.0, -1.0, 36.0]
     end = datetime.utcnow().date()
     start = end - timedelta(days=2)
     try:
-        detections = client.get_sar_detections([bbox[0], bbox[1], bbox[2], bbox[3]], start.isoformat(), end.isoformat(), limit=10)
-        logger.info("Connectivity OK, retrieved %s SAR detections", len(detections))
+        # Test AIS Vessel Presence (Level 1)
+        ais_seeds = client.gfw_get_ais_presence([bbox[0], bbox[1], bbox[2], bbox[3]], start.isoformat(), end.isoformat(), limit=10)
+        logger.info("Connectivity OK, retrieved %s AIS presence seeds", len(ais_seeds))
+        
+        # Test Dark vessel events (Level 2)
+        dark_candidates = client.get_dark_vessel_events([bbox[0], bbox[1], bbox[2], bbox[3]], start.isoformat(), end.isoformat(), limit=10)
+        logger.info("Connectivity OK, retrieved %s dark vessel candidates", len(dark_candidates))
     except Exception as exc:
         logger.error("GFW connectivity test failed: %s", exc)
         raise
 
 def test_sar_endpoint(token: str) -> None:
-    """Test isolated SAR endpoint using /v3/events and the SAR vessel detections dataset."""
-    logger.info("=== SAR Endpoint Test ===")
-    client = GFWClient(token)
-
-    test_bbox = [-9.0, 33.0, -8.0, 34.0]  # [lon_min, lat_min, lon_max, lat_max]
-    date_start = "2024-01-07"
-    date_end = "2024-01-08"
-
-    logger.info("Dataset: %s", SAR_VESSEL_DETECTIONS_DATASET)
-    logger.info("Endpoint: %s", GFW_EVENTS)
-    logger.info("Bbox: %s", test_bbox)
-    logger.info("Dates: %s -> %s", date_start, date_end)
-
-    try:
-        results = client.get_sar_detections(test_bbox, date_start, date_end, limit=10)
-        if results:
-            logger.info("✓ %s SAR detections found", len(results))
-            for r in results[:3]:
-                logger.info(
-                    "  lat=%.4f lon=%.4f matched=%s conf=%s",
-                    r.get("lat", 0.0),
-                    r.get("lon", 0.0),
-                    r.get("matched_to_ais"),
-                    r.get("confidence", "N/A"),
-                )
-        else:
-            logger.warning("✗ No SAR detections found")
-            logger.warning(
-                "  Vérifier si le token a accès à %s et si la couverture GFW existe pour cette zone.",
-                SAR_VESSEL_DETECTIONS_DATASET,
-            )
-    except httpx.HTTPStatusError as exc:
-        logger.error("✗ SAR endpoint test failed with status %s", exc.response.status_code)
-        logger.error("Response body: %s", exc.response.text[:2000])
-        raise
-    except Exception as exc:
-        logger.error("✗ SAR endpoint test failed: %s", exc)
-        raise
+    """
+    DEPRECATED per PH0-CORR-002.
+    
+    The SAR Vessel Detections dataset (public-global-sar-presence:latest) returns
+    grid cell aggregates, not individual vessel positions, making it structurally
+    unusable for this project. Use test_gfw_connection() instead to test the
+    new hybrid protocol (AIS Vessel Presence + Dark Vessel Events).
+    """
+    logger.warning("test_sar_endpoint() is DEPRECATED per PH0-CORR-002")
+    logger.warning("SAR Vessel Detections dataset returns grid aggregates, not individual positions")
+    logger.warning("Use test_gfw_connection() to test the new hybrid protocol")
+    raise NotImplementedError("SAR endpoint testing deprecated per PH0-CORR-002")
 
 
 

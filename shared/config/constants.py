@@ -7,12 +7,12 @@ SAR preprocessing algorithms, detector specifications, and satellite metadata.
 
 from typing import List
 
-# Zones géographiques marocaines (Geographic boundaries for Morocco EEZ and Territorial Waters)
+# Geographic boundaries for Morocco EEZ and Territorial Waters
 # format: [lon_min, lat_min, lon_max, lat_max]
 MOROCCO_BBOX: List[float] = [-17.0, 27.0, -1.0, 36.0]
-ZONE_Z1_NM: int = 12      # Territorial Waters (Eaux territoriales)
-ZONE_Z2_NM: int = 200     # Exclusive Economic Zone (ZEE)
-ZONE_Z3_LABEL: str = "haute_mer"
+ZONE_Z1_NM: int = 12      # Territorial Waters
+ZONE_Z2_NM: int = 200     # Exclusive Economic Zone
+ZONE_Z3_LABEL: str = "high_seas"
 
 # Preprocessing SAR parameters
 TILE_SIZE: int = 512          # pixel dimensions (512x512)

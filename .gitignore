@@ -2,6 +2,7 @@
 models/
 phase0/data/scenes/
 phase0/data/tiles/
+data/
 docs/
 
 # Exclude large ONNX model files (to be copied manually or mounted)
@@ -26,6 +27,3 @@ shared/models/*
 phase0/data/results/*.csv
 phase0/data/results/*.json
 !phase0/data/results/.gitkeep
-
-CODE_REVISION_REPORT.md
-dummy_tile.npy

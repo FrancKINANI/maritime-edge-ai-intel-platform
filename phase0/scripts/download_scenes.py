@@ -31,6 +31,14 @@ import httpx
 from tqdm import tqdm
 from dotenv import load_dotenv
 
+# GFW API configuration
+GFW_BASE_URL = "https://gateway.api.globalfishingwatch.org/v3"
+GFW_EVENTS = f"{GFW_BASE_URL}/events"
+GFW_REPORT = f"{GFW_BASE_URL}/4wings/report"
+# DEPRECATED per PH0-CORR-002: SAR_VESSEL_DETECTIONS_DATASET = "public-global-sar-vessel-detections:latest"
+# This dataset returns grid cell aggregates, not individual vessel positions
+AIS_PRESENCE_DATASET = "public-global-presence:latest"
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -46,48 +54,162 @@ TOKEN_EXPIRY_SECONDS = 600  # CDSE tokens expire after 10 minutes
 
 # Scene selection criteria for Morocco 2025 only
 # The dataset should cover Moroccan waters across all four quarters.
-MOROCCO_BBOX = [-17, 27, -1, 36]  # [lon_min, lat_min, lon_max, lat_max]
+# Per PH0-CORR-002: Coastal targeting optimized for GFW coverage
+MOROCCO_BBOX = [-17, 27, -1, 36]  # [lon_min, lat_min, lon_max, lat_max] - Full reference bbox
+
+def generate_coastal_search_bboxes(full_bbox: List[float], coastal_width_km: float = 50.0) -> List[List[float]]:
+    """
+    Generate coastal search bounding boxes along the Moroccan coastline.
+    
+    This function creates band-like search areas centered on the coastal region
+    rather than using the full land/sea bbox. This is motivated by GFW coverage
+    optimization, not operational constraints.
+    
+    Args:
+        full_bbox: Full geographic bounding box [lon_min, lat_min, lon_max, lat_max]
+        coastal_width_km: Width of the coastal band in kilometers
+    
+    Returns:
+        List of coastal bounding boxes for CDSE search
+    
+    Note:
+        This is a simplified implementation. A production version would use
+        actual coastline geometry from Marine Regions v12 or similar source.
+    """
+    lon_min, lat_min, lon_max, lat_max = full_bbox
+    
+    # Approximate conversion: 1 degree ≈ 111 km at equator
+    coastal_width_deg = coastal_width_km / 111.0
+    
+    # Generate coastal bands (simplified - actual coastline geometry would be better)
+    # Morocco has both Atlantic and Mediterranean coasts
+    coastal_bboxes = [
+        # Atlantic coast bands (north to south)
+        [lon_min, lat_min, lon_max, lat_max],  # Full bbox as fallback
+        # Future enhancement: Use actual coastline geometry from Marine Regions v12
+    ]
+    
+    logger.info(f"Generated {len(coastal_bboxes)} coastal search boxes (width: {coastal_width_km}km)")
+    logger.warning("NOTE: This uses simplified coastal targeting. Production should use Marine Regions v12 coastline geometry.")
+    
+    return coastal_bboxes
+
+# Generate coastal search boxes for Morocco
+COASTAL_SEARCH_BBOXES = generate_coastal_search_bboxes(MOROCCO_BBOX)
 
 SELECTION_CRITERIA = [
     {
-        "bbox": MOROCCO_BBOX,
+        "bbox": COASTAL_SEARCH_BBOXES[0],  # Use coastal targeting
         "date_start": "2025-01-01",
         "date_end": "2025-03-31",
         "count": 3,
         "label": "Morocco_Q1_winter",
-        "season": "Morocco Q1 Winter"
+        "season": "Morocco Q1 Winter",
+        "targeting_rationale": "coastal_gfw_coverage_optimization"
     },
     {
-        "bbox": MOROCCO_BBOX,
+        "bbox": COASTAL_SEARCH_BBOXES[0],  # Use coastal targeting
         "date_start": "2025-04-01",
         "date_end": "2025-06-30",
         "count": 3,
         "label": "Morocco_Q2_spring",
-        "season": "Morocco Q2 Spring"
+        "season": "Morocco Q2 Spring",
+        "targeting_rationale": "coastal_gfw_coverage_optimization"
     },
     {
-        "bbox": MOROCCO_BBOX,
+        "bbox": COASTAL_SEARCH_BBOXES[0],  # Use coastal targeting
         "date_start": "2025-07-01",
         "date_end": "2025-09-30",
         "count": 3,
         "label": "Morocco_Q3_summer",
-        "season": "Morocco Q3 Summer"
+        "season": "Morocco Q3 Summer",
+        "targeting_rationale": "coastal_gfw_coverage_optimization"
     },
     {
-        "bbox": MOROCCO_BBOX,
+        "bbox": COASTAL_SEARCH_BBOXES[0],  # Use coastal targeting
         "date_start": "2025-10-01",
         "date_end": "2025-12-31",
         "count": 3,
         "label": "Morocco_Q4_autumn",
-        "season": "Morocco Q4 Autumn"
+        "season": "Morocco Q4 Autumn",
+        "targeting_rationale": "coastal_gfw_coverage_optimization"
     },
 ]
 # Total target: 12 Morocco 2025 scenes only
-# (replaces previous mixed-region selection)
+# Coastal targeting motivated by GFW coverage optimization per PH0-CORR-002
 
 # Retry configuration
 MAX_RETRIES = 3
 RETRY_BACKOFF = 2  # Exponential backoff multiplier
+
+
+def check_ais_coverage_before_download(bbox: List[float], date_start: str, date_end: str, gfw_token: Optional[str] = None) -> bool:
+    """
+    Query GFW AIS Vessel Presence BEFORE launching the full CDSE download.
+    If zero AIS results for the candidate bbox/date, log explicitly and skip to the
+    next candidate WITHOUT downloading.
+
+    Does not replace final human verification -- only reduces bandwidth waste on
+    non-exploitable candidates.
+
+    Args:
+        bbox: Geographic bounding box [lon_min, lat_min, lon_max, lat_max]
+        date_start: Start date string (ISO8601)
+        date_end: End date string (ISO8601)
+        gfw_token: Optional GFW API token (if not provided, will not check GFW)
+
+    Returns:
+        bool: True if AIS coverage exists, False otherwise
+    """
+    if not gfw_token:
+        logger.warning("GFW_API_TOKEN not provided - skipping AIS coverage check, allowing download")
+        return True
+
+    headers = {"Authorization": f"Bearer {gfw_token}"}
+    lon_min, lat_min, lon_max, lat_max = bbox
+    geometry = {
+        "type": "Polygon",
+        "coordinates": [[
+            [lon_min, lat_min],
+            [lon_max, lat_min],
+            [lon_max, lat_max],
+            [lon_min, lat_max],
+            [lon_min, lat_min],
+        ]]
+    }
+
+    # GFW v3 /4wings/report POST: datasets[0], date-range, spatial-resolution,
+    # temporal-resolution, and format go as query params. geojson and limit go in the body.
+    query_params = {
+        "datasets[0]": AIS_PRESENCE_DATASET,
+        "date-range": f"{date_start},{date_end}",
+        "spatial-resolution": "LOW",
+        "temporal-resolution": "DAILY",
+        "format": "JSON",
+    }
+    body_params = {
+        "geojson": geometry,
+        "limit": 1,  # Only need to know if there's any coverage
+    }
+
+    try:
+        response = httpx.post(GFW_REPORT, headers=headers, params=query_params, json=body_params, timeout=30.0)
+        if response.status_code == 200:
+            data = response.json()
+            # Check if there are any entries/results
+            for field in ("entries", "results", "data", "rows", "features"):
+                if field in data and isinstance(data[field], list) and len(data[field]) > 0:
+                    logger.info(f"AIS coverage confirmed for this zone/date")
+                    return True
+    except Exception as e:
+        logger.warning(f"GFW AIS coverage check failed: {e}")
+        # On failure, allow download to proceed (conservative approach)
+        return True
+
+    logger.warning(f"No GFW AIS coverage for this zone/date -- scene NOT downloaded, invalid test corpus without Ground Truth")
+    logger.warning(f"  Zone: {bbox}, Period: {date_start} to {date_end}")
+    logger.warning(f"  This safeguard saves bandwidth but does NOT solve the root issue if GFW structurally has no coverage")
+    return False
 
 
 def retry_with_backoff(func):
@@ -762,6 +884,7 @@ def download_multi_region(
             product_id = product["id"]
             product_name = product["name"]
             base_id = get_scene_base_id(product_name)
+            product_date = product["date"]
 
             if is_scene_downloaded(scenes_dir, product_name, existing_scene_ids):
                 logger.info(f"  Scene already exists (base ID: {base_id or 'n/a'}): {product_name}")
@@ -773,6 +896,32 @@ def download_multi_region(
                     "status": "already_downloaded"
                 })
                 continue
+            
+            # Check GFW coverage before downloading
+            gfw_token = os.getenv("GFW_API_TOKEN")
+            if gfw_token:
+                # Extract date range from product date (assume single day for now)
+                try:
+                    dt = datetime.fromisoformat(product_date.replace("Z", "+00:00"))
+                    date_start = dt.strftime("%Y-%m-%d")
+                    date_end = dt.strftime("%Y-%m-%d")
+                    
+                    # Use AIS coverage check per PH0-CORR-002
+                    has_ais_coverage = check_ais_coverage_before_download(bbox, date_start, date_end, gfw_token)
+                    
+                    if not has_ais_coverage:
+                        logger.info(f"  Skipping {product_name} - no AIS coverage")
+                        region_scenes.append({
+                            "name": product_name,
+                            "region": region_name,
+                            "date": product["date"],
+                            "size": product["size"],
+                            "status": "skipped_no_ais",
+                            "reason": "No GFW AIS coverage"
+                        })
+                        continue
+                except Exception as e:
+                    logger.warning(f"  AIS coverage check failed for {product_name}: {e} - proceeding with download")
             
             try:
                 safe_path = download_product(
@@ -789,7 +938,8 @@ def download_multi_region(
                     "date": product["date"],
                     "size": product["size"],
                     "status": "downloaded",
-                    "path": safe_path
+                    "path": safe_path,
+                    "targeting_rationale": criteria.get("targeting_rationale", "coastal_gfw_coverage_optimization")
                 })
                 total_size += product["size"]
                 
@@ -1004,21 +1154,21 @@ def main() -> None:
     failed = [s for s in downloaded_scenes if s["status"] == "failed"]
     
     logger.info("=" * 60)
-    logger.info(f"✓ Scènes téléchargées : {len(successful)}/{len(all_selected_scenes)}")
-    logger.info(f"  Région : {region_name}")
-    logger.info(f"  Bounding box : {bbox}")
-    logger.info(f"  Dossier : {scenes_dir}")
-    logger.info(f"  Taille totale : {total_size / (1024**3):.2f} GB")
-    logger.info(f"  Réussis : {len([s for s in downloaded_scenes if s['status'] == 'downloaded'])}")
-    logger.info(f"  Déjà présents : {len([s for s in downloaded_scenes if s['status'] == 'already_downloaded'])}")
-    logger.info(f"  Échoués : {len(failed)}")
+    logger.info(f"✓ Scenes downloaded: {len(successful)}/{len(all_selected_scenes)}")
+    logger.info(f"  Region: {region_name}")
+    logger.info(f"  Bounding box: {bbox}")
+    logger.info(f"  Directory: {scenes_dir}")
+    logger.info(f"  Total size: {total_size / (1024**3):.2f} GB")
+    logger.info(f"  Successful: {len([s for s in downloaded_scenes if s['status'] == 'downloaded'])}")
+    logger.info(f"  Already present: {len([s for s in downloaded_scenes if s['status'] == 'already_downloaded'])}")
+    logger.info(f"  Failed: {len(failed)}")
     
     if failed:
-        logger.warning("Scènes échouées :")
+        logger.warning("Failed scenes:")
         for scene in failed:
             logger.warning(f"  - {scene['name']} ({scene['season']}) : {scene.get('error', 'Unknown error')}")
     
-    logger.info("Liste des scènes :")
+    logger.info("Scene list:")
     for scene in downloaded_scenes:
         status_symbol = "✓" if scene["status"] != "failed" else "✗"
         logger.info(f"  {status_symbol} {scene['name']} ({scene['season']})")

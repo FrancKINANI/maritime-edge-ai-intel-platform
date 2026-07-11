@@ -1,15 +1,18 @@
-"""Unit tests for SAR preprocessing functions."""
+"""Unit tests for SAR preprocessing and GCP georeferencing functions."""
 
 from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import numpy as np
+import pytest
 from sar_preprocessing import (
     calibrate_sigma0,
     apply_lee_filter,
     convert_to_db,
     normalize_to_uint8,
+    GCPGeoreferencer,
+    GCPOutOfBoundsError,
 )
 
 
@@ -99,3 +102,133 @@ def test_normalize_to_uint8_clipping():
     assert result[0, 0] == 0
     # 10 dB should be clipped to 255
     assert result[0, 3] == 255
+
+
+# ---------------------------------------------------------------------------
+# GCP Georeferencer Tests
+# ---------------------------------------------------------------------------
+
+
+def test_gcp_georeferencer_zero_error_at_control_points():
+    """Test that GCP interpolation has EXACTLY ZERO error at control points.
+
+    This is a validated property: the RegularGridInterpolator reproduces the
+    exact GCP values when queried at the same coordinates. The GCPs form a
+    regular NxM grid, and interpolation is exact at control points.
+    """
+    # Simulate a 4x4 GCP grid over a 30x30 pixel image
+    gcps = np.array([
+        [[35.0, -5.0], [35.5, -4.5], [36.0, -4.0], [36.5, -3.5]],
+        [[35.2, -5.2], [35.7, -4.7], [36.2, -4.2], [36.7, -3.7]],
+        [[35.4, -5.4], [35.9, -4.9], [36.4, -4.4], [36.9, -3.9]],
+        [[35.6, -5.6], [36.1, -5.1], [36.6, -4.6], [37.1, -4.1]],
+    ], dtype=np.float64)
+
+    geo = GCPGeoreferencer(gcps, image_shape=(30, 30))
+
+    # Query at GCP positions — error must be zero (machine precision)
+    # GCP lines = [0, 10, 20, 29], GCP pixels = [0, 10, 20, 29]
+    gcp_lines = [0, 10, 20, 29]
+    gcp_pixels = [0, 10, 20, 29]
+    for i, line in enumerate(gcp_lines):
+        for j, pix in enumerate(gcp_pixels):
+            lat, lon = geo.pixel_to_latlon(float(line), float(pix))
+            assert np.isclose(lat, gcps[i, j, 0], rtol=0, atol=1e-10), \
+                f"Lat error at GCP ({line}, {pix}): {lat} != {gcps[i, j, 0]}"
+            assert np.isclose(lon, gcps[i, j, 1], rtol=0, atol=1e-10), \
+                f"Lon error at GCP ({line}, {pix}): {lon} != {gcps[i, j, 1]}"
+
+
+def test_gcp_georeferencer_interior_interpolation():
+    """Test that GCP interpolation produces reasonable values between control points."""
+    gcps = np.array([
+        [[35.0, -5.0], [36.0, -4.0]],
+        [[36.0, -6.0], [37.0, -5.0]],
+    ], dtype=np.float64)
+
+    geo = GCPGeoreferencer(gcps, image_shape=(10, 10))
+
+    # Midpoint between GCPs should be approximately midway in value
+    lat, lon = geo.pixel_to_latlon(5.0, 5.0)
+    assert 35.5 < lat < 36.0, f"Interior lat {lat} outside expected range [35.5, 36.0]"
+    assert -5.5 < lon < -4.5, f"Interior lon {lon} outside expected range [-5.5, -4.5]"
+
+
+def test_gcp_georeferencer_out_of_bounds_raises():
+    """Test that GCPOutOfBoundsError is raised for pixels outside the GCP grid.
+
+    This is the explicit safeguard: boundary behavior is NOT validated, so
+    an exception must be raised rather than improvising border management.
+    """
+    gcps = np.array([
+        [[35.0, -5.0], [36.0, -4.0]],
+        [[36.0, -6.0], [37.0, -5.0]],
+    ], dtype=np.float64)
+
+    geo = GCPGeoreferencer(gcps, image_shape=(10, 10))
+
+    # GCP lines = [0, 9], pixels = [0, 9]
+    # A pixel at line=10 or pixel=10 is outside the grid
+    with pytest.raises(GCPOutOfBoundsError, match="outside the GCP grid"):
+        geo.pixel_to_latlon(10.0, 5.0)  # line out of bounds
+
+    with pytest.raises(GCPOutOfBoundsError, match="outside the GCP grid"):
+        geo.pixel_to_latlon(5.0, 10.0)  # pixel out of bounds
+
+    with pytest.raises(GCPOutOfBoundsError, match="outside the GCP grid"):
+        geo.pixel_to_latlon(-1.0, 5.0)  # line negative
+
+    with pytest.raises(GCPOutOfBoundsError, match="outside the GCP grid"):
+        geo.pixel_to_latlon(5.0, -1.0)  # pixel negative
+
+
+def test_gcp_georeferencer_valid_bounds_are_accepted():
+    """Test that pixels strictly within the GCP grid are accepted."""
+    gcps = np.array([
+        [[35.0, -5.0], [36.0, -4.0]],
+        [[36.0, -6.0], [37.0, -5.0]],
+    ], dtype=np.float64)
+
+    geo = GCPGeoreferencer(gcps, image_shape=(10, 10))
+
+    # GCP lines = [0, 9], pixels = [0, 9]
+    # Pixel at (9, 9) is the LAST GCP — should work
+    lat, lon = geo.pixel_to_latlon(9.0, 9.0)
+    assert np.isclose(lat, 37.0, atol=1e-10)
+    assert np.isclose(lon, -5.0, atol=1e-10)
+
+    # Pixel at (0, 0) is the FIRST GCP — should work
+    lat, lon = geo.pixel_to_latlon(0.0, 0.0)
+    assert np.isclose(lat, 35.0, atol=1e-10)
+    assert np.isclose(lon, -5.0, atol=1e-10)
+
+
+def test_gcp_georeferencer_tile_to_bbox():
+    """Test that tile_to_bbox computes geographic bounds from pixel coordinates."""
+    gcps = np.array([
+        [[35.0, -5.0], [36.0, -4.0]],
+        [[36.0, -6.0], [37.0, -5.0]],
+    ], dtype=np.float64)
+
+    geo = GCPGeoreferencer(gcps, image_shape=(10, 10))
+
+    # Tile covering the full image (0,0) -> (10,10)
+    # The top-right corner (0, 9) = GCP[0,1] = (36.0, -4.0)
+    # But (9, 9) = GCP[1,1] = (37.0, -5.0)
+    # So: lat_min should be 35.0 (from (0,0)), lat_max should be 37.0 (from (9,9))
+    # And: lon_min should be -6.0 (from (9,0)), lon_max should be -4.0 (from (0,9))
+    bbox = geo.tile_to_bbox(0, 0, 10, 10)
+    assert len(bbox) == 4
+    assert np.isclose(bbox[0], 35.0, atol=1e-6)  # lat_min
+    assert np.isclose(bbox[1], -6.0, atol=1e-6)  # lon_min
+    assert np.isclose(bbox[2], 37.0, atol=1e-6)  # lat_max
+    assert np.isclose(bbox[3], -4.0, atol=1e-6)  # lon_max
+
+
+def test_gcp_georeferencer_invalid_gcp_shape():
+    """Test that invalid GCP array shapes are rejected."""
+    with pytest.raises(ValueError, match=r"GCP array must be \(N, M, 2\)"):
+        GCPGeoreferencer(np.array([[1.0, 2.0]]), image_shape=(10, 10))  # 2D, not 3D
+
+    with pytest.raises(ValueError, match=r"GCP array must be \(N, M, 2\)"):
+        GCPGeoreferencer(np.ones((5, 5, 3)), image_shape=(10, 10))  # last dim != 2

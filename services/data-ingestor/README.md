@@ -1,16 +1,37 @@
 # Data Ingestor Service
 
-But: Interface pour rechercher et télécharger des produits Sentinel-1 depuis CDSE (Copernicus Data Space Ecosystem).
+**Purpose**: API interface for searching and downloading Sentinel-1 products from the Copernicus Data Space Ecosystem (CDSE).
 
-Fonctions principales
-- `search_cdse_odata(...)` : wrapper réutilisant la logique Phase0 pour interroger l'API OData.
-- `download_safe_product(...)` : téléchargement et extraction du `.SAFE` via le service zipper CDSE.
+## Main Endpoints
 
-Authentification
-- Fournir `CDSE_USERNAME` et `CDSE_PASSWORD` via `.env` ou variables d'environnement.
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/ingest` | POST | Triggers asynchronous ingestion of a Sentinel-1 product (⚠️ not implemented — 501) |
+| `/status/{job_id}` | GET | Status of an ingestion job (⚠️ not implemented — 501) |
+| `/products?bbox=&date_start=&date_end=` | GET | Lists available Sentinel-1 products via CDSE OData API (⚠️ not implemented — 501) |
+| `/health` | GET | Service health |
 
-Exécution locale / usage
-Ces fonctions sont appelées par l'orchestrateur (ex: `services/data-ingestor/main.py`) ou manuellement depuis Phase0.
+## Core Functions (Phase 0, shared)
 
-Notes
-- La logique robuste d'authentification et téléchargement est réutilisée depuis `phase0/scripts/download_scenes.py`.
+Business logic is shared from `phase0/scripts/download_scenes.py`:
+- `get_cdse_token()` — Keycloak authentication against CDSE.
+- `search_sentinel1_products()` — OData query with bbox/date/product-type filters.
+- `download_product()` — Streaming download (8 KB chunks) with automatic ZIP extraction.
+
+## Authentication
+
+Required environment variables:
+- `CDSE_USERNAME` — Copernicus Data Space account email
+- `CDSE_PASSWORD` — Associated password
+
+## Local Execution
+
+```bash
+uvicorn services.data_ingestor.main:app --host 0.0.0.0 --port 8001
+```
+
+## Notes
+
+- Downloads use the `zipper.dataspace.copernicus.eu` service with 8 KB streaming to avoid memory issues.
+- `.SAFE` products are automatically extracted and the ZIP archive removed.
+- Scene selection targets the Moroccan coastal band (optimized for GFW AIS coverage, see Phase 0).

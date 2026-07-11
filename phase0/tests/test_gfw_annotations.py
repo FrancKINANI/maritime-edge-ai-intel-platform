@@ -2,6 +2,11 @@
 
 These tests validate the GFW client behavior without making real network calls,
 which ensures tests are fast, reliable, and don't require API tokens.
+
+NOTE per PH0-CORR-002:
+- get_sar_detections() has been REMOVED from the module (dataset returns grid cell aggregates)
+- Replaced by gfw_get_ais_presence() for Level 1 annotation seeds
+- get_ais_vessels() kept for backward compatibility
 """
 
 import pytest
@@ -25,94 +30,93 @@ def test_gfw_client_initialization():
     assert client.headers["Authorization"] == "Bearer test_token"
 
 
-def test_get_sar_detections_success(mock_gfw_client):
-    """Test successful SAR detections retrieval."""
+def test_gfw_get_ais_presence_success(mock_gfw_client):
+    """Test successful AIS Vessel Presence retrieval (Level 1 annotation seeds)."""
     client, mock_req = mock_gfw_client
 
-    # Mock successful response
     mock_req.return_value = {
         "entries": [
-            {"lat": 33.0, "lon": -9.0, "confidence": 0.9, "id": "vessel1"},
-            {"lat": 33.5, "lon": -9.5, "confidence": 0.85, "id": "vessel2"}
+            {"lat": 33.0, "lon": -9.0, "mmsi": "123456789", "timestamp": "2024-01-01T12:00:00Z"},
+            {"lat": 33.5, "lon": -9.5, "mmsi": "987654321", "timestamp": "2024-01-01T12:30:00Z"},
         ]
     }
 
     bbox = [-10.0, 32.0, -8.0, 34.0]
-    results = client.get_sar_detections(bbox, "2024-01-01", "2024-01-02")
+    results = client.gfw_get_ais_presence(bbox, "2024-01-01", "2024-01-02", limit=500)
 
     assert len(results) == 2
     assert results[0]["lat"] == 33.0
-    assert results[1]["lat"] == 33.5
+    assert results[0]["lon"] == -9.0
+    assert results[0]["mmsi"] == "123456789"
+    # Verify annotation seed contract
+    assert results[0]["source"] == "ais_presence_amorce"
+    assert results[0]["requires_human_validation"] is True
     mock_req.assert_called()
 
 
-def test_get_sar_detections_empty_response(mock_gfw_client):
-    """Test handling of empty SAR detections response."""
+def test_gfw_get_ais_presence_empty_response(mock_gfw_client):
+    """Test handling of empty AIS Vessel Presence response."""
     client, mock_req = mock_gfw_client
 
-    # Mock empty response
     mock_req.return_value = {"entries": []}
 
     bbox = [-10.0, 32.0, -8.0, 34.0]
-    results = client.get_sar_detections(bbox, "2024-01-01", "2024-01-02")
+    results = client.gfw_get_ais_presence(bbox, "2024-01-01", "2024-01-02", limit=500)
 
     assert len(results) == 0
 
 
-def test_get_sar_detections_422_fallback_to_post(mock_gfw_client):
-    """Test that 422 error triggers POST fallback."""
+def test_gfw_get_ais_presence_normalized_output(mock_gfw_client):
+    """Test that AIS presence entries are normalized to the contract format."""
     client, mock_req = mock_gfw_client
 
-    # First call (GET) raises 422, second call (POST) succeeds
-    from httpx import HTTPStatusError
+    mock_req.return_value = {
+        "entries": [
+            {"lat": 35.0, "lon": -5.0, "MMSI": "111222333", "vessel_name": "TEST VESSEL", "vessel_type": "fishing"},
+        ]
+    }
 
-    mock_response_422 = Mock()
-    mock_response_422.status_code = 422
+    bbox = [-6.0, 34.0, -4.0, 36.0]
+    results = client.gfw_get_ais_presence(bbox, "2024-01-01", "2024-01-02", limit=500)
 
-    error_422 = HTTPStatusError(
-        "422 Unprocessable Entity",
-        request=Mock(),
-        response=mock_response_422
-    )
-
-    mock_req.side_effect = [
-        error_422,  # First call fails with 422
-        {"entries": [{"lat": 33.0, "lon": -9.0}]}  # Second call succeeds
-    ]
-
-    bbox = [-10.0, 32.0, -8.0, 34.0]
-    results = client.get_sar_detections(bbox, "2024-01-01", "2024-01-02")
-
-    # Should eventually succeed after fallback
     assert len(results) == 1
-    assert mock_req.call_count == 2  # GET + POST fallback
+    entry = results[0]
+    assert entry["lat"] == 35.0
+    assert entry["lon"] == -5.0
+    assert entry["mmsi"] == "111222333"
+    assert entry["vessel_name"] == "TEST VESSEL"
+    assert entry["source"] == "ais_presence_amorce"
+    assert entry["requires_human_validation"] is True
 
 
-def test_get_sar_detections_404_no_silent_fallback(mock_gfw_client):
-    """Test that 404 error does NOT have silent fallback (per requirements)."""
+def test_gfw_get_ais_presence_api_failure(mock_gfw_client):
+    """Test graceful degradation when AIS Presence API call fails."""
     client, mock_req = mock_gfw_client
 
-    # Mock 404 error
-    from httpx import HTTPStatusError
-
-    mock_response_404 = Mock()
-    mock_response_404.status_code = 404
-
-    error_404 = HTTPStatusError(
-        "404 Not Found",
-        request=Mock(),
-        response=mock_response_404
-    )
-
-    mock_req.side_effect = error_404
+    mock_req.side_effect = RuntimeError("API timeout")
 
     bbox = [-10.0, 32.0, -8.0, 34.0]
+    results = client.gfw_get_ais_presence(bbox, "2024-01-01", "2024-01-02", limit=500)
 
-    # Should raise the 404 error (no silent fallback)
-    with pytest.raises(HTTPStatusError) as exc_info:
-        client.get_sar_detections(bbox, "2024-01-01", "2024-01-02")
+    # Should return empty list on error, not crash
+    assert len(results) == 0
 
-    assert exc_info.value.response.status_code == 404
+
+def test_get_dark_vessel_events(mock_gfw_client):
+    """Test dark vessel events retrieval (Level 2)."""
+    client, mock_req = mock_gfw_client
+
+    mock_req.return_value = {
+        "entries": [
+            {"lat": 34.0, "lon": -8.0, "timestamp_off": "2024-01-01T12:00:00Z"},
+        ]
+    }
+
+    bbox = [-10.0, 32.0, -8.0, 34.0]
+    results = client.get_dark_vessel_events(bbox, "2024-01-01", "2024-01-02", limit=200)
+
+    assert len(results) == 1
+    assert results[0]["lat"] == 34.0
 
 
 def test_normalize_response_entries_various_formats():
@@ -167,17 +171,36 @@ def test_gfw_client_retry_logic():
             request=MagicMock(),
             json={"entries": [{"lat": 33.0, "lon": -9.0}]}
         )
-
-        mock_client_instance.get.side_effect = [
+        # Use post.side_effect because _request_with_retry uses POST for AIS presence queries
+        mock_client_instance.post.side_effect = [
             mock_response_500,
             mock_response_500,
             mock_response_success
         ]
 
         client = GFWClient("test_token")
-        results = client.get_sar_detections([-10.0, 32.0, -8.0, 34.0], "2024-01-01", "2024-01-02")
+        results = client.gfw_get_ais_presence(
+            [-10.0, 32.0, -8.0, 34.0], "2024-01-01", "2024-01-02", limit=500
+        )
 
         # Should succeed after retries
         assert len(results) == 1
-        assert mock_client_instance.get.call_count == 3  # 2 failures + 1 success
+        assert mock_client_instance.post.call_count == 3  # 2 failures + 1 success
         assert mock_sleep.call_count == 2  # 2 backoff sleeps
+
+
+def test_get_ais_vessels_compatibility(mock_gfw_client):
+    """Test that get_ais_vessels (legacy) still works."""
+    client, mock_req = mock_gfw_client
+
+    mock_req.return_value = {
+        "entries": [
+            {"lat": 33.0, "lon": -9.0, "mmsi": "123456789"},
+        ]
+    }
+
+    bbox = [-10.0, 32.0, -8.0, 34.0]
+    results = client.get_ais_vessels(bbox, "2024-01-01T12:00:00Z", window_hours=1.0)
+
+    assert len(results) == 1
+    assert results[0]["lat"] == 33.0

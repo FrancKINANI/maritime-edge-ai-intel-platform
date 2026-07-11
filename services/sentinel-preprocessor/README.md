@@ -1,31 +1,53 @@
 # Sentinel Preprocessor Service
 
-But: Calibrage, filtrage anti-speckle, conversion en dB, normalisation et découpage en tuiles `.npy` pour ingestion par le détecteur.
+**Purpose**: Radiometric calibration, Lee speckle filtering, dB conversion, normalization, `.npy` tiling, and GCP-based georeferencing for Sentinel-1 GRD products.
 
-Endpoints principaux
-- `POST /preprocess?safe_path=<path>&pipeline=<A|B|C|D>` : lance le pipeline demandé et renvoie un manifeste JSON des tuiles générées.
-- `GET /pipelines` : liste les pipelines disponibles.
-- `GET /health` : état du service.
+## Main Endpoints
 
-Pipelines disponibles
-- A: baseline (normalisation directe)
-- B: calibration Sigma0
-- C: Sigma0 + filtre Lee
-- D: Sigma0 + filtre Lee + log dB + égalisation (valeur par défaut provisoire)
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/preprocess?safe_path=&pipeline=` | POST | Runs a SAR preprocessing pipeline (A/B/C/D), returns a JSON manifest of generated tiles |
+| `/pipelines` | GET | Lists available pipelines with descriptions |
+| `/health` | GET | Service health |
 
-Important
-- Le choix par défaut `PREPROCESSING_PIPELINE` est provisoire (valeur par défaut documentée: `D`). Le benchmark Phase 0 n'est pas encore tranché — ne pas considérer `D` comme définitif.
-- La méthode de géoréférencement s'appuie sur les LUTs/GCPs validés dans `phase0/scripts/sar_preprocessing.py` (sans la gestion de bord non auditée).
+## Available Pipelines
 
-Exécution locale
+| Pipeline | Steps | Usage |
+|----------|-------|-------|
+| **A** | Raw: direct uint16 → [0,255] normalization | Baseline, no SAR processing |
+| **B** | Sigma0: radiometric calibration σ⁰ → norm [0,255] | Radiometric correction only |
+| **C** | Sigma0 + Lee: calibration + 5×5 adaptive filter → norm | Speckle reduction |
+| **D** | Sigma0 + Lee + Log dB: full chain → norm [0,255] | ESA-recommended chain (provisional) |
+
+> ⚠️ Pipeline D is the provisional default. Phase 0 benchmark is not yet conclusive — do not consider D as final.
+
+## GCP Georeferencing
+
+The service implements GCP-based georeferencing (`GCPGeoreferencer`) for Sentinel-1 GRD products:
+
+- **Validated property**: Interpolation error at GCP control points is EXACTLY ZERO (machine precision).
+- **Limitation**: Pixels beyond the last recorded GCP (systematic case: the image is 1 pixel larger than the GCP grid on each axis) trigger an explicit `GCPOutOfBoundsError` rather than unaudited extrapolation.
+- **Usage**: `extract_gcps_from_geotiff()` reads GCPs from a Sentinel-1 GeoTIFF, and `tile_to_bbox()` computes a tile's geographic bounding box.
+
+See `sar_preprocessing.py` — classes `GCPGeoreferencer`, `GCPOutOfBoundsError`, function `extract_gcps_from_geotiff()`.
+
+## Dependencies
+
+- `scipy` (RegularGridInterpolator), `rasterio` (GeoTIFF reading), `numpy`.
+
+## Local Execution
+
 ```bash
 uvicorn services.sentinel_preprocessor.main:app --host 0.0.0.0 --port 8002
 ```
 
-Exemple d'appel
+## Example Call
+
 ```bash
-curl -X POST "http://localhost:8002/preprocess" -d "safe_path=/data/scenes/SCENE.SAFE&pipeline=D"
+curl -X POST "http://localhost:8002/preprocess?safe_path=/data/scenes/SCENE.SAFE&pipeline=D"
 ```
 
-Emplacement de sortie
-- Par défaut les tuiles sont écrites dans `phase0/data/tiles/<scene>/<pipeline>/`.
+## Output Location
+
+- Default: `phase0/data/tiles/<scene>/<pipeline>/`
+- Tiles in `.npy` format (512×512 pixels).
