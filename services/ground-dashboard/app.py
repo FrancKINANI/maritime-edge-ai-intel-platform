@@ -174,11 +174,11 @@ def render_monitoring_mode() -> None:
     st.subheader("Geographic Zone Definition")
     col1, col2 = st.columns(2)
     with col1:
-        lat_min = st.number_input("Latitude Min", value=27.0, min=-90.0, max=90.0)
-        lon_min = st.number_input("Longitude Min", value=-17.0, min=-180.0, max=180.0)
+        lat_min = st.number_input("Latitude Min", value=27.0, min_value=-90.0, max_value=90.0)
+        lon_min = st.number_input("Longitude Min", value=-17.0, min_value=-180.0, max_value=180.0)
     with col2:
-        lat_max = st.number_input("Latitude Max", value=36.0, min=-90.0, max=90.0)
-        lon_max = st.number_input("Longitude Max", value=-1.0, min=-180.0, max=180.0)
+        lat_max = st.number_input("Latitude Max", value=36.0, min_value=-90.0, max_value=90.0)
+        lon_max = st.number_input("Longitude Max", value=-1.0, min_value=-180.0, max_value=180.0)
 
     zone_bbox = [lat_min, lon_min, lat_max, lon_max]
     st.info(f"Monitoring zone bbox: {zone_bbox}")
