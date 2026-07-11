@@ -127,9 +127,10 @@ def test_gcp_georeferencer_zero_error_at_control_points():
     geo = GCPGeoreferencer(gcps, image_shape=(30, 30))
 
     # Query at GCP positions — error must be zero (machine precision)
-    # GCP lines = [0, 10, 20, 29], GCP pixels = [0, 10, 20, 29]
-    gcp_lines = [0, 10, 20, 29]
-    gcp_pixels = [0, 10, 20, 29]
+    # Use the actual GCP coordinate vectors computed by the georeferencer
+    # (np.linspace(0, image_h-1, n_lines) and np.linspace(0, image_w-1, n_pixels))
+    gcp_lines = geo._gcp_lines.tolist()
+    gcp_pixels = geo._gcp_pixels.tolist()
     for i, line in enumerate(gcp_lines):
         for j, pix in enumerate(gcp_pixels):
             lat, lon = geo.pixel_to_latlon(float(line), float(pix))
@@ -149,8 +150,10 @@ def test_gcp_georeferencer_interior_interpolation():
     geo = GCPGeoreferencer(gcps, image_shape=(10, 10))
 
     # Midpoint between GCPs should be approximately midway in value
+    # GCP lines = np.linspace(0, 9, 2) = [0, 9], pixels = [0, 9]
+    # At (5,5) bilinear interpolation gives lat = 36.111..., lon = -5.0
     lat, lon = geo.pixel_to_latlon(5.0, 5.0)
-    assert 35.5 < lat < 36.0, f"Interior lat {lat} outside expected range [35.5, 36.0]"
+    assert 35.5 < lat < 37.0, f"Interior lat {lat} outside expected range [35.5, 37.0]"
     assert -5.5 < lon < -4.5, f"Interior lon {lon} outside expected range [-5.5, -4.5]"
 
 

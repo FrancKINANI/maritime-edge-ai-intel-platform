@@ -6,6 +6,7 @@ persisting findings in database storage, and querying aggregated metrics.
 """
 
 from fastapi import FastAPI, HTTPException, status
+from contextlib import asynccontextmanager
 from typing import List, Dict, Any, Optional
 from shared.schemas.events import DetectionEvent, BoundingBox
 import sqlite3
@@ -85,16 +86,18 @@ def determine_zone(tile_bbox_latlon: List[float]) -> str:
     return "Z3"
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
+
+
 app = FastAPI(
     title="Maritime Edge AI Intel Platform - Aggregator",
     description="Microservice aggregating, enriching, and storing detection reports.",
     version="1.0.0",
+    lifespan=lifespan,
 )
-
-
-@app.on_event("startup")
-def startup():
-    init_db()
 
 
 @app.post("/events", status_code=status.HTTP_201_CREATED, response_model=DetectionEvent)

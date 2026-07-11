@@ -40,8 +40,8 @@ class DetectionEvent(BaseModel):
     tile_id: str = Field(..., description="Identifier of the processed tile")
     tile_bbox_latlon: List[float] = Field(
         ...,
-        min_items=4,
-        max_items=4,
+        min_length=4,
+        max_length=4,
         description="Geographic bounding box of the tile: [lat_min, lon_min, lat_max, lon_max]"
     )
     detections: List[BoundingBox] = Field(..., description="List of detected vessels bounding boxes")
@@ -59,8 +59,8 @@ class IngestRequest(BaseModel):
     """Payload to trigger acquisition and ingestion of satellite scenes."""
     bbox: List[float] = Field(
         ...,
-        min_items=4,
-        max_items=4,
+        min_length=4,
+        max_length=4,
         description="Bounding box coordinates: [lon_min, lat_min, lon_max, lat_max]"
     )
     date_start: str = Field(..., description="Query start time in ISO8601 format")

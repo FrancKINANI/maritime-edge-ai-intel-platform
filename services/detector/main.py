@@ -5,6 +5,7 @@ Exposes endpoints for running model inference on preprocessed .npy tiles
 to detect vessels and output raw detection events.
 """
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, status
 from pydantic import BaseModel
 from typing import Dict, Optional, List, Tuple
@@ -30,13 +31,6 @@ class DetectRequest(BaseModel):
     preprocessing_pipeline: str = "D"
 
 
-app = FastAPI(
-    title="Maritime Edge AI Intel Platform - Detector",
-    description="Microservice wrapping the Phase I YOLOv8 ONNX model for ship detection.",
-    version="1.0.0",
-)
-
-
 # Load ONNX models once at startup
 DETECTOR_SESSION: Optional[ort.InferenceSession] = None
 SEGMENTER_SESSION: Optional[ort.InferenceSession] = None
@@ -59,9 +53,18 @@ def load_models():
         SEGMENTER_SESSION = None
 
 
-@app.on_event("startup")
-def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     load_models()
+    yield
+
+
+app = FastAPI(
+    title="Maritime Edge AI Intel Platform - Detector",
+    description="Microservice wrapping the Phase I YOLOv8 ONNX model for ship detection.",
+    version="1.0.0",
+    lifespan=lifespan,
+)
 
 
 def preprocess_tile(tile: np.ndarray, target_size: int = constants.MODEL_INPUT_SIZE) -> np.ndarray:
