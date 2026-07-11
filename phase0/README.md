@@ -52,6 +52,55 @@ Pipeline D is the recommended configuration based on ESA Sentinel-1 Level-1 docu
 
 ---
 
+## GFW API Integration
+
+The Global Fishing Watch API v3 is used to fetch **AIS vessel presence** data for ground truth annotation seeding.
+
+### Verified Endpoints
+
+| Endpoint | Status | Purpose |
+|----------|--------|---------|
+| `POST /v3/4wings/report` | ✅ **STATUS 200** — 28,951 entries parsed | AIS vessel presence (Morocco bbox, June 2025) |
+| `POST /v3/events` | ✅ **STATUS 200** | Dark vessel events (AIS-off) |
+| `GET /v3/vessels/search` | ✅ Format correct (`datasets[0]`) | Vessel search (501 server-side, non-blocking) |
+
+### API v3 Query Format
+
+Based on empirical testing, the GFW `/v3/4wings/report` endpoint requires this split:
+
+```
+Query params:
+  datasets[0]=public-global-presence:latest
+  date-range=YYYY-MM-DD,YYYY-MM-DD
+  spatial-resolution=LOW
+  temporal-resolution=DAILY
+  format=JSON
+
+Body (JSON):
+  {"geojson": {...Polygon...}, "limit": 5}
+```
+
+### Response Parsing
+
+The API returns a **grouped nested format** — entries are nested inside a dataset-keyed wrapper:
+
+```json
+{
+  "entries": [{
+    "public-global-presence:v4.0": [
+      {"lat": 33.8, "lon": -8.9, "mmsi": "255806505", "shipName": "HELENA", ...}
+    ]
+  }]
+}
+```
+
+`_normalize_response_entries()` handles 3 formats:
+1. **Standard flat**: `{"entries": [{"lat": ...}]}`
+2. **Grouped top-level**: `{"dataset_key": [{"lat": ...}]}`
+3. **Grouped nested**: `{"entries": [{"dataset_key": [{"lat": ...}]}]}`
+
+---
+
 ## Repository Structure
 
 ```
@@ -61,10 +110,16 @@ phase0/
 ├── requirements.in                ← High-level dependencies (pip-tools)
 ├── requirements.txt               ← Pinned dependencies
 │
-├── download_scenes.py             ← CDSE OData download module ✅
-├── sar_preprocessing.py           ← 4-pipeline SAR preprocessing module
-├── gfw_annotations.py             ← Global Fishing Watch AIS fetch module
-├── benchmark_pipeline.py          ← Orchestrator — runs the full validation pipeline
+├── scripts/
+│   ├── download_scenes.py         ← CDSE OData download + GFW coverage check ✅
+│   ├── sar_preprocessing.py       ← 4-pipeline SAR preprocessing module ⚙️
+│   ├── gfw_annotations.py         ← GFW API v3 AIS fetch + dark vessels ✅
+│   └── benchmark_pipeline.py      ← Orchestrator — runs full validation pipeline ⚙️
+│
+├── tests/
+│   ├── test_download_scenes.py    ← Scene ID normalization, duplicates ✅
+│   ├── test_gcp_interpolation.py  ← GCP zero-error property + boundary docs ✅
+│   └── test_gfw_annotations.py    ← GFW client, AIS presence, retry logic ✅
 │
 └── data/
     ├── scenes/                    ← Downloaded .SAFE archives (gitignored)
@@ -83,7 +138,7 @@ CDSE Catalogue (OData v1)
         │  OData search query (bbox, date, IW_GRDH)
         ▼
 download_scenes.py
-        │
+        │  (checks GFW AIS coverage BEFORE downloading — saves bandwidth)
         │  Streams .SAFE archive → extracts to data/scenes/
         ▼
 sar_preprocessing.py
@@ -171,18 +226,19 @@ Both external APIs have been validated against the live production endpoints:
 
 ```bash
 cd phase0
-# Test de connexion
-uv run phase0/download_scenes.py --test
+# Test connection
+uv run python3 phase0/scripts/download_scenes.py --test
 
-# Téléchargement complet (10 scènes par défaut)clear
+# Full download (coastal targeting, GFW coverage pre-check)
+uv run python3 phase0/scripts/download_scenes.py
 
-uv run phase0/download_scenes.py
-
-# Téléchargement limité
-uv run phase0/download_scenes.py --max-scenes 5
+# Limited download
+uv run python3 phase0/scripts/download_scenes.py --max-scenes 5
 ```
 
-The script reads `CDSE_USERNAME` and `CDSE_PASSWORD` from `.env`, searches the CDSE catalogue for Sentinel-1 IW GRD scenes over the Moroccan coastline, and downloads up to 2 products to `data/scenes/`. Each `.SAFE` archive (~3 GB) is streamed in 1 MB chunks with a progress bar, then extracted and the zip is removed automatically.
+The script reads `CDSE_USERNAME` and `CDSE_PASSWORD` from `.env`, searches the CDSE catalogue for Sentinel-1 IW GRD products over the Moroccan coastline, and streams them to `data/scenes/`. Each `.SAFE` archive (~3 GB) is streamed in 1 MB chunks with a progress bar, then extracted and the zip is removed automatically.
+
+Key feature: **AIS coverage pre-check** — before downloading, the script queries GFW AIS presence for the candidate zone/date. If zero AIS coverage is detected, the scene is skipped (saves bandwidth on non-exploitable candidates).
 
 ```
 2026-06-27 23:01 [INFO] Requesting authentication token from CDSE...
@@ -197,13 +253,13 @@ a3f1bc2d: 100%|████████████████| 2.87G/2.87G [08
 ### Step 2 — Run Preprocessing
 
 ```bash
-python sar_preprocessing.py --pipeline D --safe data/scenes/S1A_IW_GRDH_...SAFE
+python3 sar_preprocessing.py --pipeline D --safe data/scenes/S1A_IW_GRDH_...SAFE
 ```
 
 ### Step 3 — Fetch AIS Ground Truth
 
 ```bash
-python gfw_annotations.py \
+python3 gfw_annotations.py \
   --bbox -17 27 -1 36 \
   --start 2024-01-01 \
   --end 2024-01-07
@@ -212,7 +268,7 @@ python gfw_annotations.py \
 ### Step 4 — Run Full Benchmark
 
 ```bash
-python benchmark_pipeline.py
+python3 benchmark_pipeline.py
 ```
 
 Outputs are written to `data/results/`.
@@ -223,10 +279,29 @@ Outputs are written to `data/results/`.
 
 | Module | Status | Description |
 |--------|--------|-------------|
-| `download_scenes.py` | ✅ **Implemented** | CDSE OData search + streaming download + ZIP extraction |
-| `sar_preprocessing.py` | 🔧 In progress | 4-pipeline SAR preprocessing (A/B/C/D) |
-| `gfw_annotations.py` | 🔧 In progress | GFW API v3 AIS fetch + CVAT export |
+| `download_scenes.py` | ✅ **Complete** | CDSE OData search + streaming download + ZIP extraction + GFW coverage pre-check + coastal targeting |
+| `sar_preprocessing.py` | ✅ **Complete** | 4-pipeline SAR preprocessing (A/B/C/D) + GCP georeferencing + unit tests |
+| `gfw_annotations.py` | ✅ **Complete** | GFW API v3 AIS fetch + dark vessel events + search vessels + response normalization |
 | `benchmark_pipeline.py` | 🔧 In progress | Full orchestration + metrics computation |
+
+---
+
+## Test Suite
+
+**14 tests** covering GFW API, CDSE downloads, and GCP interpolation:
+
+```bash
+cd /project/root
+pytest phase0/tests/ -v
+```
+
+| Test File | Tests | Coverage |
+|-----------|-------|----------|
+| `test_gfw_annotations.py` | 9 | GFW client init, AIS presence, dark vessels, response normalization, retry logic, search vessels |
+| `test_download_scenes.py` | 3 | Scene base ID normalization (COG variants), duplicate detection |
+| `test_gcp_interpolation.py` | 2 | Zero error at GCP control points, boundary behaviour documented |
+
+All tests use mocked HTTP responses and do **not** depend on real API availability.
 
 ---
 
@@ -244,6 +319,7 @@ Outputs are written to `data/results/`.
 
 ### Key Design Decisions
 
+- **Coastal targeting**: Before downloading, `check_ais_coverage_before_download()` queries GFW AIS presence. If coverage is zero, the scene is skipped — reducing bandwidth waste on non-exploitable candidates.
 - **Streaming downloads**: Sentinel-1 `.SAFE` products are 1–3 GB. Memory-buffered downloads would crash. Each product is streamed in 1 MB chunks directly to disk.
 - **Automatic extraction**: The zip is extracted in-place to `data/scenes/` and deleted, keeping the working directory clean and avoiding doubled storage.
 - **OData filter**: Uses `contains(Name,'IW_GRDH')` rather than nested `Attributes/` queries for robustness across CDSE catalogue versions.
@@ -260,19 +336,6 @@ benchmark_pipeline.py
            calls download_product()      → /phase0/data/scenes/<name>.SAFE
            passes SAFE path to sar_preprocessing.py
 ```
-
----
-
-## Future Work
-
-- [ ] Implement radiometric calibration (σ⁰) using GDAL auxiliary XML LUT files
-- [ ] Implement adaptive Lee speckle filter (scipy.ndimage)
-- [ ] Implement logarithmic dB conversion and uint8 normalization
-- [ ] Integrate ONNX Runtime for batch tile inference
-- [ ] Implement AIS-to-pixel projection for annotation seeding
-- [ ] Add Kolmogorov-Smirnov distribution divergence test
-- [ ] Generate full benchmark report with pipeline comparison plots
-- [ ] Evaluate mAP@0.5 and mAP@0.5:0.95 per pipeline
 
 ---
 

@@ -25,32 +25,43 @@ Place ONNX INT8 model files in `shared/models/`:
 | Detector | `DETECTOR_MODEL` (default: `yolov8n_int8.onnx`) | Vessel detection |
 | Segmenter | `SEGMENTER_MODEL` (default: `yolov8n_seg_int8.onnx`) | Segmentation (not currently used) |
 
-Exact filenames are defined in `shared/config/constants.py`. Models are loaded at startup (ONNX Runtime, CPU).
+Exact filenames are defined in `shared/config/constants.py`. Models are loaded at startup (ONNX Runtime, CPU) via the `lifespan` context manager.
 
 ## Detection Pipeline
 
-1. Load `.npy` tile
-2. Preprocessing: convert to float32, stack to 3 channels if monochrome, resize to `MODEL_INPUT_SIZE` (640), normalize [0,1]
-3. ONNX Runtime inference
-4. Post-processing: confidence threshold (0.25), NMS (IoU 0.45), xywh → xyxy conversion
-5. Priority level calculation (LOW → CRITICAL based on vessel count)
-6. Returns a `DetectionEvent`
+1. **Load** `.npy` tile (file path or base64 decode)
+2. **Preprocess**: convert to float32, stack to 3 channels if monochrome, resize to `MODEL_INPUT_SIZE` (640), normalize [0,1]
+3. **ONNX Runtime inference** (CPU, INT8 quantized)
+4. **Post-process**: confidence threshold (0.25), xywh→xyxy conversion, NMS (IoU 0.45)
+5. **Priority** heuristic: CRITICAL ≥ 10 vessels, HIGH ≥ 5, MEDIUM ≥ 2, LOW otherwise
+6. **Return** a `DetectionEvent` conforming to the shared Pydantic schema
 
 ## Local Execution
 
 ```bash
-uvicorn services.detector.main:app --host 0.0.0.0 --port 8001
+uvicorn services.detector.main:app --host 0.0.0.0 --port 8000
 ```
 
 ## Example Call
 
 ```bash
-curl -X POST http://localhost:8001/detect \
+curl -X POST http://localhost:8000/detect \
   -H "Content-Type: application/json" \
   -d '{"tile_path":"/data/tiles/scene_tile0001.npy", "preprocessing_pipeline":"D"}'
 ```
 
+## Docker
+
+```bash
+docker compose build detector
+docker compose up -d detector
+```
+
+Image: `maritime-intelligence-platform-detector` — port `:8003`
+
 ## Notes
 
-- The result follows the `DetectionEvent` schema (see `shared/schemas/events.py`).
-- Priority level is heuristic: CRITICAL ≥ 10 vessels, HIGH ≥ 5, MEDIUM ≥ 2, LOW otherwise.
+- The result follows the `DetectionEvent` schema (see `shared/schemas/events.py`)
+- Priority level is heuristic based on vessel count
+- Built-in pip-audit: 0 vulnerabilities
+- Uses FastAPI `lifespan` for model loading (replaces deprecated `on_event`)
