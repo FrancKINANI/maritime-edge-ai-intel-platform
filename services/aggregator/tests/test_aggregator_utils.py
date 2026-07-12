@@ -5,10 +5,18 @@ These are pure functions testable without SQLite or FastAPI.
 """
 
 from pathlib import Path
+import importlib.util
 import sys
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from main import determine_zone
+# Load aggregator main.py by absolute path so concurrent pytest collection of
+# other services/*/main.py modules cannot shadow the name "main".
+_AGG_MAIN = Path(__file__).resolve().parents[1] / "main.py"
+_spec = importlib.util.spec_from_file_location("aggregator_main", _AGG_MAIN)
+_aggregator_main = importlib.util.module_from_spec(_spec)
+sys.modules["aggregator_main"] = _aggregator_main
+assert _spec.loader is not None
+_spec.loader.exec_module(_aggregator_main)
+determine_zone = _aggregator_main.determine_zone
 
 
 def test_determine_zone_inside_morocco_bbox():

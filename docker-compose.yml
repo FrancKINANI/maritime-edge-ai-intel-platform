@@ -137,6 +137,7 @@ services:
       - AGGREGATOR_URL=http://aggregator:8002
       - DETECTOR_URL=http://detector:8000
       - SATMON_URL=http://satellite-monitor:8000
+      - PREPROCESSOR_URL=http://sentinel-preprocessor:8000
     volumes:
       - ./shared:/app/shared
     networks:

@@ -39,18 +39,32 @@ jobs:
   tests:
     runs-on: ubuntu-latest
     needs: [lint]
+    strategy:
+      matrix:
+        suite:
+          - phase0/tests/
+          - services/sentinel-preprocessor/tests/
+          - services/aggregator/tests/
+          - services/detector/tests/
+          - services/satellite-monitor/tests/
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
-      - name: Install dependencies
+      - name: Install system dependencies (detector)
+        if: ${{ contains(matrix.suite, 'detector') }}
+        run: |
+          sudo apt-get update && sudo apt-get install -y libgl1-mesa-glx
+      - name: Install test requirements
         run: |
           pip install -r services/sentinel-preprocessor/requirements.txt
           pip install -r services/aggregator/requirements.txt
           pip install -r services/data-ingestor/requirements.txt
+          pip install -r services/detector/requirements.txt
+          pip install -r services/satellite-monitor/requirements.txt
           pip install -r phase0/requirements.txt
           pip install pytest pytest-asyncio
-      - name: Run unit tests
+      - name: Run unit tests — ${{ matrix.suite }}
         run: |
-          python -m pytest phase0/tests/ services/aggregator/tests/ services/sentinel-preprocessor/tests/ -v --tb=short
+          python -m pytest ${{ matrix.suite }} -v --tb=short

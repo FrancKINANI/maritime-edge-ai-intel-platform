@@ -117,7 +117,7 @@ async def ingest_detection_event(event: DetectionEvent) -> DetectionEvent:
                 event.timestamp.isoformat(),
                 event.tile_id,
                 json.dumps(event.tile_bbox_latlon),
-                json.dumps([d.dict() for d in event.detections]),
+                json.dumps([d.model_dump() for d in event.detections]),
                 event.vessel_count,
                 event.dark_vessel_count,
                 event.priority_level,

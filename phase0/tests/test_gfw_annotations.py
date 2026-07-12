@@ -242,3 +242,35 @@ def test_get_ais_vessels_compatibility(mock_gfw_client):
 
     assert len(results) == 1
     assert results[0]["lat"] == 33.0
+
+
+def test_gfw_get_ais_presence_query_param_contract(mock_gfw_client):
+    """Lock the GFW /4wings/report param split (query vs body) — engineering contract.
+
+    Does NOT assert HIGH vs LOW spatial-resolution (scientific arbitration pending).
+    Asserts datasets[0], date-range, spatial-resolution, temporal-resolution, format
+    are query params; geojson and limit are body params.
+    """
+    client, mock_req = mock_gfw_client
+    mock_req.return_value = {"entries": []}
+
+    client.gfw_get_ais_presence([-10.0, 32.0, -8.0, 34.0], "2024-01-01", "2024-01-02", limit=50)
+
+    assert mock_req.called
+    args = mock_req.call_args.args
+    call_kwargs = mock_req.call_args.kwargs
+    assert args[0] == "POST"
+    assert args[1].endswith("/4wings/report")
+    params = call_kwargs["params"]
+    body = call_kwargs["json_body"]
+    assert params["datasets[0]"] == "public-global-presence:latest"
+    assert params["date-range"] == "2024-01-01,2024-01-02"
+    assert "spatial-resolution" in params
+    # HIGH vs LOW is a scientific arbitration (Partie 1) — only lock presence + valid value.
+    assert params["spatial-resolution"] in ("LOW", "HIGH")
+    assert "temporal-resolution" in params
+    assert params["format"] == "JSON"
+    assert "geojson" in body
+    assert body["limit"] == 50
+    assert "datasets[0]" not in body
+    assert "date-range" not in body

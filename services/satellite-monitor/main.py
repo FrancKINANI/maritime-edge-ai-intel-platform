@@ -233,7 +233,7 @@ async def get_satellite_position(satellite_id: str, timestamp: datetime) -> Dict
         alt_m = subpoint.elevation.m
     except Exception as e:
         logger.error("SGP4 propagation error for NORAD %s: %s", norad, e, exc_info=True)
-        raise HTTPException(status_code=500, detail=f"SGP4 propagation error: {e}")
+        raise HTTPException(status_code=500, detail="SGP4 propagation error")
 
     tle_fresh = _is_cache_fresh(entry.get("updated_at"))
     return {

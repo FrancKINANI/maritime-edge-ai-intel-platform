@@ -4,11 +4,21 @@ These are pure functions testable without ONNX Runtime or any external dependenc
 """
 
 from pathlib import Path
+import importlib.util
 import sys
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import numpy as np
-from main import nms, xywh2xyxy
+
+# Load detector main.py by absolute path so concurrent pytest collection of
+# other services/*/main.py modules cannot shadow the name "main".
+_DETECTOR_MAIN = Path(__file__).resolve().parents[1] / "main.py"
+_spec = importlib.util.spec_from_file_location("detector_main", _DETECTOR_MAIN)
+_detector_main = importlib.util.module_from_spec(_spec)
+sys.modules["detector_main"] = _detector_main
+assert _spec.loader is not None
+_spec.loader.exec_module(_detector_main)
+nms = _detector_main.nms
+xywh2xyxy = _detector_main.xywh2xyxy
 
 
 def test_xywh2xyxy_center_box():

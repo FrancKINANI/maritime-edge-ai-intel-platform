@@ -22,7 +22,12 @@ phase0:
 	cd phase0 && python download_scenes.py
 
 test:
-	@echo "Pytest not yet configured. Skeletons only."
+	@# Per-service invocations avoid sys.path collisions on modules named main.py
+	uv run python -m pytest phase0/tests/ -q
+	uv run python -m pytest services/sentinel-preprocessor/tests/ -q
+	uv run python -m pytest services/aggregator/tests/ -q
+	uv run python -m pytest services/detector/tests/ -q
+	uv run python -m pytest services/satellite-monitor/tests/ -q
 
 clean:
 	@echo "Cleaning up generated tiles, downloaded scenes, and results..."

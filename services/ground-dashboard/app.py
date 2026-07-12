@@ -19,9 +19,11 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-DETECTOR_URL = os.getenv("DETECTOR_URL", "http://localhost:8001")
-SATMON_URL = os.getenv("SATMON_URL", "http://localhost:8010")
-AGGREGATOR_URL = os.getenv("AGGREGATOR_URL", "http://localhost:8020")
+# Defaults match host ports published in docker-compose.yml:
+#   preprocessor 8000, aggregator 8002, detector 8003, satellite-monitor 8004
+DETECTOR_URL = os.getenv("DETECTOR_URL", "http://localhost:8003")
+SATMON_URL = os.getenv("SATMON_URL", "http://localhost:8004")
+AGGREGATOR_URL = os.getenv("AGGREGATOR_URL", "http://localhost:8002")
 PREPROCESSOR_URL = os.getenv("PREPROCESSOR_URL", "http://localhost:8000")
 
 

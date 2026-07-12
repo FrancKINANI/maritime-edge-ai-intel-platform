@@ -5,12 +5,17 @@ Exposes endpoints for preprocessing downloaded Sentinel-1 SAFE products into
 numpy sub-tiles using multiple pipelines.
 """
 
-from fastapi import FastAPI, HTTPException, status
-from typing import Dict, Any
-from shared.config import constants
-from pathlib import Path
 import importlib.util
+import logging
 import sys
+from pathlib import Path
+from typing import Dict, Any
+
+from fastapi import FastAPI, HTTPException, status
+
+from shared.config import constants
+
+logger = logging.getLogger(__name__)
 
 # Load the local sar_preprocessing module (directory name contains a hyphen)
 _sp_path = Path(__file__).resolve().parent / "sar_preprocessing.py"
@@ -34,10 +39,10 @@ async def preprocess_scene(safe_path: str, pipeline: str = None, output_dir: str
     The default pipeline comes from environment configuration. See README.md for
     the note that the default pipeline is provisional pending Phase 0 benchmark.
     """
-    pipeline = (pipeline or constants.PREPROCESSING_PIPELINES.keys())
-    if pipeline is None:
+    # Default to pipeline D when omitted; never assign dict_keys (was a TypeError on .upper()).
+    if pipeline is None or pipeline == "":
         pipeline = "D"
-    pipeline = pipeline.upper()
+    pipeline = str(pipeline).upper()
     if pipeline not in ["A", "B", "C", "D"]:
         raise HTTPException(status_code=400, detail="pipeline must be one of A/B/C/D")
 
@@ -58,7 +63,8 @@ async def preprocess_scene(safe_path: str, pipeline: str = None, output_dir: str
     except NotImplementedError as e:
         raise HTTPException(status_code=501, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Preprocessing failed: {e}")
+        logger.error("Preprocessing failed: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail="Preprocessing failed")
 
     return result
 

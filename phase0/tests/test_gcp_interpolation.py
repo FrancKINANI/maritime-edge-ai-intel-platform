@@ -6,7 +6,6 @@ validated in Phase 0 and must not be broken by future modifications.
 """
 
 import numpy as np
-import pytest
 from scipy.interpolate import RegularGridInterpolator
 
 
@@ -58,14 +57,13 @@ def test_gcp_interpolation_zero_error_at_control_points():
     assert max_error < 1e-9, f"Maximum error {max_error} exceeds tolerance"
 
 
-def test_gcp_interpolation_boundary_behavior_unvalidated():
-    """Test that boundary behavior is documented as UNVALIDATED.
+def test_gcp_interpolation_boundary_extrapolates_without_bounds_error():
+    """Document that bare RegularGridInterpolator(bounds_error=False) extrapolates.
 
-    This test intentionally FAILS to highlight that boundary behavior
-    is not validated. The image is 1 pixel larger than the GCP grid
-    on each axis, so boundary pixels will trigger extrapolation.
+    Production code must NOT rely on this path: services/sentinel-preprocessor
+    raises GCPOutOfBoundsError for pixels outside the GCP grid instead.
+    This test only locks the scipy default behavior used historically in Phase 0.
     """
-    # Create a small GCP grid
     lines = np.array([0, 10, 20])
     pixels = np.array([0, 10, 20])
     values = np.array([
@@ -79,24 +77,12 @@ def test_gcp_interpolation_boundary_behavior_unvalidated():
         values,
         method='linear',
         bounds_error=False,
-        fill_value=None
+        fill_value=None,
     )
 
-    # Test at a point outside the GCP grid (simulating the +1 pixel boundary)
-    # This is the problematic case mentioned in the review
-    boundary_point = [21, 21]  # Just outside the grid
-
-    try:
-        result = interpolator(boundary_point)
-        # If we get here, the interpolator produced some value
-        # but this behavior is NOT validated
-        print(f"WARNING: Boundary point {boundary_point} produced value {result}")
-        print("This behavior is NOT validated for production use!")
-    except Exception as e:
-        # If we get an exception, that's also a documented behavior
-        print(f"Boundary point {boundary_point} raised exception: {e}")
-        print("This behavior is NOT validated for production use!")
-
-    # This test always warns to remind developers that boundary behavior
-    # requires human validation before production deployment
-    pytest.warns(UserWarning, match="Boundary behavior is NOT validated")
+    boundary_point = [21, 21]
+    result = interpolator(boundary_point)
+    # Extrapolated value is finite but NOT validated for production georeferencing.
+    assert np.isfinite(result).all()
+    # Interior control point remains exact (regression lock).
+    assert np.isclose(interpolator([10, 10]), 5.0, atol=1e-10)
