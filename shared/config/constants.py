@@ -3,9 +3,14 @@
 
 This module contains configuration values for geographic zones,
 SAR preprocessing algorithms, detector specifications, and satellite metadata.
+
+NOTEBOOK <-> SCRIPTS SYNCHRONIZATION:
+    The Colab notebook (colab_phase0_pipeline_final.ipynb) should, in the next
+    session, IMPORT these constants from this file rather than redefining them
+    locally. This file is the single source of truth for all shared constants.
 """
 
-from typing import List
+from typing import List, Dict
 
 # Geographic boundaries for Morocco EEZ and Territorial Waters
 # format: [lon_min, lat_min, lon_max, lat_max]
@@ -32,7 +37,7 @@ MODEL_INPUT_SIZE: int = 640   # Yolov8 input shape (640x640)
 PRIORITY_LEVELS: List[str] = ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
 
 # Preprocessing pipeline configurations for Phase 0 validation
-PREPROCESSING_PIPELINES = {
+PREPROCESSING_PIPELINES: Dict[str, str] = {
     "A": "raw",
     "B": "sigma0",
     "C": "sigma0_lee",
@@ -45,3 +50,20 @@ TLE_REFRESH_HOURS: int = 24
 # Sentinel-1 Product parameters
 SENTINEL1_PRODUCT_TYPE: str = "IW_GRDH_1S"
 SENTINEL1_POLARIZATION: str = "VV VH"
+
+# GFW API constants (shared between phase0/scripts/ and notebook)
+GFW_MARGIN_DEG: float = 0.01         # Margin around bbox for GFW queries
+N_EMPTY_TILES_PER_SCENE: int = 80     # Number of empty control tiles per scene
+MAX_TILES_PER_SCENE_HARD_CAP: int = 600  # Hard cap on tiles per scene
+GFW_SPATIAL_RESOLUTION: str = "HIGH"   # Spatial resolution for GFW queries (LOW or HIGH)
+
+# AIS density map constants
+DENSITY_CELL_SIZE_DEG: float = 0.5    # ~55 km -- density map granularity
+DENSITY_LOOKBACK_DAYS: int = 30       # Recent period for AIS density query
+N_TARGET_ZONES: int = 5               # Number of high-density zones to target
+MAX_TEST_SCENES: int = 5              # Strict test batch size
+
+# Benchmark constants
+NODATA_THRESHOLD: float = 0.30        # Max NoData ratio to keep a tile
+PIPELINES: List[str] = ["A", "B", "C", "D"]
+POLARIZATION: str = "vv"

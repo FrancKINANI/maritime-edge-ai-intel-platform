@@ -25,7 +25,7 @@ import time
 import urllib.parse
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import httpx
 from tqdm import tqdm
@@ -55,7 +55,32 @@ TOKEN_EXPIRY_SECONDS = 600  # CDSE tokens expire after 10 minutes
 # Scene selection criteria for Morocco 2025 only
 # The dataset should cover Moroccan waters across all four quarters.
 # Per PH0-CORR-002: Coastal targeting optimized for GFW coverage
+#
+# NOTE -- Two selection methods coexist:
+#   PRIMARY METHOD: build_ais_density_map() + select_and_download_scenes_from_density()
+#   targets the highest AIS density zones (maximizes annotations).
+#   DOCUMENTED FALLBACK: SELECTION_CRITERIA (seasonal criteria) kept
+#   for comparison with density-targeted scenes.
 MOROCCO_BBOX = [-17, 27, -1, 36]  # [lon_min, lat_min, lon_max, lat_max] - Full reference bbox
+
+# AIS density map parameters (PRIMARY method)
+DENSITY_CELL_SIZE_DEG = 0.5      # ~55 km density map granularity
+DENSITY_LOOKBACK_DAYS = 30       # recent period for AIS query
+N_TARGET_ZONES = 5               # number of high-density zones to target
+MAX_TEST_SCENES = 5              # strict test batch size
+
+# Targeting traceability (Part B of the protocol)
+# Fields recorded in target_trace.json for each downloaded scene:
+#   - target_density_cell_index (int, position in dmap['cells'])
+#   - target_cell_bbox (exact bbox of the targeted cell)
+# These fields are propagated into metadata.json during SAR processing.
+
+# Configurable parameters (Part C -- via environment variables)
+# Allows adjusting memory constraints without modifying the code.
+# Default values correspond to the Colab environment (16 GB RAM).
+# For a more powerful machine, these values can be increased.
+_N_EMPTY_TILES_PER_SCENE = int(os.getenv("N_EMPTY_TILES_PER_SCENE", "80"))
+_MAX_TILES_PER_SCENE_HARD_CAP = int(os.getenv("MAX_TILES_PER_SCENE_HARD_CAP", "600"))
 
 def generate_coastal_search_bboxes(full_bbox: List[float], coastal_width_km: float = 50.0) -> List[List[float]]:
     """
@@ -183,7 +208,7 @@ def check_ais_coverage_before_download(bbox: List[float], date_start: str, date_
     query_params = {
         "datasets[0]": AIS_PRESENCE_DATASET,
         "date-range": f"{date_start},{date_end}",
-        "spatial-resolution": "LOW",
+        "spatial-resolution": "HIGH",
         "temporal-resolution": "DAILY",
         "format": "JSON",
     }
@@ -196,11 +221,15 @@ def check_ais_coverage_before_download(bbox: List[float], date_start: str, date_
         response = httpx.post(GFW_REPORT, headers=headers, params=query_params, json=body_params, timeout=30.0)
         if response.status_code == 200:
             data = response.json()
-            # Check if there are any entries/results
-            for field in ("entries", "results", "data", "rows", "features"):
-                if field in data and isinstance(data[field], list) and len(data[field]) > 0:
-                    logger.info("AIS coverage confirmed for this zone/date")
-                    return True
+            # USE _normalize_response_entries() for coverage check (fix audit S1.8)
+            # The residual bug was that the len(data[field]) > 0 check could produce
+            # a false positive on a nested empty response (entries[0][dataset_key] structure).
+            # By normalizing first, we correctly handle the nested structure.
+            from phase0.scripts.gfw_annotations import _normalize_response_entries
+            normalized = _normalize_response_entries(data)
+            if normalized and len(normalized) > 0:
+                logger.info("AIS coverage confirmed for this zone/date")
+                return True
     except Exception as e:
         logger.warning(f"GFW AIS coverage check failed: {e}")
         # On failure, allow download to proceed (conservative approach)
@@ -721,6 +750,247 @@ def clean_non_morocco_scenes(scenes_dir: Path) -> None:
     logger.info("Archived %s non-Morocco scenes and updated manifest", archived_count)
 
 
+# ---------------------------------------------------------------------------
+# AIS Density Map (ported from notebook, cells 7-8)
+# PRIMARY scene selection method
+# ---------------------------------------------------------------------------
+
+
+def build_ais_density_map(bbox: List[float], cell_size_deg: float = DENSITY_CELL_SIZE_DEG,
+                          lookback_days: int = DENSITY_LOOKBACK_DAYS,
+                          gfw_token: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Queries GFW AIS Presence over the full bbox, aggregates positions by grid cell,
+    returns a density ranking. Ported from notebook cell 7.
+
+    Args:
+        bbox: Geographic bounding box [lon_min, lat_min, lon_max, lat_max]
+        cell_size_deg: Grid cell size in degrees (~55 km at 0.5 deg)
+        lookback_days: Number of days to look back for AIS data
+        gfw_token: GFW API token
+
+    Returns:
+        Dict with 'cells' (sorted by count descending), 'total_positions', etc.
+    """
+    from phase0.scripts.gfw_annotations import _normalize_response_entries, _extract_lat_lon
+
+    lon_min, lat_min, lon_max, lat_max = bbox
+    end = datetime.utcnow().date()
+    start = end - timedelta(days=lookback_days)
+
+    if not gfw_token:
+        gfw_token = os.getenv("GFW_API_TOKEN")
+    if not gfw_token:
+        logger.warning("No GFW token available -- cannot build density map.")
+        return {"cells": [], "total_positions": 0, "error": "no_token"}
+
+    logger.info(f"Querying AIS density over {bbox}, {start} -> {end}")
+
+    headers = {"Authorization": f"Bearer {gfw_token}"}
+    geometry = {
+        "type": "Polygon",
+        "coordinates": [[
+            [lon_min, lat_min], [lon_max, lat_min],
+            [lon_max, lat_max], [lon_min, lat_max],
+            [lon_min, lat_min],
+        ]]
+    }
+
+    query_params = {
+        "datasets[0]": AIS_PRESENCE_DATASET,
+        "date-range": f"{start.isoformat()},{end.isoformat()}",
+        "spatial-resolution": "HIGH",
+        "temporal-resolution": "DAILY",
+        "format": "JSON",
+    }
+    body_params = {"geojson": geometry, "limit": 500}
+
+    try:
+        response = httpx.post(GFW_REPORT, headers=headers, params=query_params,
+                              json=body_params, timeout=60.0)
+        if response.status_code != 200:
+            logger.warning(f"GFW density query failed ({response.status_code})")
+            return {"cells": [], "total_positions": 0}
+
+        entries = _normalize_response_entries(response.json())
+        positions = []
+        for entry in entries:
+            lat, lon = _extract_lat_lon(entry)
+            if lat is not None and lon is not None:
+                positions.append({"lat": lat, "lon": lon})
+
+        if not positions:
+            logger.warning("No AIS positions returned -- cannot build density map.")
+            return {"cells": [], "total_positions": 0}
+
+        n_lon_cells = max(1, int((lon_max - lon_min) / cell_size_deg))
+        n_lat_cells = max(1, int((lat_max - lat_min) / cell_size_deg))
+
+        density = {}
+        for p in positions:
+            ci = min(n_lon_cells - 1, int((p["lon"] - lon_min) / cell_size_deg))
+            cj = min(n_lat_cells - 1, int((p["lat"] - lat_min) / cell_size_deg))
+            key = (ci, cj)
+            density[key] = density.get(key, 0) + 1
+
+        cells = []
+        for (ci, cj), count in density.items():
+            cell_lon_min = lon_min + ci * cell_size_deg
+            cell_lat_min = lat_min + cj * cell_size_deg
+            cells.append({
+                "cell_index": ci * n_lat_cells + cj,  # unique index for traceability
+                "cell_bbox": [
+                    cell_lon_min, cell_lat_min,
+                    cell_lon_min + cell_size_deg, cell_lat_min + cell_size_deg
+                ],
+                "count": count,
+            })
+        cells.sort(key=lambda c: c["count"], reverse=True)
+
+        result = {
+            "total_positions": len(positions),
+            "n_cells_with_data": len(cells),
+            "cells": cells,
+            "period": f"{start.isoformat()}/{end.isoformat()}",
+        }
+
+        # Save the density map
+        density_dir = Path(__file__).parent / "data" / "density"
+        density_dir.mkdir(parents=True, exist_ok=True)
+        path = density_dir / "ais_density_map.json"
+        with open(path, "w") as f:
+            json.dump(result, f, indent=2)
+
+        logger.info(f"Density map: {len(positions)} positions -> {len(cells)} non-empty cells")
+        return result
+
+    except Exception as e:
+        logger.error(f"Density map query failed: {e}")
+        return {"cells": [], "total_positions": 0}
+
+
+# ---------------------------------------------------------------------------
+# AIS density-targeted selection and download (ported from notebook cells 9-10)
+# Part B: traceability via target_trace.json
+# ---------------------------------------------------------------------------
+
+
+def write_target_trace(scene_dir: Path, cell_index: int, cell_bbox: List[float]) -> None:
+    """
+    Write the target_trace.json file in the scene directory.
+
+    This file records targeting traceability:
+    - target_density_cell_index: position in dmap['cells'] of the targeted cell
+    - target_cell_bbox: exact bbox of the AIS cell that motivated the download
+
+    If absent (case of the 11 "seasonal criteria" scenes), SAR processing
+    will write target_density_cell_index: null in metadata.json.
+    """
+    trace = {
+        "target_density_cell_index": cell_index,
+        "target_cell_bbox": cell_bbox,
+        "protocol": "PH0-CORR-002_density_targeted",
+    }
+    trace_path = scene_dir / "target_trace.json"
+    with open(trace_path, "w") as f:
+        json.dump(trace, f, indent=2)
+    logger.info(f"Target trace written: {trace_path}")
+
+
+def select_and_download_scenes_from_density(
+    token: str,
+    density_map: Dict[str, Any],
+    n_scenes: int = MAX_TEST_SCENES,
+    output_dir: Optional[Path] = None,
+    username: str = "",
+    password: str = "",
+) -> List[str]:
+    """
+    Select and download CDSE scenes targeting the highest AIS density zones.
+    Ported from notebook cell 10.
+
+    For each downloaded scene, writes a target_trace.json file with
+    traceability fields (Part B).
+
+    Args:
+        token: CDSE authentication token
+        density_map: Result of build_ais_density_map()
+        n_scenes: Maximum number of scenes to download
+        output_dir: Output directory (default: phase0/data/scenes/)
+
+    Returns:
+        List of paths to downloaded .SAFE scenes
+    """
+    if output_dir is None:
+        output_dir = Path(__file__).parent / "data" / "scenes"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    cells = density_map.get("cells", [])
+    if not cells:
+        logger.error("Density map has no cells -- cannot select scenes.")
+        return []
+
+    end = datetime.utcnow().date()
+    start = end - timedelta(days=90)
+    downloaded = []
+    existing_ids = get_existing_scene_ids(output_dir)
+
+    for i, cell in enumerate(cells[:n_scenes]):
+        bbox = cell["cell_bbox"]
+        cell_index = cell.get("cell_index", i)
+        logger.info(f"Targeting Zone {i+1}: bbox={bbox} (AIS count: {cell['count']})")
+
+        try:
+            products = search_sentinel1_products(
+                token, bbox, start.isoformat(), end.isoformat(), max_results=1
+            )
+        except Exception as e:
+            logger.warning(f"Search failed for zone {i}: {e}")
+            continue
+
+        if not products:
+            logger.warning(f"No products found for zone {i}: {bbox}")
+            continue
+
+        p = products[0]
+        product_name = p["name"]
+
+        if is_scene_downloaded(output_dir, product_name, existing_ids):
+            logger.info(f"Scene already downloaded: {product_name}")
+            downloaded.append(str(output_dir / f"{product_name}.SAFE"))
+            continue
+
+        try:
+            # Use CDSE credentials for token refresh if available
+            dl_username = username if username else os.getenv("CDSE_USERNAME", "")
+            dl_password = password if password else os.getenv("CDSE_PASSWORD", "")
+            safe_path = download_product(
+                token, p["id"], product_name, str(output_dir),
+                time.time() + 600, dl_username, dl_password
+            )
+            # Write the targeting trace (Part B)
+            scene_path = Path(safe_path)
+            write_target_trace(scene_path, cell_index, bbox)
+
+            base_id = get_scene_base_id(product_name)
+            if base_id:
+                existing_ids.add(base_id)
+
+            downloaded.append(safe_path)
+            logger.info(f"Downloaded: {product_name} (zone {i+1}, AIS count: {cell['count']})")
+
+        except Exception as e:
+            logger.error(f"Failed to download {product_name}: {e}")
+
+    logger.info(f"Density-targeted download: {len(downloaded)}/{n_scenes} scenes")
+    return downloaded
+
+
+# ---------------------------------------------------------------------------
+# End of AIS density functions
+# ---------------------------------------------------------------------------
+
+
 def test_connection() -> None:
     """Tests CDSE connection and API functionality.
 
@@ -979,10 +1249,45 @@ def main() -> None:
     parser.add_argument("--multi-region", action="store_true", help="Download from multiple regions defined in .env")
     parser.add_argument("--max-scenes-per-region", type=int, default=3, help="Maximum scenes per region (multi-region mode)")
     parser.add_argument("--clean-non-morocco", action="store_true", help="Archive non-Morocco scenes and remove them from manifest")
+    parser.add_argument("--density", action="store_true", help="Use AIS density map for targeted scene selection (PRIMARY METHOD)")
+    parser.add_argument("--density-n-scenes", type=int, default=MAX_TEST_SCENES, help="Number of density-targeted scenes to download")
     args = parser.parse_args()
     
     if args.test:
         test_connection()
+        return
+
+    if args.density:
+        logger.info("=== AIS Density-Targeted Download Mode ===")
+        load_dotenv()
+
+        username = os.getenv("CDSE_USERNAME")
+        password = os.getenv("CDSE_PASSWORD")
+        if not username or not password:
+            logger.error("CDSE_USERNAME and CDSE_PASSWORD must be set")
+            return
+
+        gfw_token = os.getenv("GFW_API_TOKEN")
+        scenes_dir = Path(__file__).parent / "data" / "scenes"
+        scenes_dir.mkdir(parents=True, exist_ok=True)
+
+        # 1. Build AIS density map
+        logger.info("Building AIS density map...")
+        density_map = build_ais_density_map(MOROCCO_BBOX, gfw_token=gfw_token)
+        if not density_map.get("cells"):
+            logger.error("Density map empty -- cannot proceed with density-targeted download.")
+            return
+
+        # 2. CDSE authentication
+        token, expiry_time = get_cdse_token(username, password)
+
+        # 3. Targeted download
+        downloaded = select_and_download_scenes_from_density(
+            token, density_map, args.density_n_scenes,
+            scenes_dir, username, password
+        )
+
+        logger.info(f"Density-targeted download complete: {len(downloaded)} scenes")
         return
 
     if args.clean_non_morocco:

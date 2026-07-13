@@ -25,14 +25,28 @@ Architecture:
     - CalibrationLUT: Sparse LUT interpolation on-demand
     - Windowed processing: Read → process → write → free
     - Explicit memory management: del + gc.collect()
+
+Note on GCP duplication:
+    GCP logic intentionally duplicated (no phase0<->services dependency).
+    The GCPGeoreferencer and GCPOutOfBoundsError classes below are a standalone
+    copy from services/sentinel-preprocessor/sar_preprocessing.py.
+    ASSUMED RISK: any bug fix here must be manually replicated
+    in the other file (and vice versa).
 """
+
+# Note on GCP duplication:
+# GCP logic intentionally duplicated (no phase0<->services dependency).
+# The GCPGeoreferencer and GCPOutOfBoundsError classes below are a standalone
+# copy from services/sentinel-preprocessor/sar_preprocessing.py.
+# ASSUMED RISK: any bug fix here must be manually replicated
+# in the other file (and vice versa).
 
 import gc
 import logging
 import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import rasterio
@@ -60,6 +74,195 @@ LEE_PADDING = 16  # Pixels padding for Lee filter to avoid edge artifacts
 def get_ram_mb() -> float:
     """Returns current process RAM usage in MB."""
     return psutil.Process().memory_info().rss / 1024 / 1024
+
+
+# ---------------------------------------------------------------------------
+# GCP Georeferencing (standalone copy -- see note at top of file)
+# ---------------------------------------------------------------------------
+
+
+class GCPOutOfBoundsError(Exception):
+    """Raised when a pixel coordinate falls outside the validated GCP grid.
+
+    This is NOT a bug -- it is a deliberate safeguard. The Sentinel-1 GRD
+    image is systematically 1 pixel larger than the GCP grid on each axis,
+    so edge tiles always trigger this exception. Before production use, a
+    human decision is needed on how to handle boundary pixels:
+    - Clip to nearest valid GCP coordinate
+    - Reject boundary tiles entirely
+    - Document and accept the extrapolation behavior
+
+    (Standalone copy -- report bug fixes in
+     services/sentinel-preprocessor/sar_preprocessing.py)
+    """
+    pass
+
+
+class GCPGeoreferencer:
+    """
+    Georeference Sentinel-1 GRD pixels using Ground Control Points (GCPs).
+
+    Sentinel-1 GRD GeoTIFFs distributed by CDSE do not carry a usable native CRS
+    (src.crs returns None). Instead, georeferencing is carried by a regular NxM
+    GCP grid embedded in the GeoTIFF metadata. This class reconstructs pixel →
+    (lat, lon) mapping via RegularGridInterpolator.
+
+    VALIDATED PROPERTY:
+        Interpolation error at GCP control points is EXACTLY ZERO
+        (machine precision verified in phase0/tests/test_gcp_interpolation.py).
+
+    NOT VALIDATED:
+        Behavior when a requested pixel falls beyond the last recorded GCP.
+        Sentinel-1 GRD images are exactly 1 pixel larger than the GCP grid
+        on each axis, so boundary pixels will trigger extrapolation. This class
+        raises an explicit GCPOutOfBoundsError for such cases rather than
+        improvising border management.
+
+    (Standalone copy -- report bug fixes in
+     services/sentinel-preprocessor/sar_preprocessing.py)
+    """
+
+    def __init__(self, gcps: np.ndarray, image_shape: Tuple[int, int]):
+        """
+        Args:
+            gcps: Array of shape (N, M, 2) where gcps[i, j] = (lat, lon)
+                  corresponding to pixel (line, pixel) positions.
+            image_shape: (height, width) of the source image.
+
+        Raises:
+            ValueError: If GCP array does not form a regular NxM grid.
+        """
+        if gcps.ndim != 3 or gcps.shape[2] != 2:
+            raise ValueError(f"GCP array must be (N, M, 2), got shape {gcps.shape}")
+
+        self._gcps = gcps
+        self._image_h, self._image_w = image_shape
+        self._n_lines, self._n_pixels = gcps.shape[0], gcps.shape[1]
+
+        # Build coordinate vectors for the GCP grid
+        self._gcp_lines = np.linspace(0, image_shape[0] - 1, self._n_lines)
+        self._gcp_pixels = np.linspace(0, image_shape[1] - 1, self._n_pixels)
+
+        # Separate lat and lon into their own interpolation grids
+        self._lat_interpolator = RegularGridInterpolator(
+            (self._gcp_lines, self._gcp_pixels),
+            self._gcps[:, :, 0],  # lat values
+            method='linear',
+            bounds_error=False,
+            fill_value=None,
+        )
+        self._lon_interpolator = RegularGridInterpolator(
+            (self._gcp_lines, self._gcp_pixels),
+            self._gcps[:, :, 1],  # lon values
+            method='linear',
+            bounds_error=False,
+            fill_value=None,
+        )
+
+    def pixel_to_latlon(self, line: float, pixel: float) -> Tuple[float, float]:
+        """
+        Convert a pixel coordinate to geographic (lat, lon).
+
+        Args:
+            line: Image line (row) coordinate.
+            pixel: Image pixel (column) coordinate.
+
+        Returns:
+            Tuple[float, float]: (latitude, longitude).
+
+        Raises:
+            GCPOutOfBoundsError: If the requested pixel falls outside the
+                validated GCP grid.
+        """
+        line_min, line_max = float(self._gcp_lines[0]), float(self._gcp_lines[-1])
+        pixel_min, pixel_max = float(self._gcp_pixels[0]), float(self._gcp_pixels[-1])
+
+        if not (line_min <= line <= line_max and pixel_min <= pixel <= pixel_max):
+            raise GCPOutOfBoundsError(
+                f"Pixel coordinate ({line:.2f}, {pixel:.2f}) is outside the GCP grid "
+                f"bounds: lines [{line_min:.2f}, {line_max:.2f}], "
+                f"pixels [{pixel_min:.2f}, {pixel_max:.2f}]. "
+                "This boundary behavior is NOT validated and requires human review "
+                "before production use."
+            )
+
+        lat = float(self._lat_interpolator([[line, pixel]])[0])
+        lon = float(self._lon_interpolator([[line, pixel]])[0])
+        return lat, lon
+
+    def tile_to_bbox(self, y_start: int, x_start: int, y_end: int, x_end: int) -> List[float]:
+        """
+        Compute the geographic bounding box of a tile.
+
+        Args:
+            y_start, x_start: Top-left pixel coordinates.
+            y_end, x_end: Bottom-right pixel coordinates (exclusive).
+
+        Returns:
+            List[float]: [lat_min, lon_min, lat_max, lon_max]
+        """
+        corners = [
+            self.pixel_to_latlon(y_start, x_start),
+            self.pixel_to_latlon(y_start, x_end - 1),
+            self.pixel_to_latlon(y_end - 1, x_start),
+            self.pixel_to_latlon(y_end - 1, x_end - 1),
+        ]
+        lats = [c[0] for c in corners]
+        lons = [c[1] for c in corners]
+        return [min(lats), min(lons), max(lats), max(lons)]
+
+
+def extract_gcps_from_geotiff(tiff_path: str) -> Tuple[np.ndarray, Tuple[int, int]]:
+    """
+    Extract GCPs from a Sentinel-1 GRD GeoTIFF.
+
+    Args:
+        tiff_path: Path to a Sentinel-1 GRD GeoTIFF file.
+
+    Returns:
+        Tuple[np.ndarray, Tuple[int, int]]:
+            - Array of shape (N, M, 2) containing (lat, lon) values.
+            - (height, width) of the source image.
+
+    Raises:
+        ValueError: If the GeoTIFF contains no GCPs or if the GCPs do not
+            form a regular grid.
+    """
+    import rasterio
+
+    with rasterio.open(tiff_path) as src:
+        image_shape = (src.height, src.width)
+        gcps_raw = src.gcps[0] if src.gcps else []
+
+        if not gcps_raw:
+            raise ValueError(
+                f"No GCPs found in {tiff_path}. "
+                "Sentinel-1 GRD GeoTIFFs should carry a regular GCP grid."
+            )
+
+        rows = sorted(set(gcp.row for gcp in gcps_raw))
+        cols = sorted(set(gcp.col for gcp in gcps_raw))
+
+        n_lines = len(rows)
+        n_pixels = len(cols)
+
+        if n_lines * n_pixels != len(gcps_raw):
+            raise ValueError(
+                f"GCPs do not form a regular grid: {len(gcps_raw)} GCPs "
+                f"mapped to {n_lines}x{n_pixels}."
+            )
+
+        gcps_array = np.zeros((n_lines, n_pixels, 2), dtype=np.float64)
+        row_to_idx = {row: i for i, row in enumerate(rows)}
+        col_to_idx = {col: j for j, col in enumerate(cols)}
+
+        for gcp in gcps_raw:
+            i = row_to_idx[gcp.row]
+            j = col_to_idx[gcp.col]
+            gcps_array[i, j, 0] = gcp.lat
+            gcps_array[i, j, 1] = gcp.lon
+
+        return gcps_array, image_shape
 
 
 # ---------------------------------------------------------------------------
@@ -563,7 +766,22 @@ def process_safe_windowed(
                 pbar.update(1)
     
     processing_time = time.perf_counter() - start_time
-    
+
+    # Part B.2: Read target_trace.json if it exists and propagate into metadata.json
+    # If absent (case of the 11 "seasonal criteria" scenes), write null explicitly.
+    import json
+
+    target_trace = {}
+    safe_dir = Path(safe_path)
+    trace_path = safe_dir / "target_trace.json"
+    if trace_path.exists():
+        try:
+            with open(trace_path) as _f:
+                target_trace = json.load(_f)
+            logger.info(f"Target trace loaded: {target_trace}")
+        except Exception as e:
+            logger.warning(f"Failed to read target_trace.json: {e}")
+
     # Save metadata JSON
     metadata_path = scene_dir / "metadata.json"
     manifest = {
@@ -578,9 +796,11 @@ def process_safe_windowed(
         "output_dir": str(scene_dir),
         "processing_time_s": processing_time,
         "tiles": tiles_metadata,
+        "target_density_cell_index": target_trace.get("target_density_cell_index"),
+        "target_cell_bbox": target_trace.get("target_cell_bbox"),
+        "targeting_protocol": target_trace.get("protocol", "seasonal_criteria_fallback"),
     }
-    
-    import json
+
     with open(metadata_path, "w") as f:
         json.dump(manifest, f, indent=2)
     

@@ -42,6 +42,11 @@ AIS_PRESENCE_DATASET = "public-global-presence:latest"
 AIS_OFF_DATASET = "public-global-gaps-events:latest"
 FISHING_EVENTS_DATASET = "public-global-fishing-events:latest"
 
+# Spatial resolution for GFW queries: changed from LOW to HIGH per spec
+# This change must be replicated in the Colab notebook during the
+# next synchronization session (see Part D of the prompt).
+GFW_SPATIAL_RESOLUTION = "HIGH"
+
 REQUEST_DELAY_SECONDS = 0.4
 MAX_RETRIES = 3
 BACKOFF_FACTOR = 2
@@ -259,7 +264,7 @@ class GFWClient:
         query_params = {
             "datasets[0]": AIS_PRESENCE_DATASET,
             "date-range": f"{start_dt.date().isoformat()},{end_dt.date().isoformat()}",
-            "spatial-resolution": "LOW",
+            "spatial-resolution": GFW_SPATIAL_RESOLUTION,
             "temporal-resolution": "HOURLY",
             "format": "JSON",
         }
@@ -313,7 +318,7 @@ class GFWClient:
         query_params = {
             "datasets[0]": AIS_PRESENCE_DATASET,
             "date-range": f"{date_start},{date_end}",
-            "spatial-resolution": "LOW",
+            "spatial-resolution": GFW_SPATIAL_RESOLUTION,
             "temporal-resolution": "DAILY",
             "format": "JSON",
         }

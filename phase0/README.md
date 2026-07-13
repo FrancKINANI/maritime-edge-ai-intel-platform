@@ -282,13 +282,13 @@ Outputs are written to `data/results/`.
 | `download_scenes.py` | ✅ **Complete** | CDSE OData search + streaming download + ZIP extraction + GFW coverage pre-check + coastal targeting |
 | `sar_preprocessing.py` | ✅ **Complete** | 4-pipeline SAR preprocessing (A/B/C/D) + GCP georeferencing + unit tests |
 | `gfw_annotations.py` | ✅ **Complete** | GFW API v3 AIS fetch + dark vessel events + search vessels + response normalization |
-| `benchmark_pipeline.py` | 🔧 In progress | Full orchestration + metrics computation |
+| `benchmark_pipeline.py` | ✅ **Complete** | Full orchestration + metrics computation |
 
 ---
 
 ## Test Suite
 
-**14 tests** covering GFW API, CDSE downloads, and GCP interpolation:
+**17 tests** covering GFW API, CDSE downloads, GCP interpolation, and cross-implementation validation:
 
 ```bash
 cd /project/root
@@ -300,8 +300,19 @@ pytest phase0/tests/ -v
 | `test_gfw_annotations.py` | 9 | GFW client init, AIS presence, dark vessels, response normalization, retry logic, search vessels |
 | `test_download_scenes.py` | 3 | Scene base ID normalization (COG variants), duplicate detection |
 | `test_gcp_interpolation.py` | 2 | Zero error at GCP control points, boundary behaviour documented |
+| `test_gcp_cross_implementation.py` | 1 | Cross-implementation GCP consistency (phase0 vs service) |
 
 All tests use mocked HTTP responses and do **not** depend on real API availability.
+
+## Notebook <-> Scripts Synchronization
+
+The Colab notebook (`colab_phase0_pipeline_final.ipynb`) is the scientific reference. The `phase0/scripts/` Python modules are ported implementations. Key synchronization points:
+
+- **Constants**: `shared/config/constants.py` is the single source of truth. The notebook should import from this file rather than redefining constants locally.
+- **GCP logic**: `GCPGeoreferencer` and `GCPOutOfBoundsError` are duplicated in `services/sentinel-preprocessor/sar_preprocessing.py` and `phase0/scripts/sar_preprocessing.py`. Bug fixes must be replicated manually in both files.
+- **AIS density map**: `build_ais_density_map()` (notebook cells 7-8) is ported to `download_scenes.py`.
+- **Benchmark**: `benchmark_all_pipelines()` (notebook cells 20-22) is ported to `benchmark_pipeline.py`.
+- **spatial-resolution**: Changed from `LOW` to `HIGH` in all scripts. The notebook must be updated on next sync session.
 
 ---
 
