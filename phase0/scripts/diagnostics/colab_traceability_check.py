@@ -20,26 +20,35 @@ Usage:
 
 Author: Phase 0 diagnostics
 """
+# ruff: noqa: E402 — Cells 2 and 3 contain imports that are intentionally
+# NOT at the top of the file. This is a Colab script where each cell is
+# executed independently, so imports are placed in the cell that needs them.
 
 # ╔══════════════════════════════════════════════════════════════════════════════╗
 # ║ CELL 1 — Environment setup                                                ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
-# Install project dependencies
-!pip install httpx numpy rasterio scipy tqdm psutil python-dotenv
-
-# Clone the repository (or mount Google Drive if already cloned)
+import subprocess
+import sys
 import os
 from pathlib import Path
 
-# Choose one:
-# Option A: Fresh clone
+# Install project dependencies
+subprocess.check_call(
+    [sys.executable, "-m", "pip", "install",
+     "httpx", "numpy", "rasterio", "scipy", "tqdm", "psutil", "python-dotenv"]
+)
+
+# Clone the repository (or mount Google Drive if already cloned)
 if not Path("maritime-intelligence-platform").exists():
-    !git clone https://github.com/FrancKINANI/maritime-edge-ai-intel-platform.git
-    %cd maritime-intelligence-platform
+    subprocess.check_call([
+        "git", "clone",
+        "https://github.com/FrancKINANI/maritime-edge-ai-intel-platform.git"
+    ])
+    os.chdir("maritime-intelligence-platform")
 else:
-    %cd maritime-intelligence-platform
-    !git pull  # Ensure latest version
+    os.chdir("maritime-intelligence-platform")
+    subprocess.check_call(["git", "pull"])  # Ensure latest version
 
 # Option B: Google Drive mount (faster if already cloned)
 # from google.colab import drive
@@ -73,7 +82,6 @@ import sys
 sys.path.insert(0, ".")
 
 import json
-import logging
 from pathlib import Path
 
 # NOTE: logging.basicConfig is called by the imported modules themselves
@@ -202,7 +210,7 @@ else:
 TILES_DIR = Path("phase0/data/tiles")
 
 print("Running process_safe_windowed on the downloaded scene...")
-print(f"This will take several minutes (processing tile-by-tile).")
+print("This will take several minutes (processing tile-by-tile).")
 
 result = process_safe_windowed(
     safe_path=str(scene_path),

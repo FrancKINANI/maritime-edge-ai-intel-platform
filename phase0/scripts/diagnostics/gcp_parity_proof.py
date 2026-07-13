@@ -33,7 +33,7 @@ print("SUCCESS: Service module loaded via importlib")
 ServiceGCPGeoreferencer = mod.GCPGeoreferencer
 
 # 2. Import phase0 implementation
-from phase0.scripts.sar_preprocessing import GCPGeoreferencer as Phase0GCPGeoreferencer
+from phase0.scripts.sar_preprocessing import GCPGeoreferencer as Phase0GCPGeoreferencer  # noqa: E402
 
 # 3. Same synthetic GCP set as the test
 n_lines, n_pixels = 5, 5
