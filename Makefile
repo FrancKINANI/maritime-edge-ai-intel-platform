@@ -21,16 +21,55 @@ logs:
 phase0:
 	cd phase0 && python download_scenes.py
 
-test:
+test-all:
 	@# Per-service invocations avoid sys.path collisions on modules named main.py
+	@echo "=== Service tests ==="
 	uv run python -m pytest phase0/tests/ -q
 	uv run python -m pytest services/sentinel-preprocessor/tests/ -q
 	uv run python -m pytest services/aggregator/tests/ -q
 	uv run python -m pytest services/detector/tests/ -q
 	uv run python -m pytest services/satellite-monitor/tests/ -q
+	uv run python -m pytest services/data-ingestor/tests/ -q
+	uv run python -m pytest shared/tests/ -q
+	@echo "=== Integration & Security tests ==="
+	uv run python -m pytest tests/integration/ -q
+	@echo "=== Dashboard tests ==="
+	uv run python -m pytest tests/ground_dashboard/ -q
+
+test-services:
+	@echo "=== Service tests ==="
+	uv run python -m pytest phase0/tests/ -q
+	uv run python -m pytest services/sentinel-preprocessor/tests/ -q
+	uv run python -m pytest services/aggregator/tests/ -q
+	uv run python -m pytest services/detector/tests/ -q
+	uv run python -m pytest services/satellite-monitor/tests/ -q
+	uv run python -m pytest services/data-ingestor/tests/ -q
+	uv run python -m pytest shared/tests/ -q
+
+test-integration:
+	uv run python -m pytest tests/integration/ -v -q
+
+test-dashboard:
+	uv run python -m pytest tests/ground_dashboard/ -v -q
+
+test-coverage:
+	uv run python -m pytest phase0/tests/ services/sentinel-preprocessor/tests/ \
+		services/aggregator/tests/ services/detector/tests/ \
+		services/satellite-monitor/tests/ services/data-ingestor/tests/ \
+		shared/tests/ tests/integration/ tests/ground_dashboard/ -q \
+		--cov=. --cov-report=term --cov-report=html:coverage_html \
+		--cov-fail-under=60
+
+lint:
+	ruff check services/ phase0/ shared/
+
+sast:
+	bandit -r services/ --quiet || true
 
 clean:
 	@echo "Cleaning up generated tiles, downloaded scenes, and results..."
 	find phase0/data/scenes -type f ! -name '.gitkeep' -delete
 	find phase0/data/tiles -type f ! -name '.gitkeep' -delete
 	find phase0/data/results -type f ! -name '.gitkeep' -delete
+	rm -rf coverage_html/ .coverage
+	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true

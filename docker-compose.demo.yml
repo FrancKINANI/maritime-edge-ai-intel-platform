@@ -1,9 +1,22 @@
 version: '3.8'
 
 services:
+  # ── Shared base image (build once, used by all services) ──
+  maritime-base:
+    build:
+      context: .
+      dockerfile: docker/base/Dockerfile
+      target: release
+    image: maritime-intel-base:latest
+    container_name: maritime-base-builder
+    # This service exists only to build the base image as a dependency.
+    # All downstream services depend on it so docker-compose builds base first.
+    restart: "no"
+
   detector:
     build:
-      context: ./services/detector
+      context: .
+      dockerfile: services/detector/Dockerfile
     container_name: maritime-detector-demo
     ports:
       - "8003:8000"
@@ -14,6 +27,9 @@ services:
       - ./shared:/app/shared
     networks:
       - maritime-net-demo
+    depends_on:
+      maritime-base:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/health\")'"]
       interval: 15s
@@ -22,7 +38,8 @@ services:
 
   aggregator:
     build:
-      context: ./services/aggregator
+      context: .
+      dockerfile: services/aggregator/Dockerfile
     container_name: maritime-aggregator-demo
     ports:
       - "8002:8002"
@@ -33,20 +50,93 @@ services:
       - ./shared:/app/shared
     networks:
       - maritime-net-demo
+    depends_on:
+      maritime-base:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8002/health\")'"]
       interval: 15s
       timeout: 5s
       retries: 3
 
+  sentinel-preprocessor:
+    build:
+      context: .
+      dockerfile: services/sentinel-preprocessor/Dockerfile
+    container_name: maritime-preprocessor-demo
+    ports:
+      - "8000:8000"
+    environment:
+      - DEMO_MODE=true
+    volumes:
+      - tiles-volume:/data/tiles
+      - ./shared:/app/shared
+    networks:
+      - maritime-net-demo
+    depends_on:
+      maritime-base:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/health\")'"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  satellite-monitor:
+    build:
+      context: .
+      dockerfile: services/satellite-monitor/Dockerfile
+    container_name: maritime-satmon-demo
+    ports:
+      - "8004:8000"
+    environment:
+      - DEMO_MODE=true
+    networks:
+      - maritime-net-demo
+    depends_on:
+      maritime-base:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/health\")'"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  data-ingestor:
+    build:
+      context: .
+      dockerfile: services/data-ingestor/Dockerfile
+    container_name: maritime-ingestor-demo
+    ports:
+      - "8001:8000"
+    environment:
+      - DEMO_MODE=true
+    volumes:
+      - tiles-volume:/data/tiles
+      - ./shared:/app/shared
+    networks:
+      - maritime-net-demo
+    depends_on:
+      maritime-base:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/health\")'"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
   ground-dashboard:
     build:
-      context: ./services/ground-dashboard
+      context: .
+      dockerfile: services/ground-dashboard/Dockerfile
     container_name: maritime-ground-dashboard-demo
     ports:
       - "8501:8501"
     environment:
       - AGGREGATOR_URL=http://aggregator:8002
+      - PREPROCESSOR_URL=http://sentinel-preprocessor:8000
+      - DETECTOR_URL=http://detector:8000
+      - SATMON_URL=http://satellite-monitor:8000
       - DEMO_MODE=true
     volumes:
       - ./shared:/app/shared

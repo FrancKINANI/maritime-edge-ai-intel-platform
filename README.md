@@ -14,26 +14,17 @@ A high-performance microservice platform for **real-time maritime vessel detecti
 - [Architecture](#architecture)
 - [Quick Start](#quick-start)
 - [Services](#services)
-  - [Data Ingestor](#1-data-ingestor--8001)
-  - [Sentinel Preprocessor](#2-sentinel-preprocessor--8000)
-  - [Detector](#3-detector--8003)
-  - [Satellite Monitor](#4-satellite-monitor--8004)
-  - [Aggregator](#5-aggregator--8002)
-  - [Ground Dashboard](#6-ground-dashboard--8501)
+- [Docker](#docker)
 - [Environment Configuration](#environment-configuration)
 - [Development](#development)
 - [Testing](#testing)
 - [CI/CD](#cicd)
-- [API Overview](#api-overview)
-- [Phase 0 — Scientific Validation](#phase-0--scientific-validation)
+- [Makefile](#makefile)
 - [Project Structure](#project-structure)
-- [Recent Changelog](#recent-changelog)
 
 ---
 
 ## Overview
-
-This platform ingests **Sentinel-1 GRD** (Ground Range Detected) products from the Copernicus Data Space Ecosystem, applies SAR-specific preprocessing (radiometric calibration, speckle filtering, dB conversion), runs **INT8-quantized YOLOv8** vessel detection via ONNX Runtime, enriches results with **Global Fishing Watch AIS** data and satellite orbital positions, and exposes everything through a **Streamlit dashboard**.
 
 ### Key Features
 
@@ -70,7 +61,7 @@ This platform ingests **Sentinel-1 GRD** (Ground Range Detected) products from t
  | (AIS Presence)   |     |    (:8000)        |
  +--------+---------+     +--------+---------+
           |                        |
-          v                        v (512×512 .npy tiles)
+          v                        v (512x512 .npy tiles)
  +--------+---------+     +--------+---------+     +-------------------+
  |  satellite-       |     |    detector       |---->|      Redis        |
  |  monitor          |     |  YOLOv8 INT8      |     |  (Shared Cache)   |
@@ -144,6 +135,14 @@ curl http://localhost:8003/health      # detector
 curl http://localhost:8004/health      # satellite-monitor
 ```
 
+### Docker Compose Demo
+
+A standalone demo compose file is also available for quick evaluation:
+
+```bash
+docker compose -f docker-compose.demo.yml up --build
+```
+
 ---
 
 ## Services
@@ -154,17 +153,12 @@ curl http://localhost:8004/health      # satellite-monitor
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/ingest` | POST | Trigger ingestion (⚠️ 501 — in development) |
-| `/status/{job_id}` | GET | Ingestion job status (⚠️ 501 — in development) |
-| `/products` | GET | List available Sentinel-1 products (⚠️ 501 — in development) |
+| `/ingest` | POST | Trigger ingestion (501 - in development) |
+| `/status/{job_id}` | GET | Ingestion job status (501 - in development) |
+| `/products` | GET | List available Sentinel-1 products (501 - in development) |
 | `/health` | GET | Service health |
 
-Business logic is shared from `phase0/scripts/download_scenes.py`.
-- Streaming downloads (8 KB chunks, no memory blowup)
-- Automatic ZIP extraction and cleanup
-- Coastal targeting optimized for GFW AIS coverage
-
-**Docker**: `maritime-intelligence-platform-data-ingestor`
+**Image**: `maritime-intelligence-platform-data-ingestor`
 
 ---
 
@@ -174,26 +168,13 @@ Business logic is shared from `phase0/scripts/download_scenes.py`.
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/preprocess` | POST | Run SAR pipeline (A/B/C/D) on a `.SAFE` product → JSON tile manifest |
+| `/preprocess` | POST | Run SAR pipeline (A/B/C/D) on a `.SAFE` product |
 | `/pipelines` | GET | List available pipelines with descriptions |
 | `/health` | GET | Service health |
 
-**Pipelines:**
+**Pipelines:** A (Raw), B (Sigma0), C (Sigma0+Lee), D (Full chain - default)
 
-| Pipeline | Steps |
-|----------|-------|
-| **A** — Raw | `uint16 → normalize [0,255]` |
-| **B** — Sigma0 | `σ⁰ calibration → normalize [0,255]` |
-| **C** — Sigma0+Lee | `σ⁰ → Lee 5×5 filter → normalize` |
-| **D** — Full chain ⭐ | `σ⁰ → Lee 5×5 → log(dB) → normalize [0,255]` |
-
-**GCP Georeferencing** (`GCPGeoreferencer`):
-- Reconstructs pixel → (lat, lon) from Sentinel-1's embedded GCP grid
-- **Zero error at control points** (machine precision, validated)
-- `GCPOutOfBoundsError` for boundary pixels (safe by design)
-- `extract_gcps_from_geotiff()` and `tile_to_bbox()` helpers
-
-**Docker**: `maritime-intelligence-platform-sentinel-preprocessor`
+**Image**: `maritime-intelligence-platform-sentinel-preprocessor`
 
 ---
 
@@ -203,21 +184,12 @@ Business logic is shared from `phase0/scripts/download_scenes.py`.
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/detect` | POST | Detect vessels on a tile (file path or base64) → `DetectionEvent` |
+| `/detect` | POST | Detect vessels on a tile (file path or base64) |
 | `/health` | GET | Service health + model loading status |
 
-**Detection pipeline:**
-1. Load `.npy` tile
-2. Float32 conversion + 3-channel stacking + resize to 640px
-3. ONNX Runtime CPU inference
-4. Confidence threshold (0.25) + NMS (IoU 0.45)
-5. Priority heuristic: CRITICAL (≥10), HIGH (≥5), MEDIUM (≥2), LOW
+**Detection pipeline:** Load → Preprocess → ONNX inference → NMS → Priority heuristic
 
-**Models** (place in `shared/models/`):
-- `yolov8n_int8.onnx` — vessel detector
-- `yolov8n_seg_int8.onnx` — segmenter (not currently used)
-
-**Docker**: `maritime-intelligence-platform-detector`
+**Image**: `maritime-intelligence-platform-detector`
 
 ---
 
@@ -227,20 +199,16 @@ Business logic is shared from `phase0/scripts/download_scenes.py`.
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/tle/{norad_id}` | GET | Current TLE for a NORAD ID (cached, TTL configurable) |
+| `/tle/{norad_id}` | GET | Current TLE for a NORAD ID (cached, 24h TTL) |
 | `/position` | GET | Compute lat/lon/altitude at a given timestamp |
 | `/refresh-tle` | POST | Clear TLE cache |
 | `/health` | GET | Service health |
 
-**TLE sources (fallback chain):**
-1. **SatNOGS DB** (primary) — JSON API, most recent TLE used
-2. **Celestrak** (fallback) — plain-text TLE format
-
-**Cache**: In-memory, default 24h TTL (`TLE_REFRESH_HOURS`). Stale cache used if both sources unavailable.
+**TLE sources:** SatNOGS DB (primary) → Celestrak (fallback) → Stale cache (graceful)
 
 **Common NORAD IDs:** Sentinel-1A (39634), Sentinel-1B (41456), ISS (25544)
 
-**Docker**: `maritime-intelligence-platform-satellite-monitor`
+**Image**: `maritime-intelligence-platform-satellite-monitor`
 
 ---
 
@@ -250,21 +218,14 @@ Business logic is shared from `phase0/scripts/download_scenes.py`.
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/events` | POST | Ingest a detection event (zone auto-computed) → SQLite |
+| `/events` | POST | Ingest a detection event (zone auto-computed) |
 | `/events` | GET | List events with filters (`since`, `zone`, `priority`) |
 | `/stats` | GET | Aggregated statistics by zone and priority |
 | `/health` | GET | Service health |
 
-**Zone classification:**
-| Zone | Radius | Description |
-|------|--------|-------------|
-| Z1 | ≤ 12 NM | Territorial Waters |
-| Z2 | ≤ 200 NM | Exclusive Economic Zone |
-| Z3 | > 200 NM | High Seas |
+**Zone classification:** Z1 (12NM), Z2 (200NM), Z3 (High Seas)
 
-**Database**: SQLite local (`services/aggregator/data/events.db`). Pydantic schemas are DB-agnostic (PostgreSQL-ready).
-
-**Docker**: `maritime-intelligence-platform-aggregator`
+**Image**: `maritime-intelligence-platform-aggregator`
 
 ---
 
@@ -274,19 +235,64 @@ Business logic is shared from `phase0/scripts/download_scenes.py`.
 
 | Mode | Description |
 |------|-------------|
-| **1. Upload** | Upload `.npy` tiles (direct detection) or `.SAFE`/`.tiff`/`.zip` (preprocess + detect) |
-| **2. Satellite Query** | Query satellite position by NORAD ID and timestamp |
-| **3. Continuous Monitoring** | Real-time event list with zone/priority/time filters |
+| **1. Upload** | Upload `.npy` tiles or `.SAFE`/.tiff products |
+| **2. Satellite Query** | Query satellite position by NORAD ID |
+| **3. Continuous Monitoring** | Real-time event list with filters |
 
-**Configuration** (environment variables):
-| Variable | Default | Target |
-|----------|---------|--------|
-| `DETECTOR_URL` | `http://detector:8000` | Detector service |
-| `SATMON_URL` | `http://satellite-monitor:8000` | Satellite Monitor |
-| `AGGREGATOR_URL` | `http://aggregator:8002` | Aggregator |
-| `PREPROCESSOR_URL` | `http://sentinel-preprocessor:8000` | Preprocessor |
+**Image**: `maritime-intelligence-platform-ground-dashboard`
 
-**Docker**: `maritime-intelligence-platform-ground-dashboard`
+---
+
+## Docker
+
+### Base Image
+
+All services use a shared base image (`maritime-intel-base:latest`) defined in `docker/base/Dockerfile`:
+
+| Package | Version | Purpose |
+|---------|---------|---------|
+| Python | 3.10-slim | Runtime |
+| FastAPI | >=0.110.0 | REST API framework |
+| Uvicorn | >=0.29.0 | ASGI server |
+| Pydantic | >=2.7.0 | Schema validation |
+| httpx | >=0.28.0 | Async HTTP client |
+| NumPy | >=1.26.0 | Array operations |
+
+### Duplication Elimination
+
+All 6 service Dockerfiles have been refactored to `FROM maritime-intel-base:latest`, eliminating duplicated system package installations and Python dependencies. The base image is built once and cached for all services.
+
+### Docker Compose
+
+The main `docker-compose.yml` defines 7 services (6 microservices + Redis) with:
+- **Project-root build context** — all Dockerfiles use `context: .` + `dockerfile: services/<name>/Dockerfile`
+- **Healthchecks** — each service has a `/health` endpoint check
+- **Shared volumes** — `tiles-volume`, `scenes-volume` for data exchange
+- **Dependency ordering** — services wait for Redis to be healthy before starting
+
+```bash
+# Build specific service
+docker compose build data-ingestor
+
+# Run all services
+docker compose up -d
+
+# View logs
+docker compose logs -f
+
+# Stop
+docker compose down
+```
+
+### Building Individual Services
+
+```bash
+# Build base image first
+docker build -f docker/base/Dockerfile -t maritime-intel-base:latest .
+
+# Then build all services
+docker compose build
+```
 
 ---
 
@@ -296,9 +302,9 @@ Copy `.env.example` to `.env` and fill in:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `CDSE_USERNAME` | ✅ Yes | Copernicus Data Space account email |
-| `CDSE_PASSWORD` | ✅ Yes | Copernicus Data Space account password |
-| `GFW_API_TOKEN` | ⚠️ For GFW features | Global Fishing Watch JWT bearer token |
+| `CDSE_USERNAME` | Yes | Copernicus Data Space account email |
+| `CDSE_PASSWORD` | Yes | Copernicus Data Space account password |
+| `GFW_API_TOKEN` | For GFW features | Global Fishing Watch JWT bearer token |
 
 Optional region overrides: `ALGERIA_MED_BBOX`, `MAURITANIA_ATL_BBOX`, etc.
 
@@ -311,13 +317,16 @@ Optional region overrides: `ALGERIA_MED_BBOX`, `MAURITANIA_ATL_BBOX`, etc.
 ```bash
 python3.10 -m venv .venv
 source .venv/bin/activate
+# or with uv:
+uv venv && source .venv/bin/activate
 pip install -r phase0/requirements.txt
 ```
 
-### Linting
+### Linting & SAST
 
 ```bash
-uv run ruff check services/ phase0/ shared/
+make lint   # ruff check services/ phase0/ shared/
+make sast   # bandit security scan
 ```
 
 ### Docker Commands
@@ -327,106 +336,93 @@ make build    # Rebuild all Docker images
 make up       # Start all services (detached)
 make down     # Stop all services
 make logs     # Follow logs
-make clean    # Clean generated tiles/scenes/results
+make clean    # Clean generated tiles/scenes/results + coverage
 ```
 
 ---
 
 ## Testing
 
-**36 unit tests** across 3 test suites:
+**79 tests** across service tests, integration tests, and dashboard tests:
 
 ```bash
 # Run all tests
-uv run python3 -m pytest phase0/tests/ services/aggregator/tests/ services/sentinel-preprocessor/tests/ -v
+make test-all
 
 # Run specific suites
-uv run python3 -m pytest phase0/tests/                          # GFW + GCP + download tests
-uv run python3 -m pytest services/aggregator/tests/              # Zone classification tests
-uv run python3 -m pytest services/sentinel-preprocessor/tests/   # SAR preprocessing + GCP tests
+make test-services      # 43 service tests
+make test-integration   # 9 integration tests (4 skipped for missing deps)
+make test-dashboard     # 6 ground dashboard tests
 ```
 
-### Test Coverage
+### Test Organization
 
-| Module | Tests | Description |
-|--------|-------|-------------|
-| `phase0/tests/test_gfw_annotations.py` | 9 | GFW API client, AIS presence, dark vessels, normalized entries, retry logic |
-| `phase0/tests/test_download_scenes.py` | 3 | Scene base ID normalization, duplicate detection |
-| `phase0/tests/test_gcp_interpolation.py` | 2 | GCP zero-error property, boundary behavior (not validated) |
-| `services/sentinel-preprocessor/tests/` | 11 | Calibration, Lee filter, dB conversion, normalization, GCP georeferencer |
-| `services/aggregator/tests/` | 7 | Zone classification (Z1/Z2/Z3, edges, invalid) |
+```
+shared/tests/                    # 21 tests — Pydantic schemas (BoundingBox, DetectionEvent, etc.)
+services/data-ingestor/tests/   # 13 tests — FastAPI endpoints + sentinel fetcher
+services/aggregator/tests/      # 8 tests — Zone classification
+services/detector/tests/        # 7 tests — NMS, xywh2xyxy
+services/satellite-monitor/tests/  # 2 tests — TLE fallback
+services/sentinel-preprocessor/tests/ # 13 tests — SAR preprocessing, GCP georeferencing
+tests/integration/              # 13 tests — End-to-end pipeline, security (4 skipped)
+tests/ground_dashboard/          # 6 tests — Dashboard utility functions
+```
 
-### Security
+### Test Suites Details
+
+| Suite | Tests | Description |
+|-------|-------|-------------|
+| `shared/tests/` | 21 | BoundingBox, DetectionEvent, IngestRequest, TLEData schemas |
+| `services/data-ingestor/tests/` | 13 | `/health`, `/ingest`, credential resolution |
+| `services/aggregator/tests/` | 8 | Zone classification (Z1/Z2/Z3, edges, invalid) |
+| `services/detector/tests/` | 7 | NMS, xywh2xyxy converison |
+| `services/satellite-monitor/tests/` | 2 | SatNOGS + Celestrak fallback |
+| `services/sentinel-preprocessor/tests/` | 13 | Calibration, Lee filter, dB, GCP georeferencer |
+| `tests/integration/` | 9+4 skipped | Data flow, schema, TLE delegation, security |
+| `tests/ground_dashboard/` | 6 | URL formatting, BBox validation, mode parsing |
+
+### Coverage
 
 ```bash
-# pip-audit on all services — 0 vulnerabilities
-docker run --rm maritime-intelligence-platform-aggregator sh -c "pip install pip-audit -q && pip-audit -r /app/requirements.txt"
+make test-coverage   # Generates HTML report, requires 60% minimum
 ```
+
+Reports are written to `coverage_html/`.
 
 ---
 
 ## CI/CD
 
-GitHub Actions workflow (`.github/workflows/ci.yml`) with 3 jobs:
+GitHub Actions workflow (`.github/workflows/ci.yml`) with 4 job stages:
 
-| Job | Check | Status |
-|-----|-------|--------|
-| `lint` | `ruff check services/ phase0/ shared/` | ✅ |
-| `structure` | Verify all service directories and config files exist | ✅ |
-| `tests` | `pytest` on all 3 test suites (36 tests) | ✅ |
+| Job | Checks | Status |
+|-----|--------|--------|
+| `lint-and-sast` | Ruff + Bandit SAST scan | ✅ |
+| `structure` | Verify all service directories exist | ✅ |
+| `tests` | Matrix across 9 test directories | ✅ |
+| `coverage-check` | Verify minimum 60% coverage (non-blocking) | ✅ |
+
+The test matrix runs each suite independently to avoid module path collisions from hyphens in service directory names.
 
 ---
 
-## API Overview
+## Makefile
 
-### External APIs
-
-| API | Endpoint | Auth | Purpose |
-|-----|----------|------|---------|
-| **CDSE OData** | `https://catalogue.dataspace.copernicus.eu/odata/v1/` | Keycloak JWT | Search & download Sentinel-1 products |
-| **CDSE Zipper** | `https://zipper.dataspace.copernicus.eu/gh/...` | Bearer token | Streaming ZIP download |
-| **GFW v3** | `https://gateway.api.globalfishingwatch.org/v3/` | JWT Bearer | AIS vessel presence & dark vessel events |
-| **SatNOGS** | `https://db.satnogs.org/api/tle/` | Public | TLE satellite orbital data |
-| **Celestrak** | `https://celestrak.org/NORAD/elements/gp.php` | Public | TLE fallback |
-
-### GFW API v3 Integration Notes
-
-Based on empirical validation, the GFW `/v3/4wings/report` endpoint requires:
-
-| Parameter | Placement | Format |
-|-----------|-----------|--------|
-| `datasets[0]` | Query | `public-global-presence:latest` |
-| `date-range` | Query | `YYYY-MM-DD,YYYY-MM-DD` |
-| `spatial-resolution` | Query | `LOW` or `HIGH` |
-| `temporal-resolution` | Query | `DAILY` or `HOURLY` |
-| `format` | Query | `JSON` |
-| `geojson` | Body | GeoJSON Polygon |
-| `limit` | Body | Integer |
-
-The response uses a **grouped nested format**:
-```json
-{
-  "entries": [{
-    "public-global-presence:v4.0": [
-      {"lat": ..., "lon": ..., "mmsi": "...", "shipName": "...", ...}
-    ]
-  }]
-}
+```bash
+make setup              # Create data directories
+make build              # Docker compose build
+make up                 # Docker compose up -d
+make down               # Docker compose down
+make logs               # Docker compose logs -f
+make test-all           # Run all test suites
+make test-services      # Service tests only
+make test-integration   # Integration tests
+make test-dashboard     # Dashboard tests
+make test-coverage      # Tests with coverage report
+make lint               # Ruff check
+make sast               # Bandit security scan
+make clean              # Clean build artifacts + coverage
 ```
-
----
-
-## Phase 0 — Scientific Validation
-
-The **Phase 0** validation framework (in `phase0/`) benchmarks 4 preprocessing pipelines against real Sentinel-1 data using GFW AIS as ground truth.
-
-**Key question:** *Can an INT8-quantized YOLOv8 detector trained on simulated SAR imagery achieve acceptable performance on real Sentinel-1 data — without fine-tuning?*
-
-See the [Phase 0 README](./phase0/README.md) for full details on:
-- CDSE scene download and selection
-- 4-pipeline preprocessing (A/B/C/D)
-- GFW AIS annotation seeding
-- Benchmark metrics (mAP@0.5, mAP@0.5:0.95)
 
 ---
 
@@ -434,43 +430,44 @@ See the [Phase 0 README](./phase0/README.md) for full details on:
 
 ```
 .
-├── README.md                           ← This file
-├── docker-compose.yml                  ← Production compose (6 services + Redis)
-├── docker-compose.demo.yml             ← Demo compose (3 services)
-├── .github/workflows/ci.yml            ← CI: lint + structure + tests
-├── Makefile                            ─ setup, build, up, down, logs, clean
-├── .env.example                        ─ Environment template
+├── README.md
+├── docker-compose.yml              # Production compose (7 services)
+├── docker-compose.demo.yml         # Demo compose with base image build
+├── .github/workflows/ci.yml        # CI: lint + SAST + test matrix + coverage
+├── Makefile                        # Build, test, lint, sast targets
+├── pytest.ini                      # Pytest configuration
+├── .env.example                    # Environment template
 │
-├── shared/
-│   ├── config/constants.py             ─ Shared constants (zones, models, SAR params)
-│   └── schemas/events.py               ─ Pydantic schemas (DetectionEvent, etc.)
+├── docker/
+│   └── base/                       # Base image (maritime-intel-base:latest)
+│       ├── Dockerfile              #   Multi-stage with shared Python deps
+│       └── requirements.txt        #   FastAPI, Pydantic, httpx, NumPy
 │
-├── phase0/
-│   ├── scripts/                        ─ download_scenes.py, sar_preprocessing.py,
-│   │                                     gfw_annotations.py, benchmark_pipeline.py
-│   ├── tests/                          ─ test suites for all phase0 modules
-│   └── notebooks/                      ─ Colab notebooks for full pipeline
+├── shared/                         # Common code for all services
+│   ├── __init__.py                 #   Package init
+│   ├── config/                     #   Shared constants
+│   │   ├── __init__.py
+│   │   └── constants.py            #   Zones, models, SAR params
+│   ├── schemas/                    #   Pydantic schemas
+│   │   ├── __init__.py
+│   │   └── events.py               #   DetectionEvent, BoundingBox, etc.
+│   ├── models/                     #   ONNX model files (gitignored)
+│   └── tests/                      #   Schema unit tests (21 tests)
 │
-└── services/
-    ├── data-ingestor/                  ─ CDSE ingestion (:8001)
-    ├── sentinel-preprocessor/          ─ SAR preprocessing (:8000)
-    ├── detector/                       ─ YOLOv8 ONNX inference (:8003)
-    ├── satellite-monitor/              ─ TLE/SGP4 satellite tracking (:8004)
-    ├── aggregator/                     ─ Event enrichment + persistence (:8002)
-    └── ground-dashboard/               ─ Streamlit UI (:8501)
+├── phase0/                         # Scientific validation framework
+│   ├── scripts/                    #   CDSE download, SAR preprocessing, GFW, benchmark
+│   ├── tests/                      #   Test suites
+│   └── notebooks/                  #   Colab pipeline notebooks
+│
+├── services/                       # Microservices
+│   ├── data-ingestor/              #   CDSE ingestion (:8001)
+│   ├── sentinel-preprocessor/      #   SAR preprocessing (:8000)
+│   ├── detector/                   #   YOLOv8 ONNX inference (:8003)
+│   ├── satellite-monitor/          #   TLE/SGP4 satellite tracking (:8004)
+│   ├── aggregator/                 #   Event enrichment + persistence (:8002)
+│   └── ground-dashboard/           #   Streamlit UI (:8501)
+│
+└── tests/                          # Cross-service test suites
+    ├── integration/                #   End-to-end + security tests
+    └── ground_dashboard/           #   Dashboard utility tests
 ```
-
----
-
-## Recent Changelog
-
-### July 2026
-
-- **GFW API v3 compliance**: Fixed `datasets[0]` bracket notation (query params), `spatial-resolution`/`temporal-resolution`/`format` as query params, `limit`/`geojson` as body params
-- **Response parsing**: `_normalize_response_entries()` supports grouped nested format `{entries: [{dataset_key: [{vessel}]}]}`
-- **CI improvements**: Added `tests` job with 36 unit tests; fixed phase0 dependency installation
-- **Deprecation fixes**: Pydantic `min_items` → `min_length`; FastAPI `on_event` → `lifespan` context manager
-- **Streamlit compatibility**: Updated `st.number_input` API (`min` → `min_value`, `max` → `max_value`)
-- **GCP test fix**: Tests now use actual `_gcp_lines/_gcp_pixels` from the georeferencer (avoids `np.linspace` mismatch)
-- **Docker build**: 6 images built and published; `pip-audit` — 0 vulnerabilities across all services
-- **Satellite-monitor**: Explicit warning log when SatNOGS returns empty (`[]`) for Sentinel-1A

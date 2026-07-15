@@ -14,7 +14,8 @@ services:
 
   data-ingestor:
     build:
-      context: ./services/data-ingestor
+      context: .
+      dockerfile: services/data-ingestor/Dockerfile
     container_name: maritime-data-ingestor
     ports:
       - "8001:8001"
@@ -41,7 +42,8 @@ services:
 
   sentinel-preprocessor:
     build:
-      context: ./services/sentinel-preprocessor
+      context: .
+      dockerfile: services/sentinel-preprocessor/Dockerfile
     container_name: maritime-sentinel-preprocessor
     ports:
       - "8000:8000"
@@ -64,7 +66,8 @@ services:
 
   detector:
     build:
-      context: ./services/detector
+      context: .
+      dockerfile: services/detector/Dockerfile
     container_name: maritime-detector
     ports:
       - "8003:8000"
@@ -86,7 +89,8 @@ services:
 
   satellite-monitor:
     build:
-      context: ./services/satellite-monitor
+      context: .
+      dockerfile: services/satellite-monitor/Dockerfile
     container_name: maritime-satellite-monitor
     ports:
       - "8004:8000"
@@ -105,7 +109,8 @@ services:
 
   aggregator:
     build:
-      context: ./services/aggregator
+      context: .
+      dockerfile: services/aggregator/Dockerfile
     container_name: maritime-aggregator
     ports:
       - "8002:8002"
@@ -128,7 +133,8 @@ services:
 
   ground-dashboard:
     build:
-      context: ./services/ground-dashboard
+      context: .
+      dockerfile: services/ground-dashboard/Dockerfile
     container_name: maritime-ground-dashboard
     ports:
       - "8501:8501"

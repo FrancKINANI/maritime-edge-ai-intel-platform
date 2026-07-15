@@ -1,18 +1,21 @@
-# Build stage — install heavy dependencies (onnxruntime, opencv-headless)
-FROM python:3.10-slim as builder
+# =============================================================================
+# Detector — ONNX vessel detection service
+# Build stage compiles deps, runtime stage is minimal
+# =============================================================================
 
-WORKDIR /app
-COPY requirements.txt .
+FROM maritime-intel-base:latest AS builder
+
+COPY services/detector/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Runtime stage — copy only installed packages, keep image small
-FROM python:3.10-slim
+FROM maritime-intel-base:latest AS release
 
-WORKDIR /app
 COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
-COPY . .
+
+COPY services/detector/ /app/services/detector/
+COPY shared/ /app/shared/
 
 EXPOSE 8000
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "services.detector.main:app", "--host", "0.0.0.0", "--port", "8000"]
