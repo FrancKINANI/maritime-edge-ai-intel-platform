@@ -265,3 +265,56 @@ async def health_check() -> Dict[str, str]:
         "cached_tles": str(len(TLE_CACHE)),
         "fresh_tles": str(fresh),
     }
+
+
+# --------------------------------------------------------------------------
+# Input Validation
+# --------------------------------------------------------------------------
+
+def parse_satellite_id(satellite_id: str) -> int:
+    """
+    Parse and validate a NORAD satellite ID.
+
+    Accepts a string representing a positive integer NORAD ID.
+    Rejects SQL injection patterns, path traversal, and empty strings.
+
+    Args:
+        satellite_id: String representation of a NORAD ID.
+
+    Returns:
+        The parsed positive integer NORAD ID.
+
+    Raises:
+        ValueError: If the input is empty, contains non-numeric characters,
+            or contains injection/traversal patterns.
+    """
+    if not satellite_id:
+        raise ValueError("NORAD ID must not be empty")
+
+    # Strip whitespace
+    stripped = satellite_id.strip()
+
+    if not stripped:
+        raise ValueError("NORAD ID must not be empty")
+
+    # Reject injection patterns: SQL, path traversal, etc.
+    # A valid NORAD ID is purely numeric (possibly with leading zeros)
+    injection_patterns = [
+        "OR", "--", ";", "DROP", "SELECT", "INSERT", "DELETE",
+        "ALTER", "CREATE", "EXEC", "UNION", "'", '"',
+        "/", "\\", "..",
+    ]
+    for pattern in injection_patterns:
+        if pattern in stripped.upper() and pattern != "":
+            raise ValueError(f"Invalid NORAD ID: contains disallowed pattern")
+
+    # Must be purely numeric (with optional leading sign)
+    if not stripped.lstrip("+").isdigit():
+        raise ValueError(f"Invalid NORAD ID: not a valid number: {satellite_id}")
+
+    norad_id = int(stripped)
+
+    if norad_id <= 0:
+        raise ValueError(f"NORAD ID must be a positive integer, got: {norad_id}")
+
+    return norad_id

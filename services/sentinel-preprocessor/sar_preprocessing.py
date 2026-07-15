@@ -5,6 +5,9 @@ Exposes calibration, speckle filtering, decibel mapping, normalization,
 tiling routines, and GCP-based georeferencing for Sentinel-1 GRD products.
 """
 
+import os
+from pathlib import Path
+
 import numpy as np
 from typing import List, Tuple, Dict, Any, Optional
 from scipy.interpolate import RegularGridInterpolator
@@ -315,3 +318,70 @@ def pipeline_D(safe_path: str, output_dir: Optional[str] = None) -> Dict[str, An
     if _HAS_PHASE0:
         return process_safe_windowed(safe_path, "D", output_dir or "data/tiles")
     raise NotImplementedError("phase0 implementation not available in workspace")
+
+
+# --------------------------------------------------------------------------
+# Security & Input Validation
+# --------------------------------------------------------------------------
+
+class SafetyViolation(Exception):
+    """Raised when a file path attempts to escape allowed directories."""
+    pass
+
+
+_ALLOWED_BASE_DIRS = [
+    Path("/app/shared"),
+    Path("/app/uploads"),
+    Path("/data/tiles"),
+    Path("/data/scenes"),
+]
+"""Directories that are considered safe for file access."""
+
+
+def validate_safe_path(path: str) -> str:
+    """
+    Validate a file path against path traversal attacks.
+
+    Checks that:
+    1. The path does not contain '..' components (after normalization)
+    2. The resolved path starts with an allowed base directory
+    3. The path is not a system file (/etc/, /proc/, /dev/, /tmp/, /var/)
+
+    Args:
+        path: File path to validate.
+
+    Returns:
+        The resolved absolute path if safe.
+
+    Raises:
+        SafetyViolation: If the path is deemed unsafe.
+    """
+    if not path:
+        raise SafetyViolation("Empty path is not allowed")
+
+    # Normalize the path to resolve any '..' or '.' components
+    resolved = Path(path).resolve()
+
+    # Reject paths with unresolved '..' or traversal patterns
+    # (Path.resolve() eliminates these, but we also check the raw path)
+    if ".." in path.split(os.sep):
+        raise SafetyViolation(f"Path contains '..' traversal: {path}")
+
+    # Reject system file paths
+    system_dirs = ["/etc", "/proc", "/dev", "/tmp", "/var", "/sys", "/boot", "/root"]
+    for sys_dir in system_dirs:
+        if str(resolved).startswith(sys_dir) or path.startswith(sys_dir):
+            raise SafetyViolation(f"Path references system directory: {path}")
+
+    # Check that the resolved path falls within an allowed base directory
+    # If the path is relative and doesn't start with /, allow it only if
+    # it doesn't contain traversal patterns (already checked above)
+    if path.startswith("/"):
+        allowed = any(
+            str(resolved).startswith(str(base_dir.resolve()))
+            for base_dir in _ALLOWED_BASE_DIRS
+        )
+        if not allowed:
+            raise SafetyViolation(f"Path is outside allowed directories: {path}")
+
+    return str(resolved)
