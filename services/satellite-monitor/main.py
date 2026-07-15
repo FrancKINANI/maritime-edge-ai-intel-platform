@@ -306,7 +306,7 @@ def parse_satellite_id(satellite_id: str) -> int:
     ]
     for pattern in injection_patterns:
         if pattern in stripped.upper() and pattern != "":
-            raise ValueError(f"Invalid NORAD ID: contains disallowed pattern")
+            raise ValueError("Invalid NORAD ID: contains disallowed pattern")
 
     # Must be purely numeric (with optional leading sign)
     if not stripped.lstrip("+").isdigit():
