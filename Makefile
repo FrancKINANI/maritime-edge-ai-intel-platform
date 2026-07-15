@@ -22,19 +22,12 @@ phase0:
 	cd phase0 && python download_scenes.py
 
 test-all:
-	@# Per-service invocations avoid sys.path collisions on modules named main.py
-	@echo "=== Service tests ==="
-	uv run python -m pytest phase0/tests/ -q
-	uv run python -m pytest services/sentinel-preprocessor/tests/ -q
-	uv run python -m pytest services/aggregator/tests/ -q
-	uv run python -m pytest services/detector/tests/ -q
-	uv run python -m pytest services/satellite-monitor/tests/ -q
-	uv run python -m pytest services/data-ingestor/tests/ -q
-	uv run python -m pytest shared/tests/ -q
-	@echo "=== Integration & Security tests ==="
-	uv run python -m pytest tests/integration/ -q
-	@echo "=== Dashboard tests ==="
-	uv run python -m pytest tests/ground_dashboard/ -q
+	@# Single invocation with importlib mode avoids namespace collisions.
+	@echo "=== Running all tests ==="
+	uv run python -m pytest services/aggregator/tests/ services/detector/tests/ \
+		services/satellite-monitor/tests/ services/data-ingestor/tests/ \
+		services/sentinel-preprocessor/tests/ phase0/tests/ shared/tests/ \
+		tests/integration/ tests/ground_dashboard/ -v -q
 
 test-services:
 	@echo "=== Service tests ==="
@@ -53,10 +46,11 @@ test-dashboard:
 	uv run python -m pytest tests/ground_dashboard/ -v -q
 
 test-coverage:
-	uv run python -m pytest phase0/tests/ services/sentinel-preprocessor/tests/ \
-		services/aggregator/tests/ services/detector/tests/ \
+	@# Single invocation with importlib mode avoids namespace collisions.
+	uv run python -m pytest services/aggregator/tests/ services/detector/tests/ \
 		services/satellite-monitor/tests/ services/data-ingestor/tests/ \
-		shared/tests/ tests/integration/ tests/ground_dashboard/ -q \
+		services/sentinel-preprocessor/tests/ phase0/tests/ shared/tests/ \
+		tests/integration/ tests/ground_dashboard/ -q \
 		--cov=. --cov-report=term --cov-report=html:coverage_html \
 		--cov-fail-under=60
 
