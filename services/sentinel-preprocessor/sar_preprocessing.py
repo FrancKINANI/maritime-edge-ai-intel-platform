@@ -219,8 +219,8 @@ def extract_gcps_from_geotiff(tiff_path: str) -> Tuple[np.ndarray, Tuple[int, in
         for gcp in gcps_raw:
             i = row_to_idx[gcp.row]
             j = col_to_idx[gcp.col]
-            gcps_array[i, j, 0] = gcp.lat
-            gcps_array[i, j, 1] = gcp.lon
+            gcps_array[i, j, 0] = gcp.y   # latitude
+            gcps_array[i, j, 1] = gcp.x   # longitude
 
         return gcps_array, image_shape
 

@@ -51,7 +51,6 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import rasterio
 from rasterio.windows import Window
-from rasterio.transform import xy
 from scipy.interpolate import RegularGridInterpolator
 from scipy.ndimage import uniform_filter
 from tqdm import tqdm
@@ -259,8 +258,8 @@ def extract_gcps_from_geotiff(tiff_path: str) -> Tuple[np.ndarray, Tuple[int, in
         for gcp in gcps_raw:
             i = row_to_idx[gcp.row]
             j = col_to_idx[gcp.col]
-            gcps_array[i, j, 0] = gcp.lat
-            gcps_array[i, j, 1] = gcp.lon
+            gcps_array[i, j, 0] = gcp.y   # latitude
+            gcps_array[i, j, 1] = gcp.x   # longitude
 
         return gcps_array, image_shape
 
@@ -732,10 +731,25 @@ def process_safe_windowed(
                     x_local_end = x_local_start + (x_end - x_start)
                     tile_uint8 = tile_uint8[y_local_start:y_local_end, x_local_start:x_local_end]
                 
-                # Calculate geographic bounds
-                transform = dataset.transform
-                lon_min, lat_max = xy(transform, x_start, y_start)
-                lon_max, lat_min = xy(transform, x_end, y_end)
+                # Calculate geographic bounds using GCPs
+                if 'georeferencer' not in locals():
+                    _gcps, _img_shape = extract_gcps_from_geotiff(files["tiff"])
+                    georeferencer = GCPGeoreferencer(_gcps, _img_shape)
+                    del _gcps, _img_shape
+                try:
+                    geo_bbox = georeferencer.tile_to_bbox(y_start, x_start, y_end, x_end)
+                except Exception:
+                    # Fallback for edge tiles: use center + half-tile estimate
+                    y_center = float((y_start + y_end) // 2)
+                    x_center = float((x_start + x_end) // 2)
+                    try:
+                        center_lat, center_lon = georeferencer.pixel_to_latlon(y_center, x_center)
+                    except Exception:
+                        center_lat, center_lon = 0.0, 0.0
+                    half = 0.025
+                    geo_bbox = [center_lat - half, center_lon - half,
+                                center_lat + half, center_lon + half]
+                # geo_bbox format: [lat_min, lon_min, lat_max, lon_max]
                 
                 # Save tile
                 tile_id = f"{scene_id}_{pipeline_name}_tile{tile_idx:04d}"

@@ -923,6 +923,7 @@ def select_and_download_scenes_from_density(
     """
     if output_dir is None:
         output_dir = Path(__file__).parent / "data" / "scenes"
+    output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     cells = density_map.get("cells", [])

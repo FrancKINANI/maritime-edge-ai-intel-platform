@@ -21,6 +21,9 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import httpx
 from dotenv import load_dotenv
 
+# Default bbox fallback (Morocco EEZ region)
+MOROCCO_BBOX = [-17.0, 27.0, -1.0, 36.0]
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -365,14 +368,48 @@ class GFWClient:
         limit: int = 200,
     ) -> List[Dict[str, Any]]:
         logger.info("Fetching GFW dark vessel events for bbox=%s %s->%s", bbox, start_date, end_date)
-        params: Dict[str, Any] = {
-            "datasets[0]": AIS_OFF_DATASET,
-            "start-date": start_date,
-            "end-date": end_date,
-            "limit": limit,
-            "geometry": json.dumps(_bbox_polygon(bbox)),
-        }
-        return self._paginate_get(GFW_EVENTS, params, limit)
+        try:
+            # Use GET without geometry filter, then filter in code if needed
+            params: Dict[str, Any] = {
+                "datasets[0]": AIS_OFF_DATASET,
+                "start-date": start_date,
+                "end-date": end_date,
+                "limit": limit,
+                "offset": 0,
+            }
+            events = self._paginate_get(GFW_EVENTS, params, limit)
+
+            # Filter spatially in code if events were returned
+            if events and bbox:
+                lon_min, lat_min, lon_max, lat_max = bbox
+                filtered = []
+                for event in events:
+                    if not isinstance(event, dict):
+                        continue
+                    pos = event.get("position", {})
+                    if not isinstance(pos, dict):
+                        pos = {}
+                    lat = pos.get("lat")
+                    lon = pos.get("lon")
+                    if lat is not None and lon is not None:
+                        if lat_min <= lat <= lat_max and lon_min <= lon <= lon_max:
+                            filtered.append(event)
+                logger.info(
+                    "Retrieved %d dark vessel events (%d after spatial filter)",
+                    len(events),
+                    len(filtered),
+                )
+                return filtered
+
+            logger.info("Retrieved %d dark vessel events", len(events))
+            return events
+        except Exception as exc:
+            logger.warning(
+                "Failed to fetch dark vessel events (non-fatal): %s. "
+                "Continuing with AIS presence data only.",
+                exc,
+            )
+            return []
 
 # ---------------------------------------------------------------------------
 # Scene metadata and projection helpers
@@ -534,9 +571,9 @@ def project_detections_to_tiles(
 
             if detection.get("source") == "sar_detection":
                 label = "AIS_confirmed" if detection.get("matched_to_ais") else "visual_only"
-            elif detection.get("source") == "ais_presence":
+            elif detection.get("source") in ("ais_presence", "ais_presence_amorce"):
                 label = "AIS_confirmed"
-            elif detection.get("source") == "ais_off":
+            elif detection.get("source") in ("ais_off", "ais_off_candidate"):
                 label = "dark_vessel_candidate"
             else:
                 label = "visual_only"
@@ -627,7 +664,7 @@ def export_to_cvat_xml(
     task = ET.SubElement(meta, "task")
     ET.SubElement(task, "name").text = scene_id
     labels = ET.SubElement(task, "labels")
-    for label_name in ["vessel_AIS_confirmed", "vessel_visual_only", "dark_vessel_candidate"]:
+    for label_name in ["vessel_AIS_confirmed", "vessel_visual_only", "vessel_dark_vessel_candidate"]:
         label = ET.SubElement(labels, "label")
         ET.SubElement(label, "name").text = label_name
         ET.SubElement(label, "color").text = "#FF0000"
@@ -746,7 +783,18 @@ def annotate_scene(
     if not acquisition_time:
         acquisition_time = get_scene_acquisition_time(scene_id)
 
-    bbox = get_scene_bbox(metadata)
+    # Use scene bbox (from tile geo_bbox, now corrected to geographic coords)
+    # for the GFW query, so we cover the entire image area.
+    # The target_cell_bbox (from traceability) is recorded separately below.
+    try:
+        bbox = get_scene_bbox(metadata)
+    except ValueError:
+        bbox = metadata.get("target_cell_bbox") or MOROCCO_BBOX
+        logger.warning(
+            "Could not compute scene bbox from tiles. Falling back to bbox=%s",
+            bbox,
+        )
+
     date_start = acquisition_time[:10]
     date_end = (datetime.fromisoformat(acquisition_time.rstrip("Z")) + timedelta(days=1)).date().isoformat()
 
@@ -769,6 +817,20 @@ def annotate_scene(
     export_to_cvat_xml(scene_id, tile_annotations, metadata.get("tiles", []), cvat_path)
     export_to_yolo_format(scene_id, tile_annotations, metadata.get("tiles", []), scene_output)
 
+    # Propagate traceability from metadata.json (set by upstream pipeline)
+    traceability = {
+        "target_density_cell_index": metadata.get("target_density_cell_index"),
+        "target_cell_bbox": metadata.get("target_cell_bbox"),
+        "targeting_protocol": metadata.get("targeting_protocol"),
+    }
+    has_trace = any(v is not None for v in traceability.values())
+    if not has_trace:
+        traceability = None
+        logger.warning(
+            "No traceability fields found in metadata.json. "
+            "The scene was likely not processed through the density-targeted pipeline."
+        )
+
     report = {
         "scene_id": scene_id,
         "pipeline": metadata.get("pipeline", pipeline),
@@ -779,9 +841,11 @@ def annotate_scene(
         "dark_vessel_candidates": len(dark_vessel_candidates),
         "total_annotations": sum(len(anns) for anns in tile_annotations.values()),
         "class_counts": {
-            "ais_presence_amorce": sum(1 for anns in tile_annotations.values() for ann in anns if ann["label"] == "ais_presence_amorce"),
-            "ais_off_candidate": sum(1 for anns in tile_annotations.values() for ann in anns if ann["label"] == "ais_off_candidate"),
+            "AIS_confirmed": sum(1 for anns in tile_annotations.values() for ann in anns if ann["label"] == "AIS_confirmed"),
+            "visual_only": sum(1 for anns in tile_annotations.values() for ann in anns if ann["label"] == "visual_only"),
+            "dark_vessel_candidate": sum(1 for anns in tile_annotations.values() for ann in anns if ann["label"] == "dark_vessel_candidate"),
         },
+        "traceability": traceability,
         "protocol": "PH0-CORR-002_hybrid",
         "note": "All annotations require human validation in CVAT before becoming Ground Truth",
     }
@@ -802,8 +866,9 @@ def annotate_all_scenes(
     metadata_paths = sorted(tiles_root.glob("**/metadata.json"))
     summary = {
         "scenes": [],
-        "global_counts": {"ais_presence_amorce": 0, "ais_off_candidate": 0},
+        "global_counts": {"AIS_confirmed": 0, "visual_only": 0, "dark_vessel_candidate": 0},
         "total_annotations": 0,
+        "traceability_summary": None,
         "protocol": "PH0-CORR-002_hybrid",
     }
     logger.info("Found %s metadata files under %s", len(metadata_paths), tiles_root)
@@ -817,6 +882,9 @@ def annotate_all_scenes(
         for label, count in report["class_counts"].items():
             summary["global_counts"][label] += count
         summary["total_annotations"] += report["total_annotations"]
+        # Aggregate traceability from the first scene with traceability data
+        if report.get("traceability") and summary["traceability_summary"] is None:
+            summary["traceability_summary"] = report["traceability"]
 
     summary_path = Path(output_dir) / "global_summary.json"
     with open(summary_path, "w", encoding="utf-8") as handle:
