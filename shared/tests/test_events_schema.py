@@ -314,10 +314,10 @@ class TestTLEData:
 
     def test_norad_id_type(self):
         """NORAD IDs should be integers."""
-        tle = TLEData(
+        TLEData(
             satellite_name="TEST",
             norad_id=39634,
-                tle1="1 00000U 00000A   00000.00000000  .00000000  00000-0  00000-0 0  0000",
-                tle2="2 00000  98.1800 123.0000 0001200  90.0000 270.0000 14.59199999000000",
-                updated_at=datetime(2024, 1, 1),
-            )
+            tle1="1 00000U 00000A   00000.00000000  .00000000  00000-0  00000-0 0  0000",
+            tle2="2 00000  98.1800 123.0000 0001200  90.0000 270.0000 14.59199999000000",
+            updated_at=datetime(2024, 1, 1),
+        )
