@@ -1131,7 +1131,6 @@ def select_and_download_scenes_from_density(
             product = products[0]
 
         product_name = product["name"]
-        scene_id = _normalize_scene_id(product_name)
 
         # --- Case A: scene already on disk — still ensure target_trace exists ---
         if is_scene_downloaded(output_dir, product_name, existing_ids):
