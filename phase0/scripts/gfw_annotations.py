@@ -24,6 +24,13 @@ from dotenv import load_dotenv
 # Default bbox fallback (Morocco EEZ region)
 MOROCCO_BBOX = [-17.0, 27.0, -1.0, 36.0]
 
+# GFW AIS data lookback window: because AIS data available via GFW has
+# 24-72h latency, we query starting 3 days before the scene acquisition
+# date to maximise the chance of finding vessel presence in the area.
+# Vessel traffic patterns (shipping lanes, fishing grounds) are relatively
+# stable over a few days, so historical positions remain relevant seeds.
+AIS_LOOKBACK_DAYS = 3
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -755,8 +762,189 @@ def export_to_yolo_format(
     logger.info("Exported YOLO labels for %s tiles to %s", len(tile_annotations), labels_dir)
 
 # ---------------------------------------------------------------------------
-# Annotation pipeline
+# NPY → PNG conversion for CVAT import
 # ---------------------------------------------------------------------------
+
+
+def convert_npy_tiles_to_png(
+    scene_dir: str,
+    pipeline: str,
+    tile_ids: List[str],
+    output_dir: str,
+    tile_size: int = 512,
+) -> Dict[str, str]:
+    """
+    Convert a list of .npy tile files to PNG for CVAT import.
+
+    Each .npy is already uint8 (0-255) from the SAR pipeline; no
+    additional normalisation is applied. The output filename matches
+    the input EXACTLY except for the extension (.npy → .png), so CVAT
+    can link annotations to the correct image.
+
+    Args:
+        scene_dir: Path to the scene's tile directory containing
+                   ``<pipeline>/`` with .npy files.
+        pipeline: Pipeline name (e.g. "D").
+        tile_ids: List of tile IDs (e.g. ``S1D_..._D_tile0032``).
+        output_dir: Destination directory for PNG files.
+        tile_size: Expected tile dimension in pixels (default 512).
+
+    Returns:
+        Dict mapping ``tile_id`` → ``path/to/tile_id.png``.
+        Tiles whose source .npy was not found are reported via
+        ``logger.warning`` and omitted from the result.
+
+    Raises:
+        ImportError: If Pillow is not installed.
+        ValueError: If a loaded array does not have the expected shape.
+    """
+    try:
+        from PIL import Image
+    except ImportError:
+        raise ImportError(
+            "Pillow is required for PNG conversion. "
+            "Install it with: pip install Pillow"
+        )
+    import numpy as np
+    from tqdm import tqdm
+
+    tiles_path = Path(scene_dir) / pipeline
+    out_path = Path(output_dir)
+    out_path.mkdir(parents=True, exist_ok=True)
+
+    result: Dict[str, str] = {}
+    not_found: List[str] = []
+
+    for tile_id in tqdm(tile_ids, desc="Converting tiles", unit="tile"):
+        npy_file = tiles_path / f"{tile_id}.npy"
+        if not npy_file.exists():
+            not_found.append(tile_id)
+            continue
+
+        arr = np.load(str(npy_file))  # uint8, 0-255
+
+        # Validate dimensions before conversion
+        if arr.ndim != 2 or arr.shape != (tile_size, tile_size):
+            raise ValueError(
+                f"Tile {tile_id} has unexpected shape {arr.shape} "
+                f"(expected ({tile_size}, {tile_size})) — check the SAR pipeline output."
+            )
+
+        img = Image.fromarray(arr, mode="L")  # grayscale
+
+        png_path = out_path / f"{tile_id}.png"
+        img.save(str(png_path), format="PNG", optimize=True)
+        result[tile_id] = str(png_path)
+
+    if not_found:
+        logger.warning(
+            "%d tile(s) not found in %s: %s",
+            len(not_found),
+            tiles_path,
+            not_found[:10],
+        )
+
+    logger.info("Converted %d/%d tiles to PNG in %s", len(result), len(tile_ids), out_path)
+    return result
+
+
+def convert_scene_all_tiles_to_png(
+    scene_id: str,
+    tiles_root: Union[str, Path],
+    annotations_root: Union[str, Path],
+    pipeline: str = "D",
+    output_dir: Optional[Union[str, Path]] = None,
+) -> Dict[str, Any]:
+    """
+    Convert ALL tiles of a scene from .npy to PNG for CVAT import, and
+    prepare the ``cvat_import/`` directory structure (images + XML).
+
+    Layout produced::
+
+        cvat_import/
+        ├── images/
+        │   ├── S1D_..._D_tile0000.png
+        │   ├── S1D_..._D_tile0001.png
+        │   └── ...
+        └── cvat_annotation.xml   ← copied unchanged from annotation output
+
+    Args:
+        scene_id: Scene identifier (directory name under annotations/).
+        tiles_root: Root tile directory (containing ``<scene_id>/<pipeline>/``).
+        annotations_root: Root annotation directory (containing ``<scene_id>/``).
+        pipeline: Pipeline name (default "D").
+        output_dir: Where to create ``cvat_import/``. Defaults to
+                    ``<annotations_root>/<scene_id>/cvat_import/``.
+
+    Returns:
+        Dict with:
+            - n_png: number of PNG generated
+            - png_dir: path to images folder
+            - xml_path: path to copied CVAT XML
+            - estimated_size_mb: total PNG size in MB
+    """
+    tiles_root = Path(tiles_root)
+    annotations_root = Path(annotations_root)
+    scene_tile_dir = tiles_root / scene_id / pipeline
+
+    if not scene_tile_dir.is_dir():
+        raise NotADirectoryError(f"Tile directory not found: {scene_tile_dir}")
+
+    # Gather all .npy files
+    npy_files = sorted(scene_tile_dir.glob("*.npy"))
+    if not npy_files:
+        raise FileNotFoundError(f"No .npy files found in {scene_tile_dir}")
+
+    tile_ids = [f.stem for f in npy_files]
+
+    # Estimate size before converting
+    total_npy_bytes = sum(f.stat().st_size for f in npy_files)
+    logger.info(
+        "Found %d .npy files (%.1f MB raw). Converting to PNG...",
+        len(tile_ids),
+        total_npy_bytes / (1024 * 1024),
+    )
+
+    # Determine output dir
+    if output_dir is None:
+        output_dir = annotations_root / scene_id / "cvat_import"
+    output_dir = Path(output_dir)
+
+    images_dir = output_dir / "images"
+    images_dir.mkdir(parents=True, exist_ok=True)
+
+    # Convert all tiles
+    converted = convert_npy_tiles_to_png(
+        str(scene_tile_dir.parent),
+        pipeline,
+        tile_ids,
+        str(images_dir),
+    )
+
+    # Calculate PNG size
+    total_png_bytes = sum(Path(p).stat().st_size for p in converted.values())
+    logger.info(
+        "PNG conversion complete: %d files, %.1f MB (%.1f%% of raw .npy size)",
+        len(converted),
+        total_png_bytes / (1024 * 1024),
+        (total_png_bytes / total_npy_bytes * 100) if total_npy_bytes else 0,
+    )
+
+    # Copy CVAT XML
+    src_xml = annotations_root / scene_id / "cvat_annotation.xml"
+    dst_xml = output_dir / "cvat_annotation.xml"
+    if src_xml.exists():
+        shutil.copy2(str(src_xml), str(dst_xml))
+        logger.info("CVAT XML copied to %s", dst_xml)
+    else:
+        logger.warning("No CVAT XML found at %s — skipping copy", src_xml)
+
+    return {
+        "n_png": len(converted),
+        "png_dir": str(images_dir),
+        "xml_path": str(dst_xml) if dst_xml.exists() else None,
+        "estimated_size_mb": round(total_png_bytes / (1024 * 1024), 1),
+    }
 
 
 def annotate_scene(
@@ -795,8 +983,13 @@ def annotate_scene(
             bbox,
         )
 
-    date_start = acquisition_time[:10]
-    date_end = (datetime.fromisoformat(acquisition_time.rstrip("Z")) + timedelta(days=1)).date().isoformat()
+    # Use a lookback window for the GFW query because AIS data available
+    # via GFW has 24-72h latency. The lookback ensures we capture vessel
+    # positions even for recent scenes (same-day acquisition).
+    # Vessel traffic patterns are relatively stable over a few days.
+    acquisition_dt = datetime.fromisoformat(acquisition_time.rstrip("Z"))
+    date_start = (acquisition_dt - timedelta(days=AIS_LOOKBACK_DAYS)).date().isoformat()
+    date_end = (acquisition_dt + timedelta(days=1)).date().isoformat()
 
     # Per PH0-CORR-002: Replace SAR detections with AIS Vessel Presence (Level 1)
     ais_presence_seeds = gfw_client.gfw_get_ais_presence(bbox, date_start, date_end)
@@ -897,7 +1090,7 @@ def test_gfw_connection(client: GFWClient) -> None:
     logger.info("Running GFW connectivity test (PH0-CORR-002 protocol)")
     bbox = [-17.0, 27.0, -1.0, 36.0]
     end = datetime.utcnow().date()
-    start = end - timedelta(days=2)
+    start = end - timedelta(days=AIS_LOOKBACK_DAYS)
     try:
         # Test AIS Vessel Presence (Level 1)
         ais_seeds = client.gfw_get_ais_presence([bbox[0], bbox[1], bbox[2], bbox[3]], start.isoformat(), end.isoformat(), limit=10)
@@ -943,17 +1136,30 @@ def main() -> None:
     parser.add_argument("--all", action="store_true", help="Annotate all scenes under tiles root")
     parser.add_argument("--test", action="store_true", help="Run a GFW API connectivity test")
     parser.add_argument("--test-sar", action="store_true", help="Run isolated SAR endpoint test")
+    parser.add_argument("--convert-to-png", default=None, metavar="SCENE_ID",
+                        help="Convert all .npy tiles of a scene to PNG for CVAT import")
 
     args = parser.parse_args()
+
+    tiles_root = Path(args.tiles_root or Path(__file__).parent / "data" / "tiles")
+    output_dir = Path(args.output_dir or Path(__file__).parent / "data" / "annotations")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # --convert-to-png doesn't need the GFW token, skip token check for it
+    if args.convert_to_png:
+        result = convert_scene_all_tiles_to_png(
+            args.convert_to_png,
+            tiles_root,
+            annotations_root=output_dir,
+            pipeline=args.pipeline,
+        )
+        logger.info("PNG conversion result: %s", json.dumps(result, indent=2))
+        return
 
     token = os.getenv("GFW_API_TOKEN")
     if not token:
         logger.error("GFW_API_TOKEN must be set in the environment or .env file.")
         return
-
-    tiles_root = Path(args.tiles_root or Path(__file__).parent / "data" / "tiles")
-    output_dir = Path(args.output_dir or Path(__file__).parent / "data" / "annotations")
-    output_dir.mkdir(parents=True, exist_ok=True)
 
     client = GFWClient(token)
 
@@ -969,8 +1175,17 @@ def main() -> None:
         annotate_all_scenes(tiles_root, client, output_dir, pipeline=args.pipeline)
         return
 
+    if args.convert_to_png:
+        result = convert_scene_all_tiles_to_png(
+            args.convert_to_png,
+            tiles_root,
+            pipeline=args.pipeline,
+        )
+        logger.info("PNG conversion result: %s", json.dumps(result, indent=2))
+        return
+
     if not args.metadata:
-        logger.error("Either --metadata or --all must be provided")
+        logger.error("Either --metadata or --all or --convert-to-png must be provided")
         return
 
     annotate_scene(Path(args.metadata), client, output_dir, pipeline=args.pipeline)

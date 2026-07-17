@@ -872,29 +872,181 @@ def build_ais_density_map(bbox: List[float], cell_size_deg: float = DENSITY_CELL
 # ---------------------------------------------------------------------------
 # AIS density-targeted selection and download (ported from notebook cells 9-10)
 # Part B: traceability via target_trace.json
+#
+# Layout (one trace per scene, never a shared parent-level file):
+#
+#   phase0/data/scenes/
+#     <SCENE_ID>.SAFE/
+#       manifest.safe
+#       target_trace.json          ← always INSIDE the .SAFE folder
+#       measurement/ ...
+#     target_traces_index.json     ← maps scene_id → trace path + cell info
+#
+# target_trace.json fields:
+#   - scene_id                   : product name without .SAFE (explicit link)
+#   - safe_dir                   : directory name of the .SAFE folder
+#   - target_density_cell_index  : unique cell id from the density map
+#   - target_cell_bbox           : exact AIS cell bbox that motivated download
+#   - density_rank               : 1-based rank among high-density zones
+#   - ais_count                  : AIS positions counted in that cell
+#   - protocol                   : PH0-CORR-002_density_targeted
 # ---------------------------------------------------------------------------
 
+TARGET_TRACES_INDEX_NAME = "target_traces_index.json"
 
-def write_target_trace(scene_dir: Path, cell_index: int, cell_bbox: List[float]) -> None:
+
+def _normalize_scene_id(product_name: str) -> str:
+    """Strip .SAFE / trailing slash so scene_id is stable across path forms."""
+    return product_name.rstrip("/").replace(".SAFE", "")
+
+
+def resolve_safe_dir(scenes_dir: Path, product_name: str) -> Optional[Path]:
+    """Locate the on-disk .SAFE directory for a product name (handles COG variants)."""
+    scene_id = _normalize_scene_id(product_name)
+    candidates = [
+        scenes_dir / f"{scene_id}.SAFE",
+        scenes_dir / f"{product_name}.SAFE" if not product_name.endswith(".SAFE") else scenes_dir / product_name,
+        scenes_dir / product_name,
+    ]
+    for candidate in candidates:
+        if candidate.is_dir():
+            return candidate
+
+    # Fallback: match by base orbit/mission id (standard vs COG)
+    base_id = get_scene_base_id(product_name)
+    if base_id:
+        for safe_dir in scenes_dir.glob("*.SAFE"):
+            if safe_dir.is_dir() and get_scene_base_id(safe_dir.stem) == base_id:
+                return safe_dir
+    return None
+
+
+def write_target_trace(
+    scene_dir: Path,
+    cell_index: int,
+    cell_bbox: List[float],
+    *,
+    scene_id: Optional[str] = None,
+    density_rank: Optional[int] = None,
+    ais_count: Optional[int] = None,
+    protocol: str = "PH0-CORR-002_density_targeted",
+) -> Path:
     """
-    Write the target_trace.json file in the scene directory.
+    Write target_trace.json **inside** the given .SAFE directory.
 
-    This file records targeting traceability:
-    - target_density_cell_index: position in dmap['cells'] of the targeted cell
-    - target_cell_bbox: exact bbox of the AIS cell that motivated the download
+    The file is always co-located with the scene so there is never ambiguity
+    about which scene a trace belongs to. ``scene_id`` / ``safe_dir`` make the
+    link explicit even if the JSON is copied elsewhere.
 
-    If absent (case of the 11 "seasonal criteria" scenes), SAR processing
-    will write target_density_cell_index: null in metadata.json.
+    Returns:
+        Path to the written target_trace.json
     """
+    scene_dir = Path(scene_dir)
+    scene_dir.mkdir(parents=True, exist_ok=True)
+
+    resolved_scene_id = scene_id or _normalize_scene_id(scene_dir.name)
     trace = {
+        "scene_id": resolved_scene_id,
+        "safe_dir": scene_dir.name if scene_dir.name.endswith(".SAFE") else f"{scene_dir.name}.SAFE",
         "target_density_cell_index": cell_index,
-        "target_cell_bbox": cell_bbox,
-        "protocol": "PH0-CORR-002_density_targeted",
+        "target_cell_bbox": list(cell_bbox),
+        "density_rank": density_rank,
+        "ais_count": ais_count,
+        "protocol": protocol,
     }
+    # Drop None optionals for cleaner JSON when callers omit them
+    trace = {k: v for k, v in trace.items() if v is not None}
+
     trace_path = scene_dir / "target_trace.json"
-    with open(trace_path, "w") as f:
+    with open(trace_path, "w", encoding="utf-8") as f:
         json.dump(trace, f, indent=2)
-    logger.info(f"Target trace written: {trace_path}")
+    logger.info(f"Target trace written: {trace_path} (scene_id={resolved_scene_id}, cell={cell_index})")
+    return trace_path
+
+
+def update_target_traces_index(
+    scenes_dir: Path,
+    scene_id: str,
+    safe_dir_name: str,
+    trace: Dict[str, Any],
+) -> Path:
+    """
+    Update (or create) scenes_dir/target_traces_index.json.
+
+    This index is the single place to look up which target_trace.json belongs
+    to which scene without scanning every .SAFE folder.
+    """
+    scenes_dir = Path(scenes_dir)
+    index_path = scenes_dir / TARGET_TRACES_INDEX_NAME
+
+    if index_path.exists():
+        try:
+            with open(index_path, encoding="utf-8") as f:
+                index = json.load(f)
+        except (json.JSONDecodeError, OSError):
+            index = {}
+    else:
+        index = {}
+
+    if "scenes" not in index or not isinstance(index["scenes"], dict):
+        index["scenes"] = {}
+
+    index["protocol"] = "PH0-CORR-002_density_targeted"
+    index["updated_at"] = datetime.utcnow().isoformat() + "Z"
+    index["scenes"][scene_id] = {
+        "safe_dir": safe_dir_name,
+        "trace_path": f"{safe_dir_name}/target_trace.json",
+        "target_density_cell_index": trace.get("target_density_cell_index"),
+        "target_cell_bbox": trace.get("target_cell_bbox"),
+        "density_rank": trace.get("density_rank"),
+        "ais_count": trace.get("ais_count"),
+        "protocol": trace.get("protocol"),
+    }
+
+    with open(index_path, "w", encoding="utf-8") as f:
+        json.dump(index, f, indent=2)
+    logger.info(f"Target traces index updated: {index_path} (+ {scene_id})")
+    return index_path
+
+
+def write_scene_target_trace(
+    scenes_dir: Path,
+    safe_path: Path,
+    cell_index: int,
+    cell_bbox: List[float],
+    *,
+    density_rank: Optional[int] = None,
+    ais_count: Optional[int] = None,
+    protocol: str = "PH0-CORR-002_density_targeted",
+) -> Dict[str, Any]:
+    """
+    Write target_trace.json inside a scene and register it in the index.
+
+    Returns the trace dict that was written.
+    """
+    scenes_dir = Path(scenes_dir)
+    safe_path = Path(safe_path)
+    scene_id = _normalize_scene_id(safe_path.name)
+
+    trace_path = write_target_trace(
+        safe_path,
+        cell_index,
+        cell_bbox,
+        scene_id=scene_id,
+        density_rank=density_rank,
+        ais_count=ais_count,
+        protocol=protocol,
+    )
+    with open(trace_path, encoding="utf-8") as f:
+        trace = json.load(f)
+
+    update_target_traces_index(
+        scenes_dir,
+        scene_id=scene_id,
+        safe_dir_name=safe_path.name,
+        trace=trace,
+    )
+    return trace
 
 
 def select_and_download_scenes_from_density(
@@ -909,17 +1061,20 @@ def select_and_download_scenes_from_density(
     Select and download CDSE scenes targeting the highest AIS density zones.
     Ported from notebook cell 10.
 
-    For each downloaded scene, writes a target_trace.json file with
-    traceability fields (Part B).
+    For each scene (newly downloaded **or** already on disk), writes:
+      - ``<scene>.SAFE/target_trace.json``  (per-scene, co-located)
+      - updates ``target_traces_index.json`` (scene_id → trace mapping)
 
     Args:
         token: CDSE authentication token
         density_map: Result of build_ais_density_map()
         n_scenes: Maximum number of scenes to download
         output_dir: Output directory (default: phase0/data/scenes/)
+        username: CDSE username (for token refresh during long downloads)
+        password: CDSE password
 
     Returns:
-        List of paths to downloaded .SAFE scenes
+        List of paths to downloaded/existing .SAFE scenes (density-ordered)
     """
     if output_dir is None:
         output_dir = Path(__file__).parent / "data" / "scenes"
@@ -933,57 +1088,120 @@ def select_and_download_scenes_from_density(
 
     end = datetime.utcnow().date()
     start = end - timedelta(days=90)
-    downloaded = []
+    downloaded: List[str] = []
     existing_ids = get_existing_scene_ids(output_dir)
 
     for i, cell in enumerate(cells[:n_scenes]):
         bbox = cell["cell_bbox"]
         cell_index = cell.get("cell_index", i)
-        logger.info(f"Targeting Zone {i+1}: bbox={bbox} (AIS count: {cell['count']})")
+        density_rank = i + 1  # 1 = highest density zone targeted
+        ais_count = cell.get("count")
+        logger.info(
+            f"Targeting Zone {density_rank}/{n_scenes}: "
+            f"cell_index={cell_index}, bbox={bbox}, AIS count={ais_count}"
+        )
 
         try:
             products = search_sentinel1_products(
-                token, bbox, start.isoformat(), end.isoformat(), max_results=1
+                token, bbox, start.isoformat(), end.isoformat(), max_results=5
             )
         except Exception as e:
-            logger.warning(f"Search failed for zone {i}: {e}")
+            logger.warning(f"Search failed for zone {density_rank}: {e}")
             continue
 
         if not products:
-            logger.warning(f"No products found for zone {i}: {bbox}")
+            logger.warning(f"No products found for zone {density_rank}: {bbox}")
             continue
 
-        p = products[0]
-        product_name = p["name"]
+        # Prefer a product that is not already in this download batch
+        product = None
+        for candidate in products:
+            base_id = get_scene_base_id(candidate.get("name", ""))
+            # Skip only if already selected in this run (allow re-using on disk)
+            already_in_batch = False
+            if base_id:
+                for path_str in downloaded:
+                    if get_scene_base_id(Path(path_str).name) == base_id:
+                        already_in_batch = True
+                        break
+            if not already_in_batch:
+                product = candidate
+                break
+        if product is None:
+            product = products[0]
 
+        product_name = product["name"]
+        scene_id = _normalize_scene_id(product_name)
+
+        # --- Case A: scene already on disk — still ensure target_trace exists ---
         if is_scene_downloaded(output_dir, product_name, existing_ids):
-            logger.info(f"Scene already downloaded: {product_name}")
-            downloaded.append(str(output_dir / f"{product_name}.SAFE"))
+            safe_path = resolve_safe_dir(output_dir, product_name)
+            if safe_path is None:
+                logger.warning(
+                    f"Scene marked as downloaded but .SAFE not found: {product_name}"
+                )
+                continue
+            logger.info(f"Scene already downloaded: {safe_path.name}")
+            write_scene_target_trace(
+                output_dir,
+                safe_path,
+                cell_index,
+                bbox,
+                density_rank=density_rank,
+                ais_count=ais_count,
+            )
+            downloaded.append(str(safe_path))
+            base_id = get_scene_base_id(product_name)
+            if base_id:
+                existing_ids.add(base_id)
             continue
 
+        # --- Case B: fresh download ---
         try:
-            # Use CDSE credentials for token refresh if available
             dl_username = username if username else os.getenv("CDSE_USERNAME", "")
             dl_password = password if password else os.getenv("CDSE_PASSWORD", "")
-            safe_path = download_product(
-                token, p["id"], product_name, str(output_dir),
+            safe_path_str = download_product(
+                token, product["id"], product_name, str(output_dir),
                 time.time() + 600, dl_username, dl_password
             )
-            # Write the targeting trace (Part B)
-            scene_path = Path(safe_path)
-            write_target_trace(scene_path, cell_index, bbox)
+            safe_path = Path(safe_path_str)
+            # download_product can return output_dir on extraction edge-cases
+            if not safe_path.name.endswith(".SAFE") or not safe_path.is_dir():
+                resolved = resolve_safe_dir(output_dir, product_name)
+                if resolved is not None:
+                    safe_path = resolved
+                else:
+                    logger.error(f"Could not resolve .SAFE path after download: {product_name}")
+                    continue
+
+            write_scene_target_trace(
+                output_dir,
+                safe_path,
+                cell_index,
+                bbox,
+                density_rank=density_rank,
+                ais_count=ais_count,
+            )
 
             base_id = get_scene_base_id(product_name)
             if base_id:
                 existing_ids.add(base_id)
 
-            downloaded.append(safe_path)
-            logger.info(f"Downloaded: {product_name} (zone {i+1}, AIS count: {cell['count']})")
+            downloaded.append(str(safe_path))
+            logger.info(
+                f"Downloaded: {safe_path.name} "
+                f"(zone {density_rank}, cell_index={cell_index}, AIS count={ais_count})"
+            )
 
         except Exception as e:
             logger.error(f"Failed to download {product_name}: {e}")
 
     logger.info(f"Density-targeted download: {len(downloaded)}/{n_scenes} scenes")
+    if downloaded:
+        logger.info(
+            f"Per-scene target_trace.json files are inside each .SAFE; "
+            f"index at {output_dir / TARGET_TRACES_INDEX_NAME}"
+        )
     return downloaded
 
 

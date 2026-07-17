@@ -750,6 +750,7 @@ def process_safe_windowed(
                     geo_bbox = [center_lat - half, center_lon - half,
                                 center_lat + half, center_lon + half]
                 # geo_bbox format: [lat_min, lon_min, lat_max, lon_max]
+                lat_min, lon_min, lat_max, lon_max = geo_bbox
                 
                 # Save tile
                 tile_id = f"{scene_id}_{pipeline_name}_tile{tile_idx:04d}"
