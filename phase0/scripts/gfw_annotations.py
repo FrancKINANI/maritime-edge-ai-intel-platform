@@ -823,12 +823,29 @@ def convert_npy_tiles_to_png(
 
         arr = np.load(str(npy_file))  # uint8, 0-255
 
-        # Validate dimensions before conversion
-        if arr.ndim != 2 or arr.shape != (tile_size, tile_size):
+        # Validate array dimensions before conversion
+        if arr.ndim != 2:
             raise ValueError(
-                f"Tile {tile_id} has unexpected shape {arr.shape} "
-                f"(expected ({tile_size}, {tile_size})) — check the SAR pipeline output."
+                f"Tile {tile_id} has {arr.ndim} dimensions (expected 2) — "
+                "check the SAR pipeline output."
             )
+
+        # Pad edge tiles that are smaller than tile_size to maintain
+        # consistent dimensions for CVAT annotation alignment.
+        if arr.shape != (tile_size, tile_size):
+            h, w = arr.shape
+            if h < tile_size or w < tile_size:
+                padded = np.pad(arr, ((0, tile_size - h), (0, tile_size - w)), mode='edge')
+                arr = padded
+                logger.info(
+                    "Padded tile %s from %s to (%d, %d)",
+                    tile_id, (h, w), tile_size, tile_size,
+                )
+            else:
+                raise ValueError(
+                    f"Tile {tile_id} has unexpected shape {arr.shape} "
+                    f"(expected ({tile_size}, {tile_size})) — check the SAR pipeline output."
+                )
 
         img = Image.fromarray(arr, mode="L")  # grayscale
 

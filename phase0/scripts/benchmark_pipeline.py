@@ -5,9 +5,14 @@ Ported from notebook colab_phase0_pipeline_final.ipynb (cells 20-22).
 Compare model inference against ground truth across pipelines, calculating metrics
 such as Precision, Recall, mAP@0.5, and KS-distance to evaluate domain transfer.
 
-Documented limitations (carried over from the notebook):
-- estimate_bbox() uses a fixed size (methodological bias on mAP@0.5:0.95)
+Known limitations:
 - KS test is inter-pipelines only (not compared to real MRSSD dataset)
+- estimate_bbox() is defined but NEVER called by inference or metrics code;
+  its mention as "methodological bias" in earlier versions was residual
+  documentation from the original notebook, not an active issue. Predictions
+  use the real (w, h) output by the YOLO model, not a fixed size.
+  See center-distance analysis in benchmark_summary_post_fix.json for
+  independent validation that the mAP=0.0 result is not a bbox artifact.
 """
 
 import json
@@ -16,6 +21,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
+from PIL import Image
 from scipy.stats import ks_2samp
 
 logger = logging.getLogger(__name__)
@@ -27,6 +33,8 @@ logger = logging.getLogger(__name__)
 PIPELINES = ["A", "B", "C", "D"]
 TILE_SIZE = 512
 IOU_THRESHOLD = 0.5  # mAP@0.5
+MODEL_INPUT_SIZE = 640  # YOLOv8n ONNX input dimension
+NMS_IOU_THRESHOLD = 0.5  # IoU threshold for Non-Maximum Suppression
 
 
 # ---------------------------------------------------------------------------
@@ -129,15 +137,66 @@ def load_ground_truth(annotations_dir: str) -> Dict[str, List[Dict[str, Any]]]:
 # ---------------------------------------------------------------------------
 
 
-def run_inference(tiles: List[Any], model_path: str) -> Dict[str, List[Dict[str, Any]]]:
+def nms_suppress(detections: List[Dict[str, Any]], iou_threshold: float = NMS_IOU_THRESHOLD) -> List[Dict[str, Any]]:
+    """Apply Non-Maximum Suppression to remove duplicate boxes for the same vessel.
+
+    Sorts by confidence descending, keeps the highest-confidence box, and removes
+    any remaining box with IoU > threshold. This prevents the benchmark from
+    counting multiple overlapping predictions as separate false positives.
+
+    Args:
+        detections: List of detection dicts with 'bbox' [cx,cy,w,h] and 'confidence'
+        iou_threshold: IoU above which boxes are considered duplicates
+
+    Returns:
+        Filtered list with duplicates removed.
+    """
+    if len(detections) <= 1:
+        return detections
+
+    # Sort by confidence descending
+    sorted_dets = sorted(detections, key=lambda d: d["confidence"], reverse=True)
+    kept = []
+
+    while sorted_dets:
+        best = sorted_dets.pop(0)
+        kept.append(best)
+        # Remove any remaining detection with IoU > threshold against the kept one
+        sorted_dets = [
+            d for d in sorted_dets
+            if compute_iou(best["bbox"], d["bbox"]) < iou_threshold
+        ]
+
+    return kept
+
+
+def run_inference(
+    tiles: List[Any],
+    model_path: str,
+    conf_threshold: float = 0.25,
+    log_raw_first_n: int = 10,
+) -> Dict[str, List[Dict[str, Any]]]:
     """Run ONNX Runtime INT8 model inference over the generated tiles.
 
     NOTE: Requires the Phase I ONNX model (yolov8n_int8.onnx).
     If the model is not available, returns empty predictions with a warning.
 
+    Model output format (verified empirically):
+        Tensor shape: [1, 5, 8400]
+        Axis 1: [cx, cy, w, h, confidence]  (5 rows)
+        Axis 2: 8400 candidate detections
+        Must TRANSPOSE to [8400, 5] before iterating.
+        Single class (vessel) — no class dimension in output.
+
+    Post-processing:
+        1. Confidence threshold (default 0.25)
+        2. Non-Maximum Suppression (IoU threshold 0.5)
+
     Args:
         tiles: List of tile file paths or (tile_id, npy_path) tuples.
         model_path: File path to the ONNX model.
+        conf_threshold: Minimum confidence to keep a detection.
+        log_raw_first_n: Log raw proposal counts (pre-threshold) for the first N tiles.
 
     Returns:
         Dict mapping tile_id -> list of prediction dicts with:
@@ -160,46 +219,70 @@ def run_inference(tiles: List[Any], model_path: str) -> Dict[str, List[Dict[str,
     logger.info(f"Loading ONNX model: {model_path}")
     session = ort.InferenceSession(str(model_path))
     input_name = session.get_inputs()[0].name
+    input_size = MODEL_INPUT_SIZE
 
     predictions: Dict[str, List[Dict[str, Any]]] = {}
-    for item in tiles:
+    for tile_idx, item in enumerate(tiles):
         if isinstance(item, tuple):
             tile_id, npy_path = item
         else:
             tile_id = Path(str(item)).stem
             npy_path = str(item)
 
-        tile_data = np.load(npy_path).astype(np.float32) / 255.0
-        if tile_data.ndim == 2:
-            tile_data = np.stack([tile_data] * 3, axis=-1)
+        # Load tile uint8, grayscale
+        tile_uint8 = np.load(npy_path).astype(np.uint8)
+        if tile_uint8.ndim == 2:
+            # Convert grayscale to 3-channel RGB (stack identical channels)
+            tile_rgb = np.stack([tile_uint8] * 3, axis=-1)
+        else:
+            tile_rgb = tile_uint8
 
-        # Resize to model input size
-        input_size = 640
-        h, w = tile_data.shape[:2]
-        scale = min(input_size / h, input_size / w)
-        nh, nw = int(h * scale), int(w * scale)
-        resized = np.zeros((input_size, input_size, 3), dtype=np.float32)
-        resized[:nh, :nw] = tile_data[:nh, :nw]
+        # Real resize 512x512 -> input_size x input_size (not slice assignment)
+        img = Image.fromarray(tile_rgb)
+        img_resized = img.resize((input_size, input_size), Image.Resampling.LANCZOS)
+        resized = np.array(img_resized, dtype=np.float32) / 255.0
 
+        # Format: [1, 3, input_size, input_size] (CHW layout)
         input_tensor = resized.transpose(2, 0, 1)[np.newaxis, ...]
         outputs = session.run(None, {input_name: input_tensor})
 
         tile_preds = []
         if outputs and len(outputs) > 0:
-            # YOLOv8 output format: [batch, boxes, 6] where 6 = [cx, cy, w, h, conf, class]
-            detections = outputs[0][0]
+            # Model output shape: [1, 5, 8400]
+            #   5 rows = [cx, cy, w, h, confidence]
+            #   8400 cols = candidate detections
+            # Must TRANSPOSE to [8400, 5] to iterate over candidates
+            raw = outputs[0][0]
+            detections = raw.T  # shape [8400, 5]
+            n_raw = int(detections.shape[0])
+
+            if tile_idx < log_raw_first_n:
+                logger.info(
+                    f"Tile {tile_id}: raw output shape={raw.shape}, "
+                    f"after transpose={detections.shape}, "
+                    f"raw_proposals={n_raw} (expect ~8400, not 5)"
+                )
+
             for det in detections:
-                if det[4] > 0.25:  # confidence threshold
-                    cx, cy, w, h = det[:4] / input_size  # normalize
+                cx, cy, w, h, conf = det[0], det[1], det[2], det[3], det[4]
+                if conf > conf_threshold:
+                    # Normalize to [0, 1] relative to input_size
+                    cx_norm = float(cx) / float(input_size)
+                    cy_norm = float(cy) / float(input_size)
+                    w_norm = float(w) / float(input_size)
+                    h_norm = float(h) / float(input_size)
                     tile_preds.append({
-                        "bbox": [float(cx), float(cy), float(w), float(h)],
-                        "confidence": float(det[4]),
-                        "class_id": int(det[5]),
+                        "bbox": [cx_norm, cy_norm, w_norm, h_norm],
+                        "confidence": float(conf),
+                        "class_id": 0,  # single class (vessel)
                     })
 
+        # Apply NMS to remove duplicate detections for the same vessel
+        tile_preds = nms_suppress(tile_preds)
         predictions[tile_id] = tile_preds
 
-    logger.info(f"Inference complete: {sum(len(v) for v in predictions.values())} detections")
+    logger.info(f"Inference complete: {sum(len(v) for v in predictions.values())} detections "
+                f"across {len(predictions)} tiles")
     return predictions
 
 
@@ -339,25 +422,44 @@ def benchmark_all_pipelines(metadata_path: str, gt_path: str,
     """
     metadata = load_metadata(metadata_path)
     scene_id = metadata.get("scene_id", "unknown")
-    scene_dir = Path(metadata_path).parent
+
+    # Real layout from sar_preprocessing.process_safe_windowed():
+    #   tiles/<scene_id>/<pipeline_name>/metadata.json
+    #   tiles/<scene_id>/<pipeline_name>/*.npy
+    # So Path(metadata_path).parent is the pipeline directory (e.g. .../D),
+    # NOT the scene root. Using scene_dir / pipeline would yield .../D/D.
+    pipeline_meta_dir = Path(metadata_path).parent
+    scene_root = pipeline_meta_dir.parent
 
     logger.info(f"=== Benchmark: {scene_id} ===")
+    logger.info(f"Scene root: {scene_root}")
+    logger.info(f"Metadata pipeline dir: {pipeline_meta_dir}")
 
     # Load ground truth
     ground_truth = load_ground_truth(gt_path)
+    gt_tile_ids = set(ground_truth.keys())
 
-    # Collect tiles per pipeline
+    # Collect tiles per pipeline (only annotated tiles for evaluation)
     tiles_by_pipeline: Dict[str, List[str]] = {}
     for p in PIPELINES:
-        pipeline_dir = scene_dir / p
-        tile_files = sorted(pipeline_dir.glob("*.npy"))
+        pipeline_dir = scene_root / p
+        all_npy = sorted(pipeline_dir.glob("*.npy"))
+        # Restrict to annotated tiles so load count matches GT tile count
+        tile_files = [f for f in all_npy if f.stem in gt_tile_ids]
         tiles_by_pipeline[p] = [str(f) for f in tile_files]
-        logger.info(f"Pipeline {p}: {len(tile_files)} tiles")
+        logger.info(
+            f"Pipeline {p}: {len(tile_files)} annotated tiles "
+            f"(of {len(all_npy)} npy) from {pipeline_dir}"
+        )
 
     # Run inference per pipeline
     predictions_by_pipeline: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
     for p in PIPELINES:
         tile_paths = tiles_by_pipeline.get(p, [])
+        if not tile_paths:
+            logger.warning(f"Pipeline {p}: no tiles found — skipping inference (results will be 0.0)")
+            predictions_by_pipeline[p] = {}
+            continue
         tile_items = [(Path(t).stem, t) for t in tile_paths]
         predictions_by_pipeline[p] = run_inference(tile_items, model_path)
 
@@ -380,9 +482,12 @@ def benchmark_all_pipelines(metadata_path: str, gt_path: str,
         "ks_max_distance": ks_result,
         "ground_truth_tiles": len(ground_truth),
         "note": (
-            "estimate_bbox() uses a fixed size (methodological bias on "
-            "mAP@0.5:0.95). KS test is inter-pipelines only (no comparison "
-            "to real MRSSD dataset)."
+            "estimate_bbox() is defined but unused in this module — the "
+            "predictions use the real (w, h) from YOLO output, not a fixed "
+            "size. Center-distance analysis (see summary report) confirms "
+            "the mAP=0.0 result is valid, not a bbox artifact. "
+            "KS test is inter-pipelines only (no comparison to real MRSSD "
+            "dataset)."
         ),
     }
 
