@@ -1,83 +1,83 @@
-# Phase Post-0 — Fine-Tuning YOLOv8n sur Sentinel-1
+# Phase Post-0 — Fine-Tune YOLOv8n on Sentinel-1
 
-> Suite directe de la Phase 0. Le diagnostic est clos : **le zero-shot domain transfer échoue (mAP@0.5 = 0.0)**.
-> Il faut **fine-tuner** le modèle sur les 3 321 annotations AIS réelles.
+> Direct follow-up to Phase 0. The diagnosis is complete: **zero-shot domain transfer failed (mAP@0.5 = 0.0)**.
+> The model must be **fine-tuned** on the 3,321 real AIS annotations.
 
-## Contenu du dossier
+## Folder contents
 
-| Fichier | Description |
-|---------|-------------|
-| `colab_finetune_yolo.ipynb` | **Notebook Colab** — fine-tuning YOLOv8n, évaluation, export ONNX |
-| `dataset_summary.json` | Métadonnées du dataset (1 544 images, 3 321 boxes) |
-| `phase0_closure.md` | Document final de la Phase 0 — toutes les analyses |
-| `regenerate_zip.sh` | Script pour régénérer le ZIP (nécessite les scripts dans `phase0/scripts/`) |
+| File | Description |
+|------|-------------|
+| `colab_finetune_yolo.ipynb` | **Colab Notebook** — YOLOv8n fine-tuning, evaluation, ONNX export |
+| `dataset_summary.json` | Dataset metadata (1,544 images, 3,321 boxes) |
+| `phase0_closure.md` | Phase 0 final report — all analyses |
+| `regenerate_zip.sh` | Script to regenerate the ZIP (requires scripts in `phase0/scripts/`) |
 
-## Procédure
+## Workflow
 
-### 1. Régénérer le ZIP (optionnel)
+### 1. Regenerate the ZIP (optional)
 
-Le ZIP est déjà dans `phase0/data/colab_export/maritime_dataset.zip` (311 MB).
-Si besoin de le régénérer :
+The ZIP already exists at `phase0/data/colab_export/maritime_dataset.zip` (311 MB).
+To regenerate:
 
 ```bash
 cd ..
 uv run python phase0/scripts/export_colab_dataset.py
 ```
 
-### 2. Upload sur Google Drive
+### 2. Upload to Google Drive
 
 ```
 maritime_dataset.zip  (311 MB)  →  Google Drive
 ```
 
-### 3. Ouvrir le notebook dans Colab
+### 3. Open the notebook in Colab
 
 ```python
-# 1. Aller sur https://colab.research.google.com
-# 2. File → Upload Notebook → choisir colab_finetune_yolo.ipynb
-# 3. Modifier ZIP_PATH dans la 2e cellule si nécessaire
+# 1. Go to https://colab.research.google.com
+# 2. File → Upload Notebook → pick colab_finetune_yolo.ipynb
+# 3. Update ZIP_PATH in cell 2 if needed
 # 4. Runtime → Change runtime type → T4 GPU
-# 5. Run all cells (~2-4 heures)
+# 5. Run all cells (~2-4 hours)
 ```
 
-### 4. Récupérer le modèle
+### 4. Retrieve the model
 
-Après fine-tuning, le notebook sauvegarde les modèles dans Google Drive :
+After fine-tuning, the notebook saves models to Google Drive:
 
 - `yolov8n_maritime_v1.pt` (PyTorch)
 - `yolov8n_maritime_v1.onnx` (ONNX FP32)
 - `yolov8n_maritime_v1_int8.onnx` (ONNX INT8)
 
-Les copier vers `shared/models/` dans ce projet.
+Copy them to `shared/models/` in this project.
 
 ### 5. Validation
 
 ```bash
 cd ..
-# Exemple avec la scène 2 (16/07/2026) — 1 534 tuiles annotées
+# Example using scene 2 (16/07/2026) — 1,534 annotated tiles
 uv run python phase0/scripts/benchmark_pipeline.py \
   --metadata phase0/data/tiles/S1D_..._9C83/D/metadata.json \
   --ground-truth phase0/data/annotations/S1D_..._9C83/labels/ \
   --model shared/models/yolov8n_maritime_v1.onnx
 #                                    ^^^^^^^^^^^^^^^^^^^^^^^^
-#                                    Remplacer par le modèle fine-tuné fraîchement exporté
+#                                    Replace with your freshly fine-tuned model
 ```
 
-## Rappel : Décisions clés de la Phase 0
+## Key Phase 0 Decisions
 
-- ✅ **CVAT ignoré** — les labels AIS sont utilisés directement comme Ground Truth
-  (positions GPS fiables : 0% sur terre vérifié, précision < 10 m)
-- ✅ **Pipeline D** recommandé pour le fine-tuning (σ⁰+Lee+Log+HistEq)
-- ✅ **3 321 boxes** toutes en classe `vessel_AIS_confirmed` (pas de dark vessels détectés)
-- ✅ **Dataset split** : 80/10/10 (train=1 235, val=154, test=155)
+- ✅ **CVAT skipped** — AIS labels used directly as Ground Truth
+  (reliable GPS positions: 0% on land verified, <10m accuracy)
+- ✅ **Pipeline D** recommended for fine-tuning (σ⁰+Lee+Log+HistEq)
+- ✅ **3,321 boxes** all class `vessel_AIS_confirmed` (no dark vessels detected)
+- ✅ **Dataset split**: 80/10/10 (train=1,235, val=154, test=155)
 
-## Résultat attendu
+## Expected Outcome
 
-Si le fine-tuning fonctionne :
-- mAP@0.5 > 0.70 → **GO Phase 1** — déploiement microservices
-- mAP@0.5 0.50–0.70 → **MARGINAL** — plus de données ou d'epochs
-- mAP@0.5 < 0.50 → **STOP** — révision stratégique nécessaire
+If fine-tuning works:
+- mAP@0.5 > 0.70 → **GO Phase 1** — microservice deployment
+- mAP@0.5 0.50–0.70 → **MARGINAL** — more data or epochs
+- mAP@0.5 < 0.50 → **STOP** — strategic revision needed
 
 ---
 
-*Généré le 19 juillet 2026 — Projet Maritime Edge AI Platform*
+*Generated July 19, 2026 — Maritime Edge AI Platform*

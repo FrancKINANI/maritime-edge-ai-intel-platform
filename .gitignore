@@ -1,14 +1,48 @@
-# Ignored data directories (large files)
-phase0/data/scenes/
-phase0/data/tiles/
-data/
-docs/
+# =============================================================================
+# Maritime Edge AI Platform — .gitignore
+# =============================================================================
 
-# Exclude large ONNX model files (to be copied manually or mounted)
-shared/models/*
-!shared/models/.gitkeep
+# --- Phase 0 data (generated, large) ---
+/phase0/data/scenes/
+/phase0/data/tiles/
+/phase0/data/cvat_annotated_only/
+/phase0/data/colab_export/
+/phase0/data/annotations/*/cvat_import/
+/phase0/data/annotations/*/images/
+/phase0/data/results/
+/phase0/data/samples/
+/phase0/data/analysis/
 
-# Python cache files
+# --- Images (generated tiles, never committed) ---
+*.png
+*.jpg
+*.jpeg
+*.tif
+*.tiff
+
+# --- Large SAR / geospatial files ---
+*.SAFE
+*.nc
+*.geotiff
+*.npy
+
+# --- Archives ---
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+
+# --- Generated CSV/JSON/XML exports ---
+*.csv
+*.xml
+!templates/*.csv
+
+# --- ONNX models (manual transfer) ---
+/shared/models/*
+!/shared/models/.gitkeep
+
+# --- Python ---
 **/__pycache__/
 **/*.pyc
 **/*.pyo
@@ -17,28 +51,14 @@ shared/models/*
 .eggs/
 dist/
 build/
+*.so
 
-# Local environment variables
+# --- Environment ---
 .env
 .env.local
 .env.*.local
 
-# Database files
-*.db
-*.sqlite
-*.sqlite3
-
-# Benchmarking results (except keep examples or structures)
-phase0/data/results/*.csv
-phase0/data/results/*.json
-!phase0/data/results/.gitkeep
-
-# Log files
-*.log
-logs/
-*.logs
-
-# IDE and editor files
+# --- IDE / OS ---
 .vscode/
 .idea/
 *.swp
@@ -46,67 +66,23 @@ logs/
 *~
 .DS_Store
 Thumbs.db
+ehthumbs.db
 
-# Jupyter Notebook checkpoints
+# --- Jupyter ---
 .ipynb_checkpoints/
 *.ipynb_checkpoints
 
-# Testing and coverage
+# --- Testing ---
 .coverage
 .pytest_cache/
 htmlcov/
 .tox/
 .hypothesis/
 
-# Temporary files
+# --- Temp ---
 tmp/
 temp/
 *.tmp
-*.temp
 *.bak
-*.backup
-
-# Archives and compressed files
-*.zip
-*.tar
-*.tar.gz
-*.rar
-*.7z
-
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Documentation builds
-docs/_build/
-docs/.doctrees/
-site/
-
-# Cache directories
-.cache/
-__pycache__/
-
-# Large downloaded files
-*.SAFE
-*.nc
-*.tif
-*.tiff
-*.geotiff
-*.npy (except sample files)
-!phase0/data/tiles/.gitkeep
-
-# Pipeline artifacts
-phase0/data/processed/
-phase0/data/intermediate/
-
-# Reports and exports (except templates)
-*.xml
-*.csv
-!templates/*.csv
-reports/*.pdf
-reports/*.html
+*.log
+logs/
