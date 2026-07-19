@@ -7,18 +7,16 @@ such as Precision, Recall, mAP@0.5, and KS-distance to evaluate domain transfer.
 
 Known limitations:
 - KS test is inter-pipelines only (not compared to real MRSSD dataset)
-- estimate_bbox() is defined but NEVER called by inference or metrics code;
-  its mention as "methodological bias" in earlier versions was residual
-  documentation from the original notebook, not an active issue. Predictions
-  use the real (w, h) output by the YOLO model, not a fixed size.
-  See center-distance analysis in benchmark_summary_post_fix.json for
-  independent validation that the mAP=0.0 result is not a bbox artifact.
+- estimate_bbox() (legacy notebook artifact) was removed — it was never
+  called by inference or metrics code. See center-distance analysis in
+  benchmark_summary_post_fix.json for independent validation that the
+  mAP=0.0 result is not a bbox artifact.
 """
 
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 from PIL import Image
@@ -71,33 +69,6 @@ def compute_iou(box1: List[float], box2: List[float]) -> float:
     if union <= 0:
         return 0.0
     return inter / union
-
-
-# ---------------------------------------------------------------------------
-# Bounding box estimation (fixed-size, acknowledged bias)
-# ---------------------------------------------------------------------------
-
-
-def estimate_bbox(cx: float, cy: float, ts: int = TILE_SIZE, sz: float = 8.0) -> Tuple[float, float, float, float]:
-    """Estimate a bounding box with a fixed size.
-
-    NOTE: This uses a fixed size (methodological bias on mAP@0.5:0.95).
-    The estimated size assumes ~50m vessel length at 10m/pixel resolution
-    with some margin. This is a known limitation documented from the notebook.
-
-    Args:
-        cx, cy: Center coordinates in pixels.
-        ts: Tile size in pixels.
-        sz: Half-size estimate in pixels.
-
-    Returns:
-        Tuple (x_center, y_center, width, height) in YOLO normalized format.
-    """
-    w = sz / ts
-    h = sz / ts
-    xc = max(0.0, min(1.0, cx / ts))
-    yc = max(0.0, min(1.0, cy / ts))
-    return xc, yc, w, h
 
 
 # ---------------------------------------------------------------------------
@@ -482,9 +453,9 @@ def benchmark_all_pipelines(metadata_path: str, gt_path: str,
         "ks_max_distance": ks_result,
         "ground_truth_tiles": len(ground_truth),
         "note": (
-            "estimate_bbox() is defined but unused in this module — the "
-            "predictions use the real (w, h) from YOLO output, not a fixed "
-            "size. Center-distance analysis (see summary report) confirms "
+            "estimate_bbox() (legacy notebook artifact) has been removed — "
+            "the predictions use the real (w, h) from YOLO output. "
+            "Center-distance analysis (see summary report) confirms "
             "the mAP=0.0 result is valid, not a bbox artifact. "
             "KS test is inter-pipelines only (no comparison to real MRSSD "
             "dataset)."

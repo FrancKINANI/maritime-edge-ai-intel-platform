@@ -1,5 +1,4 @@
 # Ignored data directories (large files)
-models/
 phase0/data/scenes/
 phase0/data/tiles/
 data/
@@ -14,9 +13,15 @@ shared/models/*
 **/*.pyc
 **/*.pyo
 **/*.pyd
+*.egg-info/
+.eggs/
+dist/
+build/
 
 # Local environment variables
 .env
+.env.local
+.env.*.local
 
 # Database files
 *.db
@@ -27,3 +32,81 @@ shared/models/*
 phase0/data/results/*.csv
 phase0/data/results/*.json
 !phase0/data/results/.gitkeep
+
+# Log files
+*.log
+logs/
+*.logs
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Testing and coverage
+.coverage
+.pytest_cache/
+htmlcov/
+.tox/
+.hypothesis/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Archives and compressed files
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Documentation builds
+docs/_build/
+docs/.doctrees/
+site/
+
+# Cache directories
+.cache/
+__pycache__/
+
+# Large downloaded files
+*.SAFE
+*.nc
+*.tif
+*.tiff
+*.geotiff
+*.npy (except sample files)
+!phase0/data/tiles/.gitkeep
+
+# Pipeline artifacts
+phase0/data/processed/
+phase0/data/intermediate/
+
+# Reports and exports (except templates)
+*.xml
+*.csv
+!templates/*.csv
+reports/*.pdf
+reports/*.html
