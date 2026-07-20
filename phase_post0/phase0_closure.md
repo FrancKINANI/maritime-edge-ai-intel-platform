@@ -1,1 +1,0 @@
-../phase0/docs/phase0_closure.md

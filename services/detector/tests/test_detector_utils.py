@@ -3,9 +3,9 @@
 These are pure functions testable without ONNX Runtime or any external dependency.
 """
 
-from pathlib import Path
 import importlib.util
 import sys
+from pathlib import Path
 
 import numpy as np
 

@@ -5,12 +5,13 @@ Exposes a web UI containing three operational modes: Manual Image Upload,
 Interactive Satellite Query, and Real-time Continuous Monitoring.
 """
 
-import streamlit as st
-import os
-import httpx
 import base64
+import os
+from datetime import UTC, datetime
 from pathlib import Path
-from datetime import datetime
+
+import httpx
+import streamlit as st
 
 st.set_page_config(
     page_title="Maritime Edge AI Intel Platform",
@@ -38,7 +39,7 @@ def render_upload_mode() -> None:
     uploaded = st.file_uploader(
         "Choose file",
         type=["npy", "zip", "tiff", "tif"],
-        help="Preprocessed .npy tiles skip preprocessing. Raw .zip/.SAFE/.tiff products are preprocessed first."
+        help="Preprocessed .npy tiles skip preprocessing. Raw .zip/.SAFE/.tiff products are preprocessed first.",
     )
     scene_id = st.text_input("Scene ID (optional)")
     tile_id = st.text_input("Tile ID (optional)")
@@ -73,7 +74,9 @@ def render_upload_mode() -> None:
                         r = client.post(f"{DETECTOR_URL}/detect", json=payload, timeout=60.0)
                         r.raise_for_status()
                         ev = r.json()
-                    st.success(f"Detection returned {ev.get('vessel_count')} vessels (priority {ev.get('priority_level')})")
+                    st.success(
+                        f"Detection returned {ev.get('vessel_count')} vessels (priority {ev.get('priority_level')})"
+                    )
                     st.json(ev)
                 except Exception as e:
                     st.error(f"Detector request failed: {e}")
@@ -155,7 +158,7 @@ def render_query_mode() -> None:
     st.write("Query satellite position from Satellite Monitor service.")
     st.info("💡 **Tip**: Sentinel-1A NORAD ID is 39634. ISS (default) is 25544.")
     sat_id = st.text_input("Satellite NORAD ID or name", value="39634")
-    ts = st.text_input("Timestamp (UTC, ISO)", value=datetime.utcnow().isoformat())
+    ts = st.text_input("Timestamp (UTC, ISO)", value=datetime.now(UTC).isoformat())
     if st.button("Get Position"):
         try:
             with httpx.Client() as client:

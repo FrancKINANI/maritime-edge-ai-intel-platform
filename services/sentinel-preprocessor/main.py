@@ -7,9 +7,16 @@ numpy sub-tiles using multiple pipelines.
 
 import importlib.util
 import logging
+import os
 import sys
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
+
+logger = logging.getLogger(__name__)
+
+# Validate required environment variables at startup
+if not os.getenv("REDIS_URL"):
+    logger.warning("Missing required environment variable: REDIS_URL — service will start but may fail at runtime")
 
 from fastapi import FastAPI, HTTPException, status
 
@@ -17,11 +24,11 @@ from shared.config import constants
 
 logger = logging.getLogger(__name__)
 
-# Load the local sar_preprocessing module (directory name contains a hyphen)
-_sp_path = Path(__file__).resolve().parent / "sar_preprocessing.py"
-spec = importlib.util.spec_from_file_location("sentinel_sp", str(_sp_path))
+# Load the local preprocessing module (directory name contains a hyphen)
+_sp_path = Path(__file__).resolve().parent / "sar_preprocessing_module.py"
+spec = importlib.util.spec_from_file_location("sentinel_sp_mod", str(_sp_path))
 sar_preprocessing = importlib.util.module_from_spec(spec)
-sys.modules["sentinel_sp"] = sar_preprocessing
+sys.modules["sentinel_sp_mod"] = sar_preprocessing
 spec.loader.exec_module(sar_preprocessing)
 
 
@@ -32,8 +39,8 @@ app = FastAPI(
 )
 
 
-@app.post("/preprocess", status_code=status.HTTP_200_OK, response_model=Dict[str, Any])
-async def preprocess_scene(safe_path: str, pipeline: str = None, output_dir: str = None) -> Dict[str, Any]:
+@app.post("/preprocess", status_code=status.HTTP_200_OK, response_model=dict[str, Any])
+async def preprocess_scene(safe_path: str, pipeline: str = None, output_dir: str = None) -> dict[str, Any]:
     """Triggers Sentinel-1 scene preprocessing and returns manifest.
 
     The default pipeline comes from environment configuration. See README.md for
@@ -69,11 +76,11 @@ async def preprocess_scene(safe_path: str, pipeline: str = None, output_dir: str
     return result
 
 
-@app.get("/pipelines", response_model=Dict[str, str])
-async def list_pipelines() -> Dict[str, str]:
+@app.get("/pipelines", response_model=dict[str, str])
+async def list_pipelines() -> dict[str, str]:
     return {k: v for k, v in constants.PREPROCESSING_PIPELINES.items()}
 
 
-@app.get("/health", response_model=Dict[str, str])
-async def health_check() -> Dict[str, str]:
+@app.get("/health", response_model=dict[str, str])
+async def health_check() -> dict[str, str]:
     return {"status": "healthy"}

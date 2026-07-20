@@ -7,17 +7,18 @@ tiling routines, and GCP-based georeferencing for Sentinel-1 GRD products.
 
 import os
 from pathlib import Path
+from typing import Any
 
 import numpy as np
-from typing import List, Tuple, Dict, Any, Optional
 from scipy.interpolate import RegularGridInterpolator
 
 # Reuse the robust windowed pipeline implementation from phase0 when available.
 try:
     from phase0.scripts.sar_preprocessing import (
-        process_safe_windowed,
         _lee_filter_windowed,
+        process_safe_windowed,
     )
+
     _HAS_PHASE0 = True
 except Exception:
     _HAS_PHASE0 = False
@@ -48,7 +49,7 @@ class GCPGeoreferencer:
         improvising border management.
     """
 
-    def __init__(self, gcps: np.ndarray, image_shape: Tuple[int, int]):
+    def __init__(self, gcps: np.ndarray, image_shape: tuple[int, int]):
         """
         Args:
             gcps: Array of shape (N, M, 2) where gcps[i, j] = (lat, lon)
@@ -75,19 +76,19 @@ class GCPGeoreferencer:
         self._lat_interpolator = RegularGridInterpolator(
             (self._gcp_lines, self._gcp_pixels),
             self._gcps[:, :, 0],  # lat values
-            method='linear',
+            method="linear",
             bounds_error=False,  # We handle bounds ourselves with explicit check
             fill_value=None,
         )
         self._lon_interpolator = RegularGridInterpolator(
             (self._gcp_lines, self._gcp_pixels),
             self._gcps[:, :, 1],  # lon values
-            method='linear',
+            method="linear",
             bounds_error=False,
             fill_value=None,
         )
 
-    def pixel_to_latlon(self, line: float, pixel: float) -> Tuple[float, float]:
+    def pixel_to_latlon(self, line: float, pixel: float) -> tuple[float, float]:
         """
         Convert a pixel coordinate to geographic (lat, lon).
 
@@ -124,7 +125,7 @@ class GCPGeoreferencer:
         lon = float(self._lon_interpolator([[line, pixel]])[0])
         return lat, lon
 
-    def tile_to_bbox(self, y_start: int, x_start: int, y_end: int, x_end: int) -> List[float]:
+    def tile_to_bbox(self, y_start: int, x_start: int, y_end: int, x_end: int) -> list[float]:
         """
         Compute the geographic bounding box of a tile.
 
@@ -160,10 +161,11 @@ class GCPOutOfBoundsError(Exception):
     - Reject boundary tiles entirely
     - Document and accept the extrapolation behavior
     """
+
     pass
 
 
-def extract_gcps_from_geotiff(tiff_path: str) -> Tuple[np.ndarray, Tuple[int, int]]:
+def extract_gcps_from_geotiff(tiff_path: str) -> tuple[np.ndarray, tuple[int, int]]:
     """
     Extract GCPs from a Sentinel-1 GRD GeoTIFF.
 
@@ -219,8 +221,8 @@ def extract_gcps_from_geotiff(tiff_path: str) -> Tuple[np.ndarray, Tuple[int, in
         for gcp in gcps_raw:
             i = row_to_idx[gcp.row]
             j = col_to_idx[gcp.col]
-            gcps_array[i, j, 0] = gcp.y   # latitude
-            gcps_array[i, j, 1] = gcp.x   # longitude
+            gcps_array[i, j, 0] = gcp.y  # latitude
+            gcps_array[i, j, 1] = gcp.x  # longitude
 
         return gcps_array, image_shape
 
@@ -280,7 +282,9 @@ def normalize_to_uint8(data: np.ndarray, db_min: float = -30.0, db_max: float = 
     return norm
 
 
-def tile_image(data: np.ndarray, tile_size: int = 512, overlap: float = 0.5) -> List[Tuple[np.ndarray, Tuple[int, int, int, int]]]:
+def tile_image(
+    data: np.ndarray, tile_size: int = 512, overlap: float = 0.5
+) -> list[tuple[np.ndarray, tuple[int, int, int, int]]]:
     h, w = data.shape[:2]
     stride = max(1, int(tile_size * (1 - overlap)))
     tiles = []
@@ -293,7 +297,7 @@ def tile_image(data: np.ndarray, tile_size: int = 512, overlap: float = 0.5) -> 
     return tiles
 
 
-def pipeline_A(safe_path: str, output_dir: Optional[str] = None) -> Dict[str, Any]:
+def pipeline_A(safe_path: str, output_dir: str | None = None) -> dict[str, Any]:
     """Pipeline A: baseline using phase0 implementation when available.
     Returns manifest dictionary with tile metadata.
     """
@@ -302,19 +306,19 @@ def pipeline_A(safe_path: str, output_dir: Optional[str] = None) -> Dict[str, An
     raise NotImplementedError("phase0 implementation not available in workspace")
 
 
-def pipeline_B(safe_path: str, output_dir: Optional[str] = None) -> Dict[str, Any]:
+def pipeline_B(safe_path: str, output_dir: str | None = None) -> dict[str, Any]:
     if _HAS_PHASE0:
         return process_safe_windowed(safe_path, "B", output_dir or "data/tiles")
     raise NotImplementedError("phase0 implementation not available in workspace")
 
 
-def pipeline_C(safe_path: str, output_dir: Optional[str] = None) -> Dict[str, Any]:
+def pipeline_C(safe_path: str, output_dir: str | None = None) -> dict[str, Any]:
     if _HAS_PHASE0:
         return process_safe_windowed(safe_path, "C", output_dir or "data/tiles")
     raise NotImplementedError("phase0 implementation not available in workspace")
 
 
-def pipeline_D(safe_path: str, output_dir: Optional[str] = None) -> Dict[str, Any]:
+def pipeline_D(safe_path: str, output_dir: str | None = None) -> dict[str, Any]:
     if _HAS_PHASE0:
         return process_safe_windowed(safe_path, "D", output_dir or "data/tiles")
     raise NotImplementedError("phase0 implementation not available in workspace")
@@ -324,8 +328,10 @@ def pipeline_D(safe_path: str, output_dir: Optional[str] = None) -> Dict[str, An
 # Security & Input Validation
 # --------------------------------------------------------------------------
 
+
 class SafetyViolation(Exception):
     """Raised when a file path attempts to escape allowed directories."""
+
     pass
 
 
@@ -377,10 +383,7 @@ def validate_safe_path(path: str) -> str:
     # If the path is relative and doesn't start with /, allow it only if
     # it doesn't contain traversal patterns (already checked above)
     if path.startswith("/"):
-        allowed = any(
-            str(resolved).startswith(str(base_dir.resolve()))
-            for base_dir in _ALLOWED_BASE_DIRS
-        )
+        allowed = any(str(resolved).startswith(str(base_dir.resolve())) for base_dir in _ALLOWED_BASE_DIRS)
         if not allowed:
             raise SafetyViolation(f"Path is outside allowed directories: {path}")
 

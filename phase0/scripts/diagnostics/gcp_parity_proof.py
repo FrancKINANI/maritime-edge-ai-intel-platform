@@ -12,17 +12,18 @@ Usage:
 
 import importlib.util
 import sys
+
 import numpy as np
 
-sys.path.insert(0, '.')
+sys.path.insert(0, ".")
 
 # 1. Load service module via importlib (hyphen-proof)
 spec = importlib.util.spec_from_file_location(
     "service_sar",
-    "services/sentinel-preprocessor/sar_preprocessing.py",
+    "services/sentinel-preprocessor/sar_preprocessing_module.py",
 )
 if spec is None:
-    print("FATAL: could not locate services/sentinel-preprocessor/sar_preprocessing.py")
+    print("FATAL: could not locate services/sentinel-preprocessor/sar_preprocessing_module.py")
     sys.exit(1)
 
 mod = importlib.util.module_from_spec(spec)
@@ -49,13 +50,15 @@ service_gcp = ServiceGCPGeoreferencer(gcps, image_shape)
 
 print()
 print("=== GCP CONTROL POINT COMPARISON (phase0 vs service) ===")
-test_points = [(0,0), (0,25), (0,99), (25,0), (25,25), (50,50), (75,25), (99,99)]
+test_points = [(0, 0), (0, 25), (0, 99), (25, 0), (25, 25), (50, 50), (75, 25), (99, 99)]
 for line, pixel in test_points:
     lat_p0, lon_p0 = phase0_gcp.pixel_to_latlon(line, pixel)
     lat_svc, lon_svc = service_gcp.pixel_to_latlon(line, pixel)
     dlat = lat_p0 - lat_svc
     dlon = lon_p0 - lon_svc
-    print(f"  ({line:2d},{pixel:2d}): lat diff = {dlat:.2e}, lon diff = {dlon:.2e}  MATCH={abs(dlat) < 1e-12 and abs(dlon) < 1e-12}")
+    print(
+        f"  ({line:2d},{pixel:2d}): lat diff = {dlat:.2e}, lon diff = {dlon:.2e}  MATCH={abs(dlat) < 1e-12 and abs(dlon) < 1e-12}"
+    )
 
 print()
 print("=== ZERO-ERROR AT GCP CONTROL POINTS ===")

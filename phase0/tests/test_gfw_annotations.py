@@ -9,15 +9,17 @@ NOTE per PH0-CORR-002:
 - get_ais_vessels() kept for backward compatibility
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
+
 from phase0.scripts.gfw_annotations import GFWClient, _normalize_response_entries
 
 
 @pytest.fixture
 def mock_gfw_client():
     """Create a GFW client with mocked HTTP requests."""
-    with patch('phase0.scripts.gfw_annotations._request_with_retry') as mock_req:
+    with patch("phase0.scripts.gfw_annotations._request_with_retry") as mock_req:
         client = GFWClient("test_token_12345")
         yield client, mock_req
 
@@ -179,11 +181,7 @@ def test_search_vessels(mock_gfw_client):
     """Test vessel search functionality."""
     client, mock_req = mock_gfw_client
 
-    mock_req.return_value = {
-        "entries": [
-            {"name": "Test Vessel", "id": "vessel123"}
-        ]
-    }
+    mock_req.return_value = {"entries": [{"name": "Test Vessel", "id": "vessel123"}]}
 
     results = client.search_vessels("test query", limit=10)
 
@@ -194,9 +192,10 @@ def test_search_vessels(mock_gfw_client):
 
 def test_gfw_client_retry_logic():
     """Test that client implements retry logic for transient errors."""
-    with patch('phase0.scripts.gfw_annotations.time.sleep') as mock_sleep, \
-         patch('phase0.scripts.gfw_annotations.httpx.Client') as mock_client:
-
+    with (
+        patch("phase0.scripts.gfw_annotations.time.sleep") as mock_sleep,
+        patch("phase0.scripts.gfw_annotations.httpx.Client") as mock_client,
+    ):
         mock_client_instance = MagicMock()
         mock_client.return_value.__enter__.return_value = mock_client_instance
 
@@ -205,21 +204,13 @@ def test_gfw_client_retry_logic():
         # Mock responses
         mock_response_500 = Response(status_code=500, request=MagicMock())
         mock_response_success = Response(
-            status_code=200,
-            request=MagicMock(),
-            json={"entries": [{"lat": 33.0, "lon": -9.0}]}
+            status_code=200, request=MagicMock(), json={"entries": [{"lat": 33.0, "lon": -9.0}]}
         )
         # Use post.side_effect because _request_with_retry uses POST for AIS presence queries
-        mock_client_instance.post.side_effect = [
-            mock_response_500,
-            mock_response_500,
-            mock_response_success
-        ]
+        mock_client_instance.post.side_effect = [mock_response_500, mock_response_500, mock_response_success]
 
         client = GFWClient("test_token")
-        results = client.gfw_get_ais_presence(
-            [-10.0, 32.0, -8.0, 34.0], "2024-01-01", "2024-01-02", limit=500
-        )
+        results = client.gfw_get_ais_presence([-10.0, 32.0, -8.0, 34.0], "2024-01-01", "2024-01-02", limit=500)
 
         # Should succeed after retries
         assert len(results) == 1

@@ -28,23 +28,19 @@ Author: Phase 0 diagnostics
 # ║ CELL 1 — Environment setup                                                ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
+import os
 import subprocess
 import sys
-import os
 from pathlib import Path
 
 # Install project dependencies
 subprocess.check_call(
-    [sys.executable, "-m", "pip", "install",
-     "httpx", "numpy", "rasterio", "scipy", "tqdm", "psutil", "python-dotenv"]
+    [sys.executable, "-m", "pip", "install", "httpx", "numpy", "rasterio", "scipy", "tqdm", "psutil", "python-dotenv"]
 )
 
 # Clone the repository (or mount Google Drive if already cloned)
 if not Path("maritime-intelligence-platform").exists():
-    subprocess.check_call([
-        "git", "clone",
-        "https://github.com/FrancKINANI/maritime-edge-ai-intel-platform.git"
-    ])
+    subprocess.check_call(["git", "clone", "https://github.com/FrancKINANI/maritime-edge-ai-intel-platform.git"])
     os.chdir("maritime-intelligence-platform")
 else:
     os.chdir("maritime-intelligence-platform")
@@ -79,6 +75,7 @@ print("Credentials set.")
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 import sys
+
 sys.path.insert(0, ".")
 
 import json
@@ -86,12 +83,11 @@ from pathlib import Path
 
 # NOTE: logging.basicConfig is called by the imported modules themselves
 # at import time. Do NOT call it again here to avoid duplicate handlers.
-
 from phase0.scripts.download_scenes import (
-    build_ais_density_map,
-    select_and_download_scenes_from_density,
-    get_cdse_token,
     MOROCCO_BBOX,
+    build_ais_density_map,
+    get_cdse_token,
+    select_and_download_scenes_from_density,
 )
 from phase0.scripts.sar_preprocessing import process_safe_windowed
 
@@ -118,8 +114,7 @@ print(f"Period: {density_map.get('period', 'N/A')}")
 
 top_cells = density_map.get("cells", [])[:5]
 for i, cell in enumerate(top_cells):
-    print(f"  Zone {i+1}: cell_index={cell['cell_index']}, "
-          f"bbox={cell['cell_bbox']}, AIS count={cell['count']}")
+    print(f"  Zone {i + 1}: cell_index={cell['cell_index']}, bbox={cell['cell_bbox']}, AIS count={cell['count']}")
 
 if not density_map.get("cells"):
     raise RuntimeError(
@@ -183,15 +178,10 @@ if trace_path.exists():
     print("=" * 60)
 
     # Verify structure
-    assert "target_density_cell_index" in target_trace, (
-        "Missing target_density_cell_index in target_trace.json"
-    )
-    assert "target_cell_bbox" in target_trace, (
-        "Missing target_cell_bbox in target_trace.json"
-    )
+    assert "target_density_cell_index" in target_trace, "Missing target_density_cell_index in target_trace.json"
+    assert "target_cell_bbox" in target_trace, "Missing target_cell_bbox in target_trace.json"
     assert len(target_trace["target_cell_bbox"]) == 4, (
-        f"target_cell_bbox must have 4 elements, "
-        f"got {len(target_trace['target_cell_bbox'])}"
+        f"target_cell_bbox must have 4 elements, got {len(target_trace['target_cell_bbox'])}"
     )
     print("✅ target_trace.json structure valid")
 else:

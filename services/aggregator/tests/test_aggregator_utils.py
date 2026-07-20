@@ -4,9 +4,9 @@ Tests the zone classification heuristic using the Morocco BBOX reference.
 These are pure functions testable without SQLite or FastAPI.
 """
 
-from pathlib import Path
 import importlib.util
 import sys
+from pathlib import Path
 
 # Load aggregator main.py by absolute path so concurrent pytest collection of
 # other services/*/main.py modules cannot shadow the name "main".

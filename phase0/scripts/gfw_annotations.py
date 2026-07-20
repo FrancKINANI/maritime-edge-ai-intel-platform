@@ -16,9 +16,9 @@ import re
 import shutil
 import time
 import xml.etree.ElementTree as ET
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import httpx
 from dotenv import load_dotenv
@@ -74,7 +74,7 @@ ANNOTATION_LABELS = {
 # ---------------------------------------------------------------------------
 
 
-def _get_headers(api_token: str) -> Dict[str, str]:
+def _get_headers(api_token: str) -> dict[str, str]:
     if not api_token:
         raise ValueError("GFW API token is required")
     return {
@@ -87,12 +87,12 @@ def _get_headers(api_token: str) -> Dict[str, str]:
 def _request_with_retry(
     method: str,
     url: str,
-    headers: Dict[str, str],
-    params: Optional[Dict[str, Any]] = None,
-    json_body: Optional[Dict[str, Any]] = None,
+    headers: dict[str, str],
+    params: dict[str, Any] | None = None,
+    json_body: dict[str, Any] | None = None,
     timeout: float = 30.0,
-) -> Dict[str, Any]:
-    last_error: Optional[Exception] = None
+) -> dict[str, Any]:
+    last_error: Exception | None = None
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             with httpx.Client(timeout=timeout) as client:
@@ -131,21 +131,23 @@ def _request_with_retry(
     raise RuntimeError(f"GFW request to {url} failed after {MAX_RETRIES} retries") from last_error
 
 
-def _bbox_polygon(bbox: List[float]) -> Dict[str, Any]:
+def _bbox_polygon(bbox: list[float]) -> dict[str, Any]:
     lon_min, lat_min, lon_max, lat_max = bbox
     return {
         "type": "Polygon",
-        "coordinates": [[
-            [lon_min, lat_min],
-            [lon_max, lat_min],
-            [lon_max, lat_max],
-            [lon_min, lat_max],
-            [lon_min, lat_min],
-        ]],
+        "coordinates": [
+            [
+                [lon_min, lat_min],
+                [lon_max, lat_min],
+                [lon_max, lat_max],
+                [lon_min, lat_max],
+                [lon_min, lat_min],
+            ]
+        ],
     }
 
 
-def _normalize_response_entries(response: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _normalize_response_entries(response: dict[str, Any]) -> list[dict[str, Any]]:
     """
     Normalize GFW API responses to a flat list of entry dicts.
 
@@ -173,9 +175,12 @@ def _normalize_response_entries(response: Dict[str, Any]) -> List[Dict[str, Any]
             # Check if this is a nested grouped format:
             # entries = [{dataset_key: [entry1, entry2, ...]}, ...]
             # Each element is a dict with a single key whose value is a list of dicts
-            if (len(raw_list) > 0 and isinstance(raw_list[0], dict)
-                    and any(isinstance(v, list) for v in raw_list[0].values())):
-                flattened: List[Dict[str, Any]] = []
+            if (
+                len(raw_list) > 0
+                and isinstance(raw_list[0], dict)
+                and any(isinstance(v, list) for v in raw_list[0].values())
+            ):
+                flattened: list[dict[str, Any]] = []
                 for wrapper in raw_list:
                     if not isinstance(wrapper, dict):
                         continue
@@ -186,8 +191,8 @@ def _normalize_response_entries(response: Dict[str, Any]) -> List[Dict[str, Any]
                     return flattened
             return raw_list
     # Fallback: handle top-level grouped format {dataset_key: [entry, ...]}
-    grouped_entries: List[Dict[str, Any]] = []
-    for key, value in response.items():
+    grouped_entries: list[dict[str, Any]] = []
+    for _key, value in response.items():
         if isinstance(value, list) and len(value) > 0 and isinstance(value[0], dict):
             grouped_entries.extend(value)
     if grouped_entries:
@@ -195,7 +200,7 @@ def _normalize_response_entries(response: Dict[str, Any]) -> List[Dict[str, Any]
     return []
 
 
-def _extract_lat_lon(event: Dict[str, Any]) -> Tuple[Optional[float], Optional[float]]:
+def _extract_lat_lon(event: dict[str, Any]) -> tuple[float | None, float | None]:
     if event is None:
         return None, None
     if "lat" in event and "lon" in event:
@@ -215,6 +220,7 @@ def _extract_lat_lon(event: Dict[str, Any]) -> Tuple[Optional[float], Optional[f
             return float(position["latitude"]), float(position["longitude"])
     return None, None
 
+
 # ---------------------------------------------------------------------------
 # GFW client
 # ---------------------------------------------------------------------------
@@ -227,8 +233,8 @@ class GFWClient:
         self.api_token = api_token
         self.headers = _get_headers(api_token)
 
-    def _paginate_get(self, url: str, params: Dict[str, Any], limit: int) -> List[Dict[str, Any]]:
-        results: List[Dict[str, Any]] = []
+    def _paginate_get(self, url: str, params: dict[str, Any], limit: int) -> list[dict[str, Any]]:
+        results: list[dict[str, Any]] = []
         offset = 0
         while True:
             params["offset"] = offset
@@ -243,7 +249,7 @@ class GFWClient:
             time.sleep(REQUEST_DELAY_SECONDS)
         return results
 
-    def search_vessels(self, query: str, limit: int = 50) -> List[Dict[str, Any]]:
+    def search_vessels(self, query: str, limit: int = 50) -> list[dict[str, Any]]:
         logger.info("Searching GFW vessels for query=%s", query)
         # GFW v3 API requires datasets[0] format (bracket notation) for query params
         params = {
@@ -260,10 +266,10 @@ class GFWClient:
 
     def get_ais_vessels(
         self,
-        bbox: List[float],
+        bbox: list[float],
         acquisition_time: str,
         window_hours: float = 1.0,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         logger.info("Fetching GFW AIS presence for acquisition_time=%s", acquisition_time)
         acquisition_time = acquisition_time.rstrip("Z")
         dt = datetime.fromisoformat(acquisition_time)
@@ -290,11 +296,11 @@ class GFWClient:
 
     def gfw_get_ais_presence(
         self,
-        bbox: List[float],
+        bbox: list[float],
         date_start: str,
         date_end: str,
         limit: int = 500,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Fetch AIS Vessel Presence positions via the GFW API.
 
@@ -342,28 +348,30 @@ class GFWClient:
         try:
             response = _request_with_retry("POST", GFW_REPORT, self.headers, params=query_params, json_body=body_params)
             entries = _normalize_response_entries(response)
-            
+
             # Normalize entries to the expected format
             normalized = []
             for entry in entries:
                 lat, lon = _extract_lat_lon(entry)
                 if lat is None or lon is None:
                     continue
-                    
-                normalized.append({
-                    "lat": lat,
-                    "lon": lon,
-                    "timestamp": entry.get("timestamp") or entry.get("date") or "",
-                    "mmsi": entry.get("mmsi") or entry.get("MMSI"),
-                    "vessel_name": entry.get("vessel_name") or entry.get("name"),
-                    "vessel_type": entry.get("vessel_type") or entry.get("type"),
-                    "source": "ais_presence_amorce",
-                    "requires_human_validation": True,
-                })
-            
+
+                normalized.append(
+                    {
+                        "lat": lat,
+                        "lon": lon,
+                        "timestamp": entry.get("timestamp") or entry.get("date") or "",
+                        "mmsi": entry.get("mmsi") or entry.get("MMSI"),
+                        "vessel_name": entry.get("vessel_name") or entry.get("name"),
+                        "vessel_type": entry.get("vessel_type") or entry.get("type"),
+                        "source": "ais_presence_amorce",
+                        "requires_human_validation": True,
+                    }
+                )
+
             logger.info(f"Retrieved {len(normalized)} AIS presence entries as annotation seeds")
             return normalized
-            
+
         except Exception as e:
             logger.error(f"Failed to fetch AIS Vessel Presence: {e}")
             logger.warning("The endpoint for AIS Vessel Presence may need verification against GFW documentation")
@@ -371,15 +379,15 @@ class GFWClient:
 
     def get_dark_vessel_events(
         self,
-        bbox: List[float],
+        bbox: list[float],
         start_date: str,
         end_date: str,
         limit: int = 200,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         logger.info("Fetching GFW dark vessel events for bbox=%s %s->%s", bbox, start_date, end_date)
         try:
             # Use GET without geometry filter, then filter in code if needed
-            params: Dict[str, Any] = {
+            params: dict[str, Any] = {
                 "datasets[0]": AIS_OFF_DATASET,
                 "start-date": start_date,
                 "end-date": end_date,
@@ -414,11 +422,11 @@ class GFWClient:
             return events
         except Exception as exc:
             logger.warning(
-                "Failed to fetch dark vessel events (non-fatal): %s. "
-                "Continuing with AIS presence data only.",
+                "Failed to fetch dark vessel events (non-fatal): %s. Continuing with AIS presence data only.",
                 exc,
             )
             return []
+
 
 # ---------------------------------------------------------------------------
 # Shared seeded RNG for reproducible bbox size sampling
@@ -432,10 +440,10 @@ _RNG_BBOX = random.Random(42)
 # ---------------------------------------------------------------------------
 
 
-def load_scene_metadata(scene_path: Union[str, Path], polarization: str = "vv") -> Dict[str, Any]:
+def load_scene_metadata(scene_path: str | Path, polarization: str = "vv") -> dict[str, Any]:
     scene_path = Path(scene_path)
     if scene_path.is_file() and scene_path.name == "metadata.json":
-        with open(scene_path, "r", encoding="utf-8") as f:
+        with open(scene_path, encoding="utf-8") as f:
             return json.load(f)
 
     measurement_dir = scene_path / "measurement"
@@ -455,7 +463,7 @@ def load_scene_metadata(scene_path: Union[str, Path], polarization: str = "vv") 
             break
 
     if not tiff_files:
-        raise FileNotFoundError("No GeoTIFF found for polarization '%s' in %s" % (polarization, scene_path))
+        raise FileNotFoundError(f"No GeoTIFF found for polarization '{polarization}' in {scene_path}")
 
     tiff_path = tiff_files[0]
     import rasterio
@@ -471,9 +479,9 @@ def load_scene_metadata(scene_path: Union[str, Path], polarization: str = "vv") 
         }
 
 
-def load_tile_metadata(metadata_path: Union[str, Path]) -> Dict[str, Any]:
+def load_tile_metadata(metadata_path: str | Path) -> dict[str, Any]:
     metadata_path = Path(metadata_path)
-    with open(metadata_path, "r", encoding="utf-8") as f:
+    with open(metadata_path, encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -485,7 +493,7 @@ def get_scene_acquisition_time(scene_id: str) -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def get_scene_bbox(scene_metadata: Dict[str, Any]) -> List[float]:
+def get_scene_bbox(scene_metadata: dict[str, Any]) -> list[float]:
     lat_min = float("inf")
     lon_min = float("inf")
     lat_max = float("-inf")
@@ -504,7 +512,7 @@ def get_scene_bbox(scene_metadata: Dict[str, Any]) -> List[float]:
     return [lon_min, lat_min, lon_max, lat_max]
 
 
-def point_in_tile(lat: float, lon: float, tile: Dict[str, Any]) -> bool:
+def point_in_tile(lat: float, lon: float, tile: dict[str, Any]) -> bool:
     geo = tile.get("geo_bbox")
     if not geo or len(geo) != 4:
         return False
@@ -512,7 +520,7 @@ def point_in_tile(lat: float, lon: float, tile: Dict[str, Any]) -> bool:
     return lat_min <= lat <= lat_max and lon_min <= lon <= lon_max
 
 
-def latlon_to_tile_pixel(lat: float, lon: float, tile: Dict[str, Any], tile_size: int = 512) -> Tuple[float, float]:
+def latlon_to_tile_pixel(lat: float, lon: float, tile: dict[str, Any], tile_size: int = 512) -> tuple[float, float]:
     geo = tile.get("geo_bbox")
     if not geo or len(geo) != 4:
         raise ValueError("Tile metadata is missing geo_bbox")
@@ -527,9 +535,9 @@ def latlon_to_tile_pixel(lat: float, lon: float, tile: Dict[str, Any], tile_size
 
 
 def _sample_vessel_dimensions(
-    vessel_type: Optional[str],
+    vessel_type: str | None,
     rng: random.Random,
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """Sample realistic vessel length (m) and aspect ratio.
 
     Categories are based on IHS Maritime / GFW vessel type classification.
@@ -543,13 +551,13 @@ def _sample_vessel_dimensions(
         if any(kw in vt for kw in ["tanker", "cargo", "container"]):
             length_min, length_max = 100.0, 350.0  # large commercial
         elif any(kw in vt for kw in ["fishing", "trawler", "longliner"]):
-            length_min, length_max = 10.0, 40.0     # small fishing
+            length_min, length_max = 10.0, 40.0  # small fishing
         elif any(kw in vt for kw in ["passenger", "pleasure", "yacht"]):
-            length_min, length_max = 30.0, 150.0    # medium passenger
+            length_min, length_max = 30.0, 150.0  # medium passenger
         elif any(kw in vt for kw in ["tug", "supply", "offshore"]):
-            length_min, length_max = 20.0, 80.0     # service vessels
+            length_min, length_max = 20.0, 80.0  # service vessels
         else:
-            length_min, length_max = 10.0, 300.0    # unknown — broad
+            length_min, length_max = 10.0, 300.0  # unknown — broad
     else:
         # No vessel type: global distribution (60% small, 30% medium, 10% large)
         roll = rng.random()
@@ -581,8 +589,8 @@ def estimate_bbox_yolo(
     center_x: float,
     center_y: float,
     tile_size: int = 512,
-    vessel_type: Optional[str] = None,
-) -> Tuple[float, float, float, float]:
+    vessel_type: str | None = None,
+) -> tuple[float, float, float, float]:
     """
     Estimate a YOLO bounding box for a vessel from its AIS position.
 
@@ -631,14 +639,14 @@ def estimate_bbox_yolo(
 
 
 def project_detections_to_tiles(
-    detections: List[Dict[str, Any]],
-    tiles: List[Dict[str, Any]],
-    tile_size: Optional[int] = None,
-) -> Dict[str, List[Dict[str, Any]]]:
+    detections: list[dict[str, Any]],
+    tiles: list[dict[str, Any]],
+    tile_size: int | None = None,
+) -> dict[str, list[dict[str, Any]]]:
     if tile_size is None:
         tile_size = 512
 
-    tile_annotations: Dict[str, List[Dict[str, Any]]] = {}
+    tile_annotations: dict[str, list[dict[str, Any]]] = {}
     projected = 0
     ignored = 0
 
@@ -683,7 +691,10 @@ def project_detections_to_tiles(
                 "bbox_yolo": [round(v, 6) for v in bbox],
                 "label": label,
                 "source": detection.get("source"),
-                "timestamp": detection.get("timestamp") or detection.get("timestamp_off") or detection.get("start") or "",
+                "timestamp": detection.get("timestamp")
+                or detection.get("timestamp_off")
+                or detection.get("start")
+                or "",
                 "confidence": detection.get("confidence") or detection.get("score"),
                 "vessel_info": detection.get("vessel_info") or detection.get("vessel") or {},
             }
@@ -695,12 +706,13 @@ def project_detections_to_tiles(
     logger.info("Projected %s detections to tiles, ignored %s detections outside tile coverage", projected, ignored)
     return tile_annotations
 
+
 # ---------------------------------------------------------------------------
 # Export helpers
 # ---------------------------------------------------------------------------
 
 
-def export_csv(records: List[Dict[str, Any]], output_path: Union[str, Path]) -> str:
+def export_csv(records: list[dict[str, Any]], output_path: str | Path) -> str:
     out_path = Path(output_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     if not records:
@@ -715,21 +727,23 @@ def export_csv(records: List[Dict[str, Any]], output_path: Union[str, Path]) -> 
     return str(out_path)
 
 
-def export_geojson(records: List[Dict[str, Any]], output_path: Union[str, Path]) -> str:
-    features: List[Dict[str, Any]] = []
+def export_geojson(records: list[dict[str, Any]], output_path: str | Path) -> str:
+    features: list[dict[str, Any]] = []
     for record in records:
         lat, lon = _extract_lat_lon(record)
         if lat is None or lon is None:
             continue
         properties = {k: v for k, v in record.items() if k not in ("lat", "lon", "latitude", "longitude", "geometry")}
-        features.append({
-            "type": "Feature",
-            "geometry": {
-                "type": "Point",
-                "coordinates": [lon, lat],
-            },
-            "properties": properties,
-        })
+        features.append(
+            {
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [lon, lat],
+                },
+                "properties": properties,
+            }
+        )
     out_path = Path(output_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w", encoding="utf-8") as handle:
@@ -738,7 +752,7 @@ def export_geojson(records: List[Dict[str, Any]], output_path: Union[str, Path])
     return str(out_path)
 
 
-def export_json(records: List[Dict[str, Any]], output_path: Union[str, Path]) -> str:
+def export_json(records: list[dict[str, Any]], output_path: str | Path) -> str:
     out_path = Path(output_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w", encoding="utf-8") as handle:
@@ -749,9 +763,9 @@ def export_json(records: List[Dict[str, Any]], output_path: Union[str, Path]) ->
 
 def export_to_cvat_xml(
     scene_id: str,
-    tile_annotations: Dict[str, List[Dict[str, Any]]],
-    tiles: List[Dict[str, Any]],
-    output_path: Union[str, Path],
+    tile_annotations: dict[str, list[dict[str, Any]]],
+    tiles: list[dict[str, Any]],
+    output_path: str | Path,
 ) -> str:
     root = ET.Element("annotations")
     version = ET.SubElement(root, "version")
@@ -812,9 +826,9 @@ def export_to_cvat_xml(
 
 def export_to_yolo_format(
     scene_id: str,
-    tile_annotations: Dict[str, List[Dict[str, Any]]],
-    tiles: List[Dict[str, Any]],
-    output_dir: Union[str, Path],
+    tile_annotations: dict[str, list[dict[str, Any]]],
+    tiles: list[dict[str, Any]],
+    output_dir: str | Path,
 ) -> None:
     output_path = Path(output_dir)
     labels_dir = output_path / "labels"
@@ -850,6 +864,7 @@ def export_to_yolo_format(
 
     logger.info("Exported YOLO labels for %s tiles to %s", len(tile_annotations), labels_dir)
 
+
 # ---------------------------------------------------------------------------
 # NPY → PNG conversion for CVAT import
 # ---------------------------------------------------------------------------
@@ -858,10 +873,10 @@ def export_to_yolo_format(
 def convert_npy_tiles_to_png(
     scene_dir: str,
     pipeline: str,
-    tile_ids: List[str],
+    tile_ids: list[str],
     output_dir: str,
     tile_size: int = 512,
-) -> Dict[str, str]:
+) -> dict[str, str]:
     """
     Convert a list of .npy tile files to PNG for CVAT import.
 
@@ -890,10 +905,7 @@ def convert_npy_tiles_to_png(
     try:
         from PIL import Image
     except ImportError:
-        raise ImportError(
-            "Pillow is required for PNG conversion. "
-            "Install it with: pip install Pillow"
-        )
+        raise ImportError("Pillow is required for PNG conversion. Install it with: pip install Pillow")
     import numpy as np
     from tqdm import tqdm
 
@@ -901,8 +913,8 @@ def convert_npy_tiles_to_png(
     out_path = Path(output_dir)
     out_path.mkdir(parents=True, exist_ok=True)
 
-    result: Dict[str, str] = {}
-    not_found: List[str] = []
+    result: dict[str, str] = {}
+    not_found: list[str] = []
 
     for tile_id in tqdm(tile_ids, desc="Converting tiles", unit="tile"):
         npy_file = tiles_path / f"{tile_id}.npy"
@@ -914,21 +926,21 @@ def convert_npy_tiles_to_png(
 
         # Validate array dimensions before conversion
         if arr.ndim != 2:
-            raise ValueError(
-                f"Tile {tile_id} has {arr.ndim} dimensions (expected 2) — "
-                "check the SAR pipeline output."
-            )
+            raise ValueError(f"Tile {tile_id} has {arr.ndim} dimensions (expected 2) — check the SAR pipeline output.")
 
         # Pad edge tiles that are smaller than tile_size to maintain
         # consistent dimensions for CVAT annotation alignment.
         if arr.shape != (tile_size, tile_size):
             h, w = arr.shape
             if h < tile_size or w < tile_size:
-                padded = np.pad(arr, ((0, tile_size - h), (0, tile_size - w)), mode='edge')
+                padded = np.pad(arr, ((0, tile_size - h), (0, tile_size - w)), mode="edge")
                 arr = padded
                 logger.info(
                     "Padded tile %s from %s to (%d, %d)",
-                    tile_id, (h, w), tile_size, tile_size,
+                    tile_id,
+                    (h, w),
+                    tile_size,
+                    tile_size,
                 )
             else:
                 raise ValueError(
@@ -956,11 +968,11 @@ def convert_npy_tiles_to_png(
 
 def convert_scene_all_tiles_to_png(
     scene_id: str,
-    tiles_root: Union[str, Path],
-    annotations_root: Union[str, Path],
+    tiles_root: str | Path,
+    annotations_root: str | Path,
     pipeline: str = "D",
-    output_dir: Optional[Union[str, Path]] = None,
-) -> Dict[str, Any]:
+    output_dir: str | Path | None = None,
+) -> dict[str, Any]:
     """
     Convert ALL tiles of a scene from .npy to PNG for CVAT import, and
     prepare the ``cvat_import/`` directory structure (images + XML).
@@ -1054,17 +1066,17 @@ def convert_scene_all_tiles_to_png(
 
 
 def annotate_scene(
-    metadata_path: Union[str, Path],
+    metadata_path: str | Path,
     gfw_client: GFWClient,
-    output_dir: Union[str, Path],
+    output_dir: str | Path,
     pipeline: str = "D",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Annotate a scene using the hybrid protocol per PH0-CORR-002:
     - Level 1: GFW AIS Vessel Presence as annotation seeds (amorce)
     - Level 2: AIS-off events as dark vessel candidates
     - All annotations require human validation in CVAT before becoming Ground Truth
-    
+
     NOTE: SAR Vessel Detections dataset is NOT used as it returns grid cell
     aggregates, not individual vessel positions, making it structurally unusable.
     """
@@ -1102,9 +1114,13 @@ def annotate_scene(
     dark_vessel_candidates = gfw_client.get_dark_vessel_events(bbox, date_start, date_end)
 
     # Combine both sources with distinct labels for CVAT
-    detections: List[Dict[str, Any]] = []
-    detections.extend({**event, "source": "ais_presence_amorce", "label": "ais_presence_amorce"} for event in ais_presence_seeds)
-    detections.extend({**event, "source": "ais_off_candidate", "label": "ais_off_candidate"} for event in dark_vessel_candidates)
+    detections: list[dict[str, Any]] = []
+    detections.extend(
+        {**event, "source": "ais_presence_amorce", "label": "ais_presence_amorce"} for event in ais_presence_seeds
+    )
+    detections.extend(
+        {**event, "source": "ais_off_candidate", "label": "ais_off_candidate"} for event in dark_vessel_candidates
+    )
 
     tile_size = metadata.get("tile_size", 512)
     tile_annotations = project_detections_to_tiles(detections, metadata.get("tiles", []), tile_size=tile_size)
@@ -1140,9 +1156,15 @@ def annotate_scene(
         "dark_vessel_candidates": len(dark_vessel_candidates),
         "total_annotations": sum(len(anns) for anns in tile_annotations.values()),
         "class_counts": {
-            "AIS_confirmed": sum(1 for anns in tile_annotations.values() for ann in anns if ann["label"] == "AIS_confirmed"),
-            "visual_only": sum(1 for anns in tile_annotations.values() for ann in anns if ann["label"] == "visual_only"),
-            "dark_vessel_candidate": sum(1 for anns in tile_annotations.values() for ann in anns if ann["label"] == "dark_vessel_candidate"),
+            "AIS_confirmed": sum(
+                1 for anns in tile_annotations.values() for ann in anns if ann["label"] == "AIS_confirmed"
+            ),
+            "visual_only": sum(
+                1 for anns in tile_annotations.values() for ann in anns if ann["label"] == "visual_only"
+            ),
+            "dark_vessel_candidate": sum(
+                1 for anns in tile_annotations.values() for ann in anns if ann["label"] == "dark_vessel_candidate"
+            ),
         },
         "traceability": traceability,
         "protocol": "PH0-CORR-002_hybrid",
@@ -1156,11 +1178,11 @@ def annotate_scene(
 
 
 def annotate_all_scenes(
-    tiles_root: Union[str, Path],
+    tiles_root: str | Path,
     gfw_client: GFWClient,
-    output_dir: Union[str, Path],
+    output_dir: str | Path,
     pipeline: str = "D",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     tiles_root = Path(tiles_root)
     metadata_paths = sorted(tiles_root.glob("**/metadata.json"))
     summary = {
@@ -1195,24 +1217,29 @@ def annotate_all_scenes(
 def test_gfw_connection(client: GFWClient) -> None:
     logger.info("Running GFW connectivity test (PH0-CORR-002 protocol)")
     bbox = [-17.0, 27.0, -1.0, 36.0]
-    end = datetime.utcnow().date()
+    end = datetime.now(UTC).date()
     start = end - timedelta(days=AIS_LOOKBACK_DAYS)
     try:
         # Test AIS Vessel Presence (Level 1)
-        ais_seeds = client.gfw_get_ais_presence([bbox[0], bbox[1], bbox[2], bbox[3]], start.isoformat(), end.isoformat(), limit=10)
+        ais_seeds = client.gfw_get_ais_presence(
+            [bbox[0], bbox[1], bbox[2], bbox[3]], start.isoformat(), end.isoformat(), limit=10
+        )
         logger.info("Connectivity OK, retrieved %s AIS presence seeds", len(ais_seeds))
-        
+
         # Test Dark vessel events (Level 2)
-        dark_candidates = client.get_dark_vessel_events([bbox[0], bbox[1], bbox[2], bbox[3]], start.isoformat(), end.isoformat(), limit=10)
+        dark_candidates = client.get_dark_vessel_events(
+            [bbox[0], bbox[1], bbox[2], bbox[3]], start.isoformat(), end.isoformat(), limit=10
+        )
         logger.info("Connectivity OK, retrieved %s dark vessel candidates", len(dark_candidates))
     except Exception as exc:
         logger.error("GFW connectivity test failed: %s", exc)
         raise
 
+
 def test_sar_endpoint(token: str) -> None:
     """
     DEPRECATED per PH0-CORR-002.
-    
+
     The SAR Vessel Detections dataset (public-global-sar-presence:latest) returns
     grid cell aggregates, not individual vessel positions, making it structurally
     unusable for this project. Use test_gfw_connection() instead to test the
@@ -1222,7 +1249,6 @@ def test_sar_endpoint(token: str) -> None:
     logger.warning("SAR Vessel Detections dataset returns grid aggregates, not individual positions")
     logger.warning("Use test_gfw_connection() to test the new hybrid protocol")
     raise NotImplementedError("SAR endpoint testing deprecated per PH0-CORR-002")
-
 
 
 # ---------------------------------------------------------------------------
@@ -1242,8 +1268,12 @@ def main() -> None:
     parser.add_argument("--all", action="store_true", help="Annotate all scenes under tiles root")
     parser.add_argument("--test", action="store_true", help="Run a GFW API connectivity test")
     parser.add_argument("--test-sar", action="store_true", help="Run isolated SAR endpoint test")
-    parser.add_argument("--convert-to-png", default=None, metavar="SCENE_ID",
-                        help="Convert all .npy tiles of a scene to PNG for CVAT import")
+    parser.add_argument(
+        "--convert-to-png",
+        default=None,
+        metavar="SCENE_ID",
+        help="Convert all .npy tiles of a scene to PNG for CVAT import",
+    )
 
     args = parser.parse_args()
 

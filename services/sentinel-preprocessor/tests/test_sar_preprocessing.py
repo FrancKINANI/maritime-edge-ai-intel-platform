@@ -1,18 +1,19 @@
 """Unit tests for SAR preprocessing and GCP georeferencing functions."""
 
-from pathlib import Path
 import sys
+from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import numpy as np
 import pytest
-from sar_preprocessing import (
-    calibrate_sigma0,
-    apply_lee_filter,
-    convert_to_db,
-    normalize_to_uint8,
+from sar_preprocessing_module import (
     GCPGeoreferencer,
     GCPOutOfBoundsError,
+    apply_lee_filter,
+    calibrate_sigma0,
+    convert_to_db,
+    normalize_to_uint8,
 )
 
 
@@ -28,7 +29,7 @@ def test_calibrate_sigma0_pure():
     # Result should be float32
     assert result.dtype == np.float32
     # Check specific calculation for one pixel
-    expected = (100.0 ** 2) / (1.0 ** 2)
+    expected = (100.0**2) / (1.0**2)
     assert np.isclose(result[0, 0], expected)
 
 
@@ -117,12 +118,15 @@ def test_gcp_georeferencer_zero_error_at_control_points():
     regular NxM grid, and interpolation is exact at control points.
     """
     # Simulate a 4x4 GCP grid over a 30x30 pixel image
-    gcps = np.array([
-        [[35.0, -5.0], [35.5, -4.5], [36.0, -4.0], [36.5, -3.5]],
-        [[35.2, -5.2], [35.7, -4.7], [36.2, -4.2], [36.7, -3.7]],
-        [[35.4, -5.4], [35.9, -4.9], [36.4, -4.4], [36.9, -3.9]],
-        [[35.6, -5.6], [36.1, -5.1], [36.6, -4.6], [37.1, -4.1]],
-    ], dtype=np.float64)
+    gcps = np.array(
+        [
+            [[35.0, -5.0], [35.5, -4.5], [36.0, -4.0], [36.5, -3.5]],
+            [[35.2, -5.2], [35.7, -4.7], [36.2, -4.2], [36.7, -3.7]],
+            [[35.4, -5.4], [35.9, -4.9], [36.4, -4.4], [36.9, -3.9]],
+            [[35.6, -5.6], [36.1, -5.1], [36.6, -4.6], [37.1, -4.1]],
+        ],
+        dtype=np.float64,
+    )
 
     geo = GCPGeoreferencer(gcps, image_shape=(30, 30))
 
@@ -134,18 +138,23 @@ def test_gcp_georeferencer_zero_error_at_control_points():
     for i, line in enumerate(gcp_lines):
         for j, pix in enumerate(gcp_pixels):
             lat, lon = geo.pixel_to_latlon(float(line), float(pix))
-            assert np.isclose(lat, gcps[i, j, 0], rtol=0, atol=1e-10), \
+            assert np.isclose(lat, gcps[i, j, 0], rtol=0, atol=1e-10), (
                 f"Lat error at GCP ({line}, {pix}): {lat} != {gcps[i, j, 0]}"
-            assert np.isclose(lon, gcps[i, j, 1], rtol=0, atol=1e-10), \
+            )
+            assert np.isclose(lon, gcps[i, j, 1], rtol=0, atol=1e-10), (
                 f"Lon error at GCP ({line}, {pix}): {lon} != {gcps[i, j, 1]}"
+            )
 
 
 def test_gcp_georeferencer_interior_interpolation():
     """Test that GCP interpolation produces reasonable values between control points."""
-    gcps = np.array([
-        [[35.0, -5.0], [36.0, -4.0]],
-        [[36.0, -6.0], [37.0, -5.0]],
-    ], dtype=np.float64)
+    gcps = np.array(
+        [
+            [[35.0, -5.0], [36.0, -4.0]],
+            [[36.0, -6.0], [37.0, -5.0]],
+        ],
+        dtype=np.float64,
+    )
 
     geo = GCPGeoreferencer(gcps, image_shape=(10, 10))
 
@@ -163,10 +172,13 @@ def test_gcp_georeferencer_out_of_bounds_raises():
     This is the explicit safeguard: boundary behavior is NOT validated, so
     an exception must be raised rather than improvising border management.
     """
-    gcps = np.array([
-        [[35.0, -5.0], [36.0, -4.0]],
-        [[36.0, -6.0], [37.0, -5.0]],
-    ], dtype=np.float64)
+    gcps = np.array(
+        [
+            [[35.0, -5.0], [36.0, -4.0]],
+            [[36.0, -6.0], [37.0, -5.0]],
+        ],
+        dtype=np.float64,
+    )
 
     geo = GCPGeoreferencer(gcps, image_shape=(10, 10))
 
@@ -187,10 +199,13 @@ def test_gcp_georeferencer_out_of_bounds_raises():
 
 def test_gcp_georeferencer_valid_bounds_are_accepted():
     """Test that pixels strictly within the GCP grid are accepted."""
-    gcps = np.array([
-        [[35.0, -5.0], [36.0, -4.0]],
-        [[36.0, -6.0], [37.0, -5.0]],
-    ], dtype=np.float64)
+    gcps = np.array(
+        [
+            [[35.0, -5.0], [36.0, -4.0]],
+            [[36.0, -6.0], [37.0, -5.0]],
+        ],
+        dtype=np.float64,
+    )
 
     geo = GCPGeoreferencer(gcps, image_shape=(10, 10))
 
@@ -208,10 +223,13 @@ def test_gcp_georeferencer_valid_bounds_are_accepted():
 
 def test_gcp_georeferencer_tile_to_bbox():
     """Test that tile_to_bbox computes geographic bounds from pixel coordinates."""
-    gcps = np.array([
-        [[35.0, -5.0], [36.0, -4.0]],
-        [[36.0, -6.0], [37.0, -5.0]],
-    ], dtype=np.float64)
+    gcps = np.array(
+        [
+            [[35.0, -5.0], [36.0, -4.0]],
+            [[36.0, -6.0], [37.0, -5.0]],
+        ],
+        dtype=np.float64,
+    )
 
     geo = GCPGeoreferencer(gcps, image_shape=(10, 10))
 

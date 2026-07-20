@@ -1,7 +1,7 @@
 # Maritime Edge AI Intelligence Platform (Phase II)
 
 [![CI](https://github.com/FrancKINANI/maritime-edge-ai-intel-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/FrancKINANI/maritime-edge-ai-intel-platform/actions/workflows/ci.yml)
-[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![Docker](https://img.shields.io/badge/Docker-20.10%2B-2496ED.svg)](https://docker.com)
 
 A high-performance microservice platform for **real-time maritime vessel detection** from Copernicus Sentinel-1 SAR satellite imagery. Transitions simulation-trained Edge AI models (Phase I) to a fully operational, containerized architecture consuming real-world radar scenes.
@@ -100,7 +100,7 @@ A high-performance microservice platform for **real-time maritime vessel detecti
 
 - Docker v20.10+
 - Docker Compose v2.0+
-- Python 3.10+ (for local validation scripts)
+- Python 3.11+ (for local validation scripts)
 - A [Copernicus Data Space](https://dataspace.copernicus.eu/) account (free)
 - A [Global Fishing Watch](https://globalfishingwatch.org/) API token (free tier)
 
@@ -251,7 +251,7 @@ All services use a shared base image (`maritime-intel-base:latest`) defined in `
 
 | Package | Version | Purpose |
 |---------|---------|---------|
-| Python | 3.10-slim | Runtime |
+| Python | 3.11-slim | Runtime |
 | FastAPI | >=0.110.0 | REST API framework |
 | Uvicorn | >=0.29.0 | ASGI server |
 | Pydantic | >=2.7.0 | Schema validation |
@@ -315,7 +315,7 @@ Optional region overrides: `ALGERIA_MED_BBOX`, `MAURITANIA_ATL_BBOX`, etc.
 ### Local Python Setup
 
 ```bash
-python3.10 -m venv .venv
+python3.11 -m venv .venv
 source .venv/bin/activate
 # or with uv:
 uv venv && source .venv/bin/activate

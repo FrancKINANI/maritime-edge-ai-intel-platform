@@ -29,7 +29,6 @@ import shutil
 import sys
 import zipfile
 from pathlib import Path
-from typing import Dict, List, Tuple
 
 logger = logging.getLogger("export_colab")
 
@@ -54,13 +53,13 @@ def parse_yolo_label(txt_path: Path) -> int:
     return len(text.splitlines()) if text else 0
 
 
-def build_flat_dataset(input_dir: Path, output_dir: Path, split: Tuple[float, float, float]):
+def build_flat_dataset(input_dir: Path, output_dir: Path, split: tuple[float, float, float]):
     """Merge scenes into a flat YOLO dataset with train/val/test split."""
     train_pct, val_pct, test_pct = split
     assert abs(train_pct + val_pct + test_pct - 100) < 0.01, "Split must sum to 100"
 
     # Collect all image-label pairs
-    pairs: List[Tuple[Path, Path]] = []
+    pairs: list[tuple[Path, Path]] = []
     for scene_dir in sorted(input_dir.iterdir()):
         if not scene_dir.is_dir():
             continue
@@ -77,8 +76,9 @@ def build_flat_dataset(input_dir: Path, output_dir: Path, split: Tuple[float, fl
         logger.error("No image-label pairs found in %s", input_dir)
         sys.exit(1)
 
-    logger.info("Found %d image-label pairs across %d scenes", len(pairs),
-                len([d for d in input_dir.iterdir() if d.is_dir()]))
+    logger.info(
+        "Found %d image-label pairs across %d scenes", len(pairs), len([d for d in input_dir.iterdir() if d.is_dir()])
+    )
 
     # Shuffle deterministically
     random.seed(42)
@@ -92,12 +92,11 @@ def build_flat_dataset(input_dir: Path, output_dir: Path, split: Tuple[float, fl
 
     splits = {
         "train": pairs[:n_train],
-        "val": pairs[n_train:n_train + n_val],
-        "test": pairs[n_train + n_val:],
+        "val": pairs[n_train : n_train + n_val],
+        "test": pairs[n_train + n_val :],
     }
 
-    logger.info("Split: train=%d, val=%d, test=%d",
-                len(splits["train"]), len(splits["val"]), len(splits["test"]))
+    logger.info("Split: train=%d, val=%d, test=%d", len(splits["train"]), len(splits["val"]), len(splits["test"]))
 
     # Copy files into flat structure
     temp_path = output_dir / TEMP_DIR
@@ -187,21 +186,28 @@ def main():
         description="Export annotated AIS dataset for Google Colab fine-tuning",
     )
     parser.add_argument(
-        "--input", type=Path,
+        "--input",
+        type=Path,
         default=Path("phase0/data/cvat_annotated_only"),
         help="Input directory with scene subdirectories (default: cvat_annotated_only)",
     )
     parser.add_argument(
-        "--output", type=Path,
+        "--output",
+        type=Path,
         default=Path("phase0/data/colab_export"),
         help="Output directory for ZIP + notebook (default: phase0/data/colab_export)",
     )
     parser.add_argument(
-        "--split", type=float, nargs=3, default=[80, 10, 10],
+        "--split",
+        type=float,
+        nargs=3,
+        default=[80, 10, 10],
         help="Train/val/test split percentages (default: 80 10 10)",
     )
     parser.add_argument(
-        "-v", "--verbose", action="store_true",
+        "-v",
+        "--verbose",
+        action="store_true",
         help="Verbose logging",
     )
     args = parser.parse_args()
@@ -254,8 +260,9 @@ def main():
     print("  COLAB EXPORT COMPLETE")
     print("=" * 60)
     print(f"  Dataset:  {summary['total_images']} images, {summary['total_boxes']} boxes")
-    print(f"  Split:    train={summary['split']['train']}, "
-          f"val={summary['split']['val']}, test={summary['split']['test']}")
+    print(
+        f"  Split:    train={summary['split']['train']}, val={summary['split']['val']}, test={summary['split']['test']}"
+    )
     print(f"  Classes:  {summary['classes']}")
     print()
     print(f"  ZIP:      {zip_path} ({zip_path.stat().st_size / 1024 / 1024:.0f} MB)")

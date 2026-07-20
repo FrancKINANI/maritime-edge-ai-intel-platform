@@ -9,15 +9,12 @@ a running Streamlit instance (no browser automation).
 
 from __future__ import annotations
 
-from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
-
+from unittest.mock import patch
 
 # ---------------------------------------------------------------------------
 # Environment variable parsing
 # ---------------------------------------------------------------------------
+
 
 def test_dashboard_default_urls():
     """Verify default service URLs when environment variables are unset."""
@@ -31,7 +28,6 @@ def test_dashboard_default_urls():
 
     # When env vars are cleared, defaults should be used
     with patch.dict("os.environ", {}, clear=True):
-        import sys
         # We can't easily re-import the module, so check the expected defaults
         assert default_urls["DETECTOR_URL"] == "http://localhost:8003"
         assert default_urls["PREPROCESSOR_URL"] == "http://localhost:8000"
@@ -40,6 +36,7 @@ def test_dashboard_default_urls():
 # ---------------------------------------------------------------------------
 # Service URL formatting helpers
 # ---------------------------------------------------------------------------
+
 
 def test_service_url_formatting():
     """Test that service URLs are correctly formatted from env vars."""
@@ -50,7 +47,7 @@ def test_service_url_formatting():
         "satmon": "http://{host}:8004",
     }
 
-    for service, template in url_templates.items():
+    for _service, template in url_templates.items():
         url = template.format(host="localhost")
         assert url.startswith("http://")
         assert "localhost" in url
@@ -64,12 +61,13 @@ def test_service_url_formatting():
 # Input validation helpers (extracted from app.py logic)
 # ---------------------------------------------------------------------------
 
+
 def test_bbox_input_validation():
     """Test bounding box input validation rules used by the dashboard."""
     valid_bboxes = [
-        [27.0, -17.0, 36.0, -1.0],     # Morocco bbox
-        [-90.0, -180.0, 90.0, 180.0],   # Full globe
-        [30.0, -10.0, 35.0, -5.0],      # Small valid bbox
+        [27.0, -17.0, 36.0, -1.0],  # Morocco bbox
+        [-90.0, -180.0, 90.0, 180.0],  # Full globe
+        [30.0, -10.0, 35.0, -5.0],  # Small valid bbox
     ]
 
     for bbox in valid_bboxes:
@@ -78,10 +76,10 @@ def test_bbox_input_validation():
         assert -180 <= lon_min <= lon_max <= 180, f"Invalid lon range: {bbox}"
 
     invalid_bboxes = [
-        [100.0, -17.0, 36.0, -1.0],     # Lat > 90
-        [27.0, -200.0, 36.0, -1.0],     # Lon < -180
-        [36.0, -17.0, 27.0, -1.0],      # lat_min > lat_max (swapped)
-        [27.0, -1.0, 36.0, -17.0],      # lon_min > lon_max (swapped)
+        [100.0, -17.0, 36.0, -1.0],  # Lat > 90
+        [27.0, -200.0, 36.0, -1.0],  # Lon < -180
+        [36.0, -17.0, 27.0, -1.0],  # lat_min > lat_max (swapped)
+        [27.0, -1.0, 36.0, -17.0],  # lon_min > lon_max (swapped)
     ]
 
     for bbox in invalid_bboxes:
@@ -97,6 +95,7 @@ def test_bbox_input_validation():
 # ---------------------------------------------------------------------------
 # Mode routing logic
 # ---------------------------------------------------------------------------
+
 
 def test_mode_parsing():
     """Test that mode selection strings are correctly parsed."""
@@ -120,6 +119,7 @@ def test_mode_parsing():
 # Pipeline selection validation
 # ---------------------------------------------------------------------------
 
+
 def test_pipeline_selection_options():
     """Test that pipeline selection matches expected values."""
     pipelines = ["A", "B", "C", "D"]
@@ -138,6 +138,7 @@ def test_pipeline_selection_options():
 # ---------------------------------------------------------------------------
 # Event data format helpers
 # ---------------------------------------------------------------------------
+
 
 def test_event_table_formatting():
     """Test that event data is correctly formatted for Streamlit dataframe display."""

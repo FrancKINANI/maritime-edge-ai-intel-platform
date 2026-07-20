@@ -17,6 +17,7 @@ from __future__ import annotations
 import sys
 from datetime import datetime
 from pathlib import Path
+
 import pytest
 
 # Add project root to sys.path so 'shared' package is importable
@@ -26,6 +27,7 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 try:
     from pydantic import ValidationError
+
     from shared.schemas.events import (
         BoundingBox,
         DetectionEvent,
@@ -39,6 +41,7 @@ except ImportError as exc:
 # =============================================================================
 # BoundingBox
 # =============================================================================
+
 
 class TestBoundingBox:
     """Tests for BoundingBox schema."""
@@ -90,6 +93,7 @@ class TestBoundingBox:
 # DetectionEvent
 # =============================================================================
 
+
 class TestDetectionEvent:
     """Tests for DetectionEvent schema."""
 
@@ -100,9 +104,7 @@ class TestDetectionEvent:
             timestamp=datetime(2024, 1, 1, 12, 0, 0),
             tile_id="tile_001",
             tile_bbox_latlon=[30.0, -10.0, 31.0, -9.0],
-            detections=[
-                BoundingBox(x1=0.1, y1=0.2, x2=0.5, y2=0.6, confidence=0.95)
-            ],
+            detections=[BoundingBox(x1=0.1, y1=0.2, x2=0.5, y2=0.6, confidence=0.95)],
             vessel_count=1,
             dark_vessel_count=0,
             priority_level="HIGH",
@@ -252,6 +254,7 @@ class TestDetectionEvent:
 # IngestRequest
 # =============================================================================
 
+
 class TestIngestRequest:
     """Tests for IngestRequest schema."""
 
@@ -295,6 +298,7 @@ class TestIngestRequest:
 # =============================================================================
 # TLEData
 # =============================================================================
+
 
 class TestTLEData:
     """Tests for TLEData schema."""

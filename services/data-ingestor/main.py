@@ -5,9 +5,21 @@ Exposes endpoints for querying Copernicus Sentinel-1 catalog products, starting 
 jobs, and monitoring ingestion tasks.
 """
 
+import logging
+import os
+from typing import Any
+
 from fastapi import FastAPI, HTTPException, status
-from typing import List, Dict, Any
+
 from shared.schemas.events import IngestRequest
+
+logger = logging.getLogger(__name__)
+
+# Validate required environment variables at startup
+_REQUIRED_ENV_VARS = ["CDSE_USERNAME", "CDSE_PASSWORD", "REDIS_URL"]
+for _var in _REQUIRED_ENV_VARS:
+    if not os.getenv(_var):
+        logger.warning("Missing required environment variable: %s — service will start but may fail at runtime", _var)
 
 app = FastAPI(
     title="Maritime Edge AI Intel Platform - Data Ingestor",
@@ -16,8 +28,8 @@ app = FastAPI(
 )
 
 
-@app.post("/ingest", status_code=status.HTTP_202_ACCEPTED, response_model=Dict[str, str])
-async def trigger_ingestion(request: IngestRequest) -> Dict[str, str]:
+@app.post("/ingest", status_code=status.HTTP_202_ACCEPTED, response_model=dict[str, str])
+async def trigger_ingestion(request: IngestRequest) -> dict[str, str]:
     """Asynchronously triggers the ingestion and acquisition of a Sentinel-1 product.
 
     Args:
@@ -32,8 +44,8 @@ async def trigger_ingestion(request: IngestRequest) -> Dict[str, str]:
     )
 
 
-@app.get("/status/{job_id}", response_model=Dict[str, Any])
-async def get_ingestion_status(job_id: str) -> Dict[str, Any]:
+@app.get("/status/{job_id}", response_model=dict[str, Any])
+async def get_ingestion_status(job_id: str) -> dict[str, Any]:
     """Retrieves progress status of a running/scheduled ingestion job.
 
     Args:
@@ -48,10 +60,8 @@ async def get_ingestion_status(job_id: str) -> Dict[str, Any]:
     )
 
 
-@app.get("/products", response_model=List[Dict[str, Any]])
-async def list_available_products(
-    bbox: str, date_start: str, date_end: str
-) -> List[Dict[str, Any]]:
+@app.get("/products", response_model=list[dict[str, Any]])
+async def list_available_products(bbox: str, date_start: str, date_end: str) -> list[dict[str, Any]]:
     """Lists Sentinel-1 products matching search criteria from Copernicus Data Space.
 
     Args:
@@ -68,8 +78,8 @@ async def list_available_products(
     )
 
 
-@app.get("/health", response_model=Dict[str, str])
-async def health_check() -> Dict[str, str]:
+@app.get("/health", response_model=dict[str, str])
+async def health_check() -> dict[str, str]:
     """Service health check endpoint.
 
     Returns:

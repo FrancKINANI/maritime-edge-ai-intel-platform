@@ -2,11 +2,10 @@
 """Generate visual samples of SAR tiles to verify preprocessing quality."""
 
 import json
-import shutil
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
 # Paths (one level up from scripts/ to phase0/)
 DATA_DIR = Path(__file__).parent.parent / "data"
@@ -61,7 +60,11 @@ def create_annotated_png(npy_path: str, output_path: Path, tile_info: dict, anno
                 y2 = int((y_center + h / 2) * tile_size)
                 # Different colors per label
                 label = ann.get("label", "unknown")
-                color = {"AIS_confirmed": (0, 255, 0), "visual_only": (255, 255, 0), "dark_vessel_candidate": (255, 0, 0)}.get(label, (255, 255, 255))
+                color = {
+                    "AIS_confirmed": (0, 255, 0),
+                    "visual_only": (255, 255, 0),
+                    "dark_vessel_candidate": (255, 0, 0),
+                }.get(label, (255, 255, 255))
                 draw.rectangle([x1, y1, x2, y2], outline=color, width=2)
                 draw.text((x1 + 2, y1 + 2), label, fill=color)
 
@@ -257,27 +260,27 @@ def generate_html(scenes_data: list[dict]) -> str:
     for sd in scenes_data:
         html += f"""
 <div class="scene-section">
-  <div class="scene-title">📡 {sd['scene_id'][:50]}…</div>
+  <div class="scene-title">📡 {sd["scene_id"][:50]}…</div>
   <div class="scene-meta">
-    <span class="badge"><strong>Tuiles:</strong> {sd['n_tiles']:,}</span>
-    <span class="badge"><strong>Annotations:</strong> {sd['n_annotations']:,}</span>
-    <span class="badge"><strong>Tuiles annotées:</strong> {sd['n_annotated_tiles']}</span>
-    <span class="badge"><strong>AIS seeds:</strong> {sd['ais_seeds']}</span>
-    <span class="badge"><strong>BBox:</strong> {sd['bbox']}</span>
+    <span class="badge"><strong>Tuiles:</strong> {sd["n_tiles"]:,}</span>
+    <span class="badge"><strong>Annotations:</strong> {sd["n_annotations"]:,}</span>
+    <span class="badge"><strong>Tuiles annotées:</strong> {sd["n_annotated_tiles"]}</span>
+    <span class="badge"><strong>AIS seeds:</strong> {sd["ais_seeds"]}</span>
+    <span class="badge"><strong>BBox:</strong> {sd["bbox"]}</span>
   </div>
   <div class="tile-grid">
 """
         for tile in sd["samples"]:
             img_src = tile["img_rel"]
             has_ann = tile["n_annotations"] > 0
-            ann_label = f'{tile["n_annotations"]} annotation(s)' if has_ann else "Aucune"
+            ann_label = f"{tile['n_annotations']} annotation(s)" if has_ann else "Aucune"
             ann_class = "annotation-badge" if has_ann else "no-annotation"
             lon_min, lat_min, lon_max, lat_max = tile["geo_bbox"]
             html += f"""
     <div class="tile-card" onclick="openLightbox('{img_src}')">
-      <img src="{img_src}" alt="{tile['tile_id'][:60]}…" loading="lazy">
+      <img src="{img_src}" alt="{tile["tile_id"][:60]}…" loading="lazy">
       <div class="tile-info">
-        <div class="tile-id">{tile['tile_id'][:50]}…</div>
+        <div class="tile-id">{tile["tile_id"][:50]}…</div>
         <div>📌 {lat_min:.3f}°N, {lon_min:.3f}°E</div>
         <span class="{ann_class}">{ann_label}</span>
       </div>
@@ -334,10 +337,12 @@ def main():
                         if len(parts) == 5:
                             cls_id, xc, yc, w, h = parts
                             label_map = {"0": "AIS_confirmed", "1": "visual_only", "2": "dark_vessel_candidate"}
-                            annotations.append({
-                                "label": label_map.get(cls_id, "unknown"),
-                                "bbox_yolo": [float(xc), float(yc), float(w), float(h)],
-                            })
+                            annotations.append(
+                                {
+                                    "label": label_map.get(cls_id, "unknown"),
+                                    "bbox_yolo": [float(xc), float(yc), float(w), float(h)],
+                                }
+                            )
                 if annotations:
                     ann_lookup[tile_id] = annotations
 
@@ -376,22 +381,26 @@ def main():
             annotations = ann_lookup.get(tid, [])
             create_annotated_png(npy_path, img_path, tile, annotations if annotations else None)
 
-            scene_samples.append({
-                "tile_id": tid,
-                "img_rel": f"images/{img_name}",
-                "n_annotations": len(annotations),
-                "geo_bbox": tile["geo_bbox"],
-            })
+            scene_samples.append(
+                {
+                    "tile_id": tid,
+                    "img_rel": f"images/{img_name}",
+                    "n_annotations": len(annotations),
+                    "geo_bbox": tile["geo_bbox"],
+                }
+            )
 
-        scenes_data.append({
-            "scene_id": scene_id,
-            "n_tiles": len(tiles),
-            "n_annotations": sum(len(a) for a in ann_lookup.values()),
-            "n_annotated_tiles": len(ann_lookup),
-            "ais_seeds": report.get("ais_presence_seeds", 0) if report else 0,
-            "bbox": report.get("traceability", {}).get("target_cell_bbox", "N/A") if report else "N/A",
-            "samples": scene_samples,
-        })
+        scenes_data.append(
+            {
+                "scene_id": scene_id,
+                "n_tiles": len(tiles),
+                "n_annotations": sum(len(a) for a in ann_lookup.values()),
+                "n_annotated_tiles": len(ann_lookup),
+                "ais_seeds": report.get("ais_presence_seeds", 0) if report else 0,
+                "bbox": report.get("traceability", {}).get("target_cell_bbox", "N/A") if report else "N/A",
+                "samples": scene_samples,
+            }
+        )
 
         print(f"  → {len(scene_samples)} samples generated")
 

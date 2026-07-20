@@ -54,7 +54,7 @@ import logging
 import shutil
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 
@@ -73,9 +73,9 @@ CLASS_NAMES = {
 CLASS_IDS = {v: k for k, v in CLASS_NAMES.items()}
 
 CLASS_COLORS = {
-    0: "#4CAF50",   # AIS_confirmed — green
-    1: "#FF9800",   # visual_only — orange
-    2: "#F44336",   # dark_vessel — red
+    0: "#4CAF50",  # AIS_confirmed — green
+    1: "#FF9800",  # visual_only — orange
+    2: "#F44336",  # dark_vessel — red
 }
 
 PROGRESS_FILE = "_validation_progress.json"
@@ -87,7 +87,7 @@ EXPORT_DIR = "labels_validated"
 # ---------------------------------------------------------------------------
 
 
-def parse_yolo_label(txt_path: Path, img_w: int = 512, img_h: int = 512) -> List[Dict[str, Any]]:
+def parse_yolo_label(txt_path: Path, img_w: int = 512, img_h: int = 512) -> list[dict[str, Any]]:
     """Parse a YOLO .txt label file into a list of annotation dicts with pixel coordinates.
 
     Supports: cls cx cy w h (normalized).
@@ -113,17 +113,25 @@ def parse_yolo_label(txt_path: Path, img_w: int = 512, img_h: int = 512) -> List
         y1 = int(cy - h / 2)
         x2 = int(cx + w / 2)
         y2 = int(cy + h / 2)
-        boxes.append({
-            "class_id": cls_id,
-            "class_name": CLASS_NAMES.get(cls_id, "unknown"),
-            "x1": x1, "y1": y1, "x2": x2, "y2": y2,
-            "cx": cx, "cy": cy, "w": w, "h": h,
-            "status": "pending",
-        })
+        boxes.append(
+            {
+                "class_id": cls_id,
+                "class_name": CLASS_NAMES.get(cls_id, "unknown"),
+                "x1": x1,
+                "y1": y1,
+                "x2": x2,
+                "y2": y2,
+                "cx": cx,
+                "cy": cy,
+                "w": w,
+                "h": h,
+                "status": "pending",
+            }
+        )
     return boxes
 
 
-def boxes_to_yolo(boxes: List[Dict[str, Any]], img_w: int = 512, img_h: int = 512) -> str:
+def boxes_to_yolo(boxes: list[dict[str, Any]], img_w: int = 512, img_h: int = 512) -> str:
     """Convert annotation dicts back to YOLO format string.
 
     Deleted boxes are excluded from output.
@@ -146,7 +154,7 @@ def boxes_to_yolo(boxes: List[Dict[str, Any]], img_w: int = 512, img_h: int = 51
 # ---------------------------------------------------------------------------
 
 
-def load_progress(scene_dir: Path) -> Dict[str, Any]:
+def load_progress(scene_dir: Path) -> dict[str, Any]:
     """Load validation progress JSON from scene directory."""
     prog_path = scene_dir / PROGRESS_FILE
     if prog_path.exists():
@@ -154,7 +162,7 @@ def load_progress(scene_dir: Path) -> Dict[str, Any]:
     return {"completed_tiles": [], "decisions": {}}
 
 
-def save_progress(scene_dir: Path, progress: Dict[str, Any]) -> None:
+def save_progress(scene_dir: Path, progress: dict[str, Any]) -> None:
     """Save validation progress to JSON file."""
     prog_path = scene_dir / PROGRESS_FILE
     prog_path.write_text(json.dumps(progress, indent=2, ensure_ascii=False))
@@ -189,8 +197,8 @@ class ValidationSession:
         self.tile_idx = 0
         self.selected_box = -1
         self.running = True
-        self.current_boxes: List[Dict[str, Any]] = []
-        self.current_img: Optional[np.ndarray] = None
+        self.current_boxes: list[dict[str, Any]] = []
+        self.current_img: np.ndarray | None = None
 
         # Matplotlib figure
         self.fig, self.ax = plt.subplots(figsize=(10, 10))
@@ -201,8 +209,13 @@ class ValidationSession:
 
         # Status bar
         self.status_text = self.fig.text(
-            0.5, 0.01, "", ha="center", va="bottom",
-            fontsize=9, family="monospace",
+            0.5,
+            0.01,
+            "",
+            ha="center",
+            va="bottom",
+            fontsize=9,
+            family="monospace",
             bbox=dict(boxstyle="round,pad=0.3", facecolor="#333", edgecolor="none"),
             color="white",
         )
@@ -241,8 +254,8 @@ class ValidationSession:
             sys.exit(1)
 
         global plt, patches, KeyEvent, MouseButton, MouseEvent
-        import matplotlib.pyplot as plt
         import matplotlib.patches as patches
+        import matplotlib.pyplot as plt
         from matplotlib.backend_bases import KeyEvent, MouseButton, MouseEvent
 
     def run(self):
@@ -324,7 +337,7 @@ class ValidationSession:
             f"Tile {self.tile_idx + 1}/{self.total} — {tile_name[:40]}\n"
             f"Boxes: {active} active ({pending} pending) | "
             f"Validated: {completed}/{self.total} tiles",
-            fontsize=10
+            fontsize=10,
         )
 
         # Draw boxes
@@ -332,11 +345,15 @@ class ValidationSession:
             if b["status"] == "deleted":
                 continue
             color = CLASS_COLORS.get(b["class_id"], "#FFFFFF")
-            is_selected = (i == self.selected_box)
+            is_selected = i == self.selected_box
             lw = 3 if is_selected else 1.5
             rect = patches.Rectangle(
-                (b["x1"], b["y1"]), b["x2"] - b["x1"], b["y2"] - b["y1"],
-                linewidth=lw, edgecolor=color, facecolor="none",
+                (b["x1"], b["y1"]),
+                b["x2"] - b["x1"],
+                b["y2"] - b["y1"],
+                linewidth=lw,
+                edgecolor=color,
+                facecolor="none",
                 alpha=0.9,
             )
             self.ax.add_patch(rect)
@@ -348,15 +365,18 @@ class ValidationSession:
             elif b["status"] == "accepted":
                 tag += " ✅"
             self.ax.text(
-                b["x1"], b["y1"] - 4, tag,
-                fontsize=7, color=color, va="bottom",
+                b["x1"],
+                b["y1"] - 4,
+                tag,
+                fontsize=7,
+                color=color,
+                va="bottom",
                 bbox=dict(boxstyle="round,pad=0.1", facecolor="#222", alpha=0.7, edgecolor="none"),
             )
 
             # Center cross for selected box
             if is_selected:
-                self.ax.plot(b["cx"], b["cy"], marker="+", color="yellow",
-                             markersize=12, mew=2)
+                self.ax.plot(b["cx"], b["cy"], marker="+", color="yellow", markersize=12, mew=2)
 
         self.ax.set_xlim(0, 512)
         self.ax.set_ylim(512, 0)
@@ -420,20 +440,26 @@ class ValidationSession:
             self._draw()
 
         elif key == "e" and self.selected_box >= 0:
-            if self.selected_box < len(self.current_boxes) and \
-                    self.current_boxes[self.selected_box]["status"] != "deleted":
+            if (
+                self.selected_box < len(self.current_boxes)
+                and self.current_boxes[self.selected_box]["status"] != "deleted"
+            ):
                 self.current_boxes[self.selected_box]["status"] = "edited"
                 logger.info("Box #%d marked as 'needs edit'", self.selected_box)
             self._draw()
 
         elif key == "E" and self.selected_box >= 0:
-            if self.selected_box < len(self.current_boxes) and \
-                    self.current_boxes[self.selected_box]["status"] != "deleted":
+            if (
+                self.selected_box < len(self.current_boxes)
+                and self.current_boxes[self.selected_box]["status"] != "deleted"
+            ):
                 self._edit_box_interactive()
 
         elif key in ("1", "2", "3") and self.selected_box >= 0:
-            if self.selected_box < len(self.current_boxes) and \
-                    self.current_boxes[self.selected_box]["status"] != "deleted":
+            if (
+                self.selected_box < len(self.current_boxes)
+                and self.current_boxes[self.selected_box]["status"] != "deleted"
+            ):
                 new_cls = int(key) - 1
                 self.current_boxes[self.selected_box]["class_id"] = new_cls
                 self.current_boxes[self.selected_box]["class_name"] = CLASS_NAMES[new_cls]
@@ -495,9 +521,7 @@ class ValidationSession:
             return
         box = self.current_boxes[self.selected_box]
 
-        self.status_text.set_text(
-            "🖱️  Click two opposite corners for the new box  |  [Esc]=cancel"
-        )
+        self.status_text.set_text("🖱️  Click two opposite corners for the new box  |  [Esc]=cancel")
         self.fig.canvas.draw_idle()
 
         corners = []
@@ -544,8 +568,7 @@ class ValidationSession:
             box["w"] = x2n - x1n
             box["h"] = y2n - y1n
             box["status"] = "edited"
-            logger.info("Box #%d edited: (%d,%d)-(%d,%d)",
-                        self.selected_box, x1n, y1n, x2n, y2n)
+            logger.info("Box #%d edited: (%d,%d)-(%d,%d)", self.selected_box, x1n, y1n, x2n, y2n)
 
         self._draw()
 
@@ -603,8 +626,7 @@ def export_validated(scene_dir: Path) -> None:
         shutil.copy2(png_path, export_images / png_path.name)
         exported += 1
 
-    logger.info("Export complete: %d tiles exported, %d skipped (not validated)",
-                exported, skipped)
+    logger.info("Export complete: %d tiles exported, %d skipped (not validated)", exported, skipped)
     logger.info("  Labels: %s", export_labels)
     logger.info("  Images: %s", export_images)
 
@@ -726,39 +748,46 @@ def generate_report(scene_dir: Path, output_path: Path) -> None:
             f'<div class="tile-card {status_class}">'
             f'<img src="{rel_img_path}" loading="lazy" alt="{tile_name}">'
             '<div class="info">'
-            f'<b>{tile_name[:30]}...</b> {"✅" if is_validated else "⏳"}'
-            f' {" ".join(badges) if badges else " <i>no boxes</i>"}'
+            f"<b>{tile_name[:30]}...</b> {'✅' if is_validated else '⏳'}"
+            f" {' '.join(badges) if badges else ' <i>no boxes</i>'}"
             "</div></div>"
         )
 
     # Stats cards
-    html_parts.extend([
-        '<div class="stats">',
-        f'<div class="stat-card"><div class="num">{tiles_validated}/{total_tiles}</div>Tiles validated</div>',
-        f'<div class="stat-card"><div class="num">{total_boxes}</div>Total boxes</div>',
-        f'<div class="stat-card"><div class="num">{accepted_count}</div>Accepted ✅</div>',
-        f'<div class="stat-card"><div class="num">{edited_count}</div>Edited ✏️</div>',
-        f'<div class="stat-card"><div class="num">{deleted_count}</div>Deleted 🗑️</div>',
-        "</div>",
-        '<div class="tile-grid">',
-        *html_tiles,
-        "</div>",
-        "<script>",
-        "document.querySelectorAll('.tile-card').forEach(c => {",
-        "  c.style.cursor = 'pointer';",
-        "  c.onclick = function() {",
-        "    const img = this.querySelector('img');",
-        "    window.open(img.src, '_blank', 'width=512,height=512');",
-        "  }",
-        "});",
-        "</script></body></html>",
-    ])
+    html_parts.extend(
+        [
+            '<div class="stats">',
+            f'<div class="stat-card"><div class="num">{tiles_validated}/{total_tiles}</div>Tiles validated</div>',
+            f'<div class="stat-card"><div class="num">{total_boxes}</div>Total boxes</div>',
+            f'<div class="stat-card"><div class="num">{accepted_count}</div>Accepted ✅</div>',
+            f'<div class="stat-card"><div class="num">{edited_count}</div>Edited ✏️</div>',
+            f'<div class="stat-card"><div class="num">{deleted_count}</div>Deleted 🗑️</div>',
+            "</div>",
+            '<div class="tile-grid">',
+            *html_tiles,
+            "</div>",
+            "<script>",
+            "document.querySelectorAll('.tile-card').forEach(c => {",
+            "  c.style.cursor = 'pointer';",
+            "  c.onclick = function() {",
+            "    const img = this.querySelector('img');",
+            "    window.open(img.src, '_blank', 'width=512,height=512');",
+            "  }",
+            "});",
+            "</script></body></html>",
+        ]
+    )
 
     output_path.write_text("\n".join(html_parts))
     logger.info("Report generated: %s", output_path)
     logger.info("  Tiles: %d (%d validated)", total_tiles, tiles_validated)
-    logger.info("  Boxes: %d total, %d accepted, %d edited, %d deleted",
-                total_boxes, accepted_count, edited_count, deleted_count)
+    logger.info(
+        "  Boxes: %d total, %d accepted, %d edited, %d deleted",
+        total_boxes,
+        accepted_count,
+        edited_count,
+        deleted_count,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -789,23 +818,32 @@ def main():
         description="CVAT Fallback Validator — interactive annotation validation for AIS labels",
     )
     parser.add_argument(
-        "--scene", type=Path, required=True,
+        "--scene",
+        type=Path,
+        required=True,
         help="Path to scene directory (e.g. phase0/data/cvat_annotated_only/S1D_20260716)",
     )
     parser.add_argument(
-    "--resume", action="store_true",
-    help="Resume an interrupted validation session (auto-detected by default)",
+        "--resume",
+        action="store_true",
+        help="Resume an interrupted validation session (auto-detected by default)",
     )
     parser.add_argument(
-        "--export-only", action="store_true",
+        "--export-only",
+        action="store_true",
         help="Export validated labels without launching the interactive GUI",
     )
     parser.add_argument(
-        "--generate-report", type=Path, default=None, metavar="OUTPUT.html",
+        "--generate-report",
+        type=Path,
+        default=None,
+        metavar="OUTPUT.html",
         help="Generate a static HTML overview of all tiles (no GUI needed)",
     )
     parser.add_argument(
-        "-v", "--verbose", action="store_true",
+        "-v",
+        "--verbose",
+        action="store_true",
         help="Verbose logging",
     )
 
@@ -838,6 +876,7 @@ def main():
     if args.generate_report:
         # Use Agg backend for batch mode — no GUI needed
         import matplotlib
+
         matplotlib.use("Agg")
         generate_report(args.scene, args.generate_report)
     elif args.export_only:

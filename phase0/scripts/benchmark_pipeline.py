@@ -16,7 +16,7 @@ Known limitations:
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 from PIL import Image
@@ -40,7 +40,7 @@ NMS_IOU_THRESHOLD = 0.5  # IoU threshold for Non-Maximum Suppression
 # ---------------------------------------------------------------------------
 
 
-def compute_iou(box1: List[float], box2: List[float]) -> float:
+def compute_iou(box1: list[float], box2: list[float]) -> float:
     """Compute IoU between two bounding boxes in YOLO format [cx, cy, w, h]."""
     # Convert YOLO to corner format [x1, y1, x2, y2]
     b1_x1 = box1[0] - box1[2] / 2
@@ -76,30 +76,31 @@ def compute_iou(box1: List[float], box2: List[float]) -> float:
 # ---------------------------------------------------------------------------
 
 
-def load_ground_truth(annotations_dir: str) -> Dict[str, List[Dict[str, Any]]]:
+def load_ground_truth(annotations_dir: str) -> dict[str, list[dict[str, Any]]]:
     """Load YOLO format ground truth annotations."""
     labels_dir = Path(annotations_dir)
     if not labels_dir.exists():
         raise FileNotFoundError(f"Annotations directory not found: {labels_dir}")
 
-    ground_truth: Dict[str, List[Dict[str, Any]]] = {}
+    ground_truth: dict[str, list[dict[str, Any]]] = {}
     for label_file in sorted(labels_dir.glob("*.txt")):
         tile_id = label_file.stem
         boxes = []
-        with open(label_file, "r") as f:
+        with open(label_file) as f:
             for line in f:
                 parts = line.strip().split()
                 if len(parts) == 5:
                     class_id = int(parts[0])
                     cx, cy, w, h = map(float, parts[1:5])
-                    boxes.append({
-                        "class_id": class_id,
-                        "bbox": [cx, cy, w, h],
-                    })
+                    boxes.append(
+                        {
+                            "class_id": class_id,
+                            "bbox": [cx, cy, w, h],
+                        }
+                    )
         ground_truth[tile_id] = boxes
 
-    logger.info(f"Loaded ground truth: {len(ground_truth)} tiles, "
-                f"{sum(len(v) for v in ground_truth.values())} boxes")
+    logger.info(f"Loaded ground truth: {len(ground_truth)} tiles, {sum(len(v) for v in ground_truth.values())} boxes")
     return ground_truth
 
 
@@ -108,7 +109,7 @@ def load_ground_truth(annotations_dir: str) -> Dict[str, List[Dict[str, Any]]]:
 # ---------------------------------------------------------------------------
 
 
-def nms_suppress(detections: List[Dict[str, Any]], iou_threshold: float = NMS_IOU_THRESHOLD) -> List[Dict[str, Any]]:
+def nms_suppress(detections: list[dict[str, Any]], iou_threshold: float = NMS_IOU_THRESHOLD) -> list[dict[str, Any]]:
     """Apply Non-Maximum Suppression to remove duplicate boxes for the same vessel.
 
     Sorts by confidence descending, keeps the highest-confidence box, and removes
@@ -133,20 +134,17 @@ def nms_suppress(detections: List[Dict[str, Any]], iou_threshold: float = NMS_IO
         best = sorted_dets.pop(0)
         kept.append(best)
         # Remove any remaining detection with IoU > threshold against the kept one
-        sorted_dets = [
-            d for d in sorted_dets
-            if compute_iou(best["bbox"], d["bbox"]) < iou_threshold
-        ]
+        sorted_dets = [d for d in sorted_dets if compute_iou(best["bbox"], d["bbox"]) < iou_threshold]
 
     return kept
 
 
 def run_inference(
-    tiles: List[Any],
+    tiles: list[Any],
     model_path: str,
     conf_threshold: float = 0.25,
     log_raw_first_n: int = 10,
-) -> Dict[str, List[Dict[str, Any]]]:
+) -> dict[str, list[dict[str, Any]]]:
     """Run ONNX Runtime INT8 model inference over the generated tiles.
 
     NOTE: Requires the Phase I ONNX model (yolov8n_int8.onnx).
@@ -192,7 +190,7 @@ def run_inference(
     input_name = session.get_inputs()[0].name
     input_size = MODEL_INPUT_SIZE
 
-    predictions: Dict[str, List[Dict[str, Any]]] = {}
+    predictions: dict[str, list[dict[str, Any]]] = {}
     for tile_idx, item in enumerate(tiles):
         if isinstance(item, tuple):
             tile_id, npy_path = item
@@ -242,18 +240,21 @@ def run_inference(
                     cy_norm = float(cy) / float(input_size)
                     w_norm = float(w) / float(input_size)
                     h_norm = float(h) / float(input_size)
-                    tile_preds.append({
-                        "bbox": [cx_norm, cy_norm, w_norm, h_norm],
-                        "confidence": float(conf),
-                        "class_id": 0,  # single class (vessel)
-                    })
+                    tile_preds.append(
+                        {
+                            "bbox": [cx_norm, cy_norm, w_norm, h_norm],
+                            "confidence": float(conf),
+                            "class_id": 0,  # single class (vessel)
+                        }
+                    )
 
         # Apply NMS to remove duplicate detections for the same vessel
         tile_preds = nms_suppress(tile_preds)
         predictions[tile_id] = tile_preds
 
-    logger.info(f"Inference complete: {sum(len(v) for v in predictions.values())} detections "
-                f"across {len(predictions)} tiles")
+    logger.info(
+        f"Inference complete: {sum(len(v) for v in predictions.values())} detections across {len(predictions)} tiles"
+    )
     return predictions
 
 
@@ -262,8 +263,9 @@ def run_inference(
 # ---------------------------------------------------------------------------
 
 
-def compute_metrics(predictions: Dict[str, List[Dict[str, Any]]],
-                    ground_truth: Dict[str, List[Dict[str, Any]]]) -> Dict[str, float]:
+def compute_metrics(
+    predictions: dict[str, list[dict[str, Any]]], ground_truth: dict[str, list[dict[str, Any]]]
+) -> dict[str, float]:
     """Calculate evaluation metrics (Precision, Recall, mAP@0.5).
 
     Args:
@@ -321,8 +323,7 @@ def compute_metrics(predictions: Dict[str, List[Dict[str, Any]]],
 # ---------------------------------------------------------------------------
 
 
-def compute_ks_distance(tiles: Dict[str, List[Dict[str, Any]]],
-                        reference_dataset: Optional[str] = None) -> float:
+def compute_ks_distance(tiles: dict[str, list[dict[str, Any]]], reference_dataset: str | None = None) -> float:
     """Calculate Kolmogorov-Smirnov distance between intensity distributions.
 
     Evaluates covariate shift by comparing pixel intensity distributions
@@ -337,10 +338,9 @@ def compute_ks_distance(tiles: Dict[str, List[Dict[str, Any]]],
         KS test statistic (max inter-pipeline distance).
     """
     if reference_dataset:
-        logger.warning("Reference dataset comparison not implemented yet. "
-                       "KS test is inter-pipelines only.")
+        logger.warning("Reference dataset comparison not implemented yet. KS test is inter-pipelines only.")
 
-    samples: Dict[str, List[float]] = {}
+    samples: dict[str, list[float]] = {}
     for pipeline, tile_list in tiles.items():
         pixels = []
         for tile_path in tile_list:
@@ -355,7 +355,7 @@ def compute_ks_distance(tiles: Dict[str, List[Dict[str, Any]]],
     max_ks = 0.0
     pipeline_names = list(samples.keys())
     for i, p1 in enumerate(pipeline_names):
-        for p2 in pipeline_names[i + 1:]:
+        for p2 in pipeline_names[i + 1 :]:
             s, pv = ks_2samp(samples[p1], samples[p2])
             max_ks = max(max_ks, s)
             logger.info(f"KS({p1}, {p2}) = {s:.4f} (p={pv:.4e})")
@@ -368,9 +368,9 @@ def compute_ks_distance(tiles: Dict[str, List[Dict[str, Any]]],
 # ---------------------------------------------------------------------------
 
 
-def load_metadata(metadata_path: str) -> Dict[str, Any]:
+def load_metadata(metadata_path: str) -> dict[str, Any]:
     """Load tile metadata from a JSON file."""
-    with open(metadata_path, "r") as f:
+    with open(metadata_path) as f:
         return json.load(f)
 
 
@@ -379,8 +379,7 @@ def load_metadata(metadata_path: str) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def benchmark_all_pipelines(metadata_path: str, gt_path: str,
-                            model_path: str) -> Dict[str, Any]:
+def benchmark_all_pipelines(metadata_path: str, gt_path: str, model_path: str) -> dict[str, Any]:
     """Run performance benchmarks across the 4 pre-processing pipelines (A/B/C/D).
 
     Args:
@@ -411,20 +410,17 @@ def benchmark_all_pipelines(metadata_path: str, gt_path: str,
     gt_tile_ids = set(ground_truth.keys())
 
     # Collect tiles per pipeline (only annotated tiles for evaluation)
-    tiles_by_pipeline: Dict[str, List[str]] = {}
+    tiles_by_pipeline: dict[str, list[str]] = {}
     for p in PIPELINES:
         pipeline_dir = scene_root / p
         all_npy = sorted(pipeline_dir.glob("*.npy"))
         # Restrict to annotated tiles so load count matches GT tile count
         tile_files = [f for f in all_npy if f.stem in gt_tile_ids]
         tiles_by_pipeline[p] = [str(f) for f in tile_files]
-        logger.info(
-            f"Pipeline {p}: {len(tile_files)} annotated tiles "
-            f"(of {len(all_npy)} npy) from {pipeline_dir}"
-        )
+        logger.info(f"Pipeline {p}: {len(tile_files)} annotated tiles (of {len(all_npy)} npy) from {pipeline_dir}")
 
     # Run inference per pipeline
-    predictions_by_pipeline: Dict[str, Dict[str, List[Dict[str, Any]]]] = {}
+    predictions_by_pipeline: dict[str, dict[str, list[dict[str, Any]]]] = {}
     for p in PIPELINES:
         tile_paths = tiles_by_pipeline.get(p, [])
         if not tile_paths:
@@ -435,14 +431,14 @@ def benchmark_all_pipelines(metadata_path: str, gt_path: str,
         predictions_by_pipeline[p] = run_inference(tile_items, model_path)
 
     # Compute metrics per pipeline
-    metrics_results: Dict[str, Dict[str, Any]] = {}
+    metrics_results: dict[str, dict[str, Any]] = {}
     for p in PIPELINES:
         preds = predictions_by_pipeline.get(p, {})
         metrics = compute_metrics(preds, ground_truth)
         metrics_results[p] = metrics
-        logger.info(f"Pipeline {p}: P={metrics['precision']:.3f}, "
-                    f"R={metrics['recall']:.3f}, "
-                    f"mAP@0.5={metrics['mAP@0.5']:.3f}")
+        logger.info(
+            f"Pipeline {p}: P={metrics['precision']:.3f}, R={metrics['recall']:.3f}, mAP@0.5={metrics['mAP@0.5']:.3f}"
+        )
 
     # KS test (inter-pipeline)
     ks_result = compute_ks_distance(tiles_by_pipeline)
@@ -471,7 +467,7 @@ def benchmark_all_pipelines(metadata_path: str, gt_path: str,
 # ---------------------------------------------------------------------------
 
 
-def export_results(results: Dict[str, Any], output_dir: str) -> Dict[str, str]:
+def export_results(results: dict[str, Any], output_dir: str) -> dict[str, str]:
     """Export benchmark findings to JSON and CSV formats.
 
     Args:
@@ -492,9 +488,17 @@ def export_results(results: Dict[str, Any], output_dir: str) -> Dict[str, str]:
     # CSV export (flat table of metrics per pipeline)
     csv_path = output_path / f"benchmark_{results['scene_id']}.csv"
     import csv
+
     with open(csv_path, "w", newline="") as f:
-        fieldnames = ["pipeline", "precision", "recall", "mAP@0.5",
-                      "true_positives", "false_positives", "false_negatives"]
+        fieldnames = [
+            "pipeline",
+            "precision",
+            "recall",
+            "mAP@0.5",
+            "true_positives",
+            "false_positives",
+            "false_negatives",
+        ]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         for pipeline, metrics in results.get("metrics_by_pipeline", {}).items():
@@ -514,33 +518,23 @@ def export_results(results: Dict[str, Any], output_dir: str) -> Dict[str, str]:
 def main() -> None:
     import argparse
 
-    parser = argparse.ArgumentParser(
-        description="Pipeline benchmarking and domain shift evaluation"
+    parser = argparse.ArgumentParser(description="Pipeline benchmarking and domain shift evaluation")
+    parser.add_argument("--metadata", required=True, help="Path to scene metadata.json")
+    parser.add_argument("--ground-truth", required=True, help="Directory with YOLO label .txt files")
+    parser.add_argument(
+        "--model",
+        default="shared/models/yolov8n_int8.onnx",
+        help="Path to ONNX model (default: shared/models/yolov8n_int8.onnx)",
     )
     parser.add_argument(
-        "--metadata", required=True, help="Path to scene metadata.json"
-    )
-    parser.add_argument(
-        "--ground-truth", required=True, help="Directory with YOLO label .txt files"
-    )
-    parser.add_argument(
-        "--model", default="shared/models/yolov8n_int8.onnx",
-        help="Path to ONNX model (default: shared/models/yolov8n_int8.onnx)"
-    )
-    parser.add_argument(
-        "--output-dir", default=None,
-        help="Output directory for results (default: phase0/data/results/)"
+        "--output-dir", default=None, help="Output directory for results (default: phase0/data/results/)"
     )
 
     args = parser.parse_args()
 
-    output_dir = args.output_dir or str(
-        Path(__file__).parent / "data" / "results"
-    )
+    output_dir = args.output_dir or str(Path(__file__).parent / "data" / "results")
 
-    results = benchmark_all_pipelines(
-        args.metadata, args.ground_truth, args.model
-    )
+    results = benchmark_all_pipelines(args.metadata, args.ground_truth, args.model)
     export_results(results, output_dir)
 
     logger.info("Benchmark complete.")

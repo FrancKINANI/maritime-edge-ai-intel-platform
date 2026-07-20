@@ -36,13 +36,12 @@ import logging
 import mimetypes
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-from urllib.parse import quote, unquote
+from typing import Any
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, Response
 
 logger = logging.getLogger("annotation_server")
 
@@ -69,7 +68,7 @@ PROGRESS_FILE = "_validation_progress.json"
 # ---------------------------------------------------------------------------
 
 
-def parse_yolo_label(txt_path: Path, img_w: int = 512, img_h: int = 512) -> List[Dict[str, Any]]:
+def parse_yolo_label(txt_path: Path, img_w: int = 512, img_h: int = 512) -> list[dict[str, Any]]:
     """Parse a YOLO .txt file into annotation dicts with pixel coordinates."""
     boxes = []
     if not txt_path.exists():
@@ -86,19 +85,21 @@ def parse_yolo_label(txt_path: Path, img_w: int = 512, img_h: int = 512) -> List
         cy = float(parts[2]) * img_h
         w = float(parts[3]) * img_w
         h = float(parts[4]) * img_h
-        boxes.append({
-            "class_id": cls_id,
-            "class_name": CLASS_NAMES.get(cls_id, "unknown"),
-            "x1": int(cx - w / 2),
-            "y1": int(cy - h / 2),
-            "x2": int(cx + w / 2),
-            "y2": int(cy + h / 2),
-            "status": "pending",
-        })
+        boxes.append(
+            {
+                "class_id": cls_id,
+                "class_name": CLASS_NAMES.get(cls_id, "unknown"),
+                "x1": int(cx - w / 2),
+                "y1": int(cy - h / 2),
+                "x2": int(cx + w / 2),
+                "y2": int(cy + h / 2),
+                "status": "pending",
+            }
+        )
     return boxes
 
 
-def load_progress(scene_dir: Path) -> Dict[str, Any]:
+def load_progress(scene_dir: Path) -> dict[str, Any]:
     """Load validation progress from JSON."""
     prog_path = scene_dir / PROGRESS_FILE
     if prog_path.exists():
@@ -106,7 +107,7 @@ def load_progress(scene_dir: Path) -> Dict[str, Any]:
     return {"completed_tiles": [], "decisions": {}}
 
 
-def save_progress(scene_dir: Path, progress: Dict[str, Any]) -> None:
+def save_progress(scene_dir: Path, progress: dict[str, Any]) -> None:
     """Save validation progress to JSON."""
     prog_path = scene_dir / PROGRESS_FILE
     prog_path.write_text(json.dumps(progress, indent=2, ensure_ascii=False))
@@ -153,12 +154,14 @@ def create_app(data_root: Path) -> FastAPI:
             if png_count == 0:
                 continue
             progress = load_progress(d)
-            scenes.append({
-                "id": d.name,
-                "name": d.name,
-                "tile_count": png_count,
-                "validated": len(progress.get("completed_tiles", [])),
-            })
+            scenes.append(
+                {
+                    "id": d.name,
+                    "name": d.name,
+                    "tile_count": png_count,
+                    "validated": len(progress.get("completed_tiles", [])),
+                }
+            )
         return {"scenes": scenes}
 
     # ------------------------------------------------------------------
@@ -195,11 +198,13 @@ def create_app(data_root: Path) -> FastAPI:
                         b["class_id"] = saved.get("class_id", b["class_id"])
                         b["class_name"] = CLASS_NAMES.get(b["class_id"], "unknown")
 
-            tiles.append({
-                "id": tile_id,
-                "validated": tile_id in completed,
-                "boxes": boxes,
-            })
+            tiles.append(
+                {
+                    "id": tile_id,
+                    "validated": tile_id in completed,
+                    "boxes": boxes,
+                }
+            )
 
         total_validated = len(completed)
         return {
@@ -236,7 +241,7 @@ def create_app(data_root: Path) -> FastAPI:
 
     class DecisionRequest(BaseModel):
         validated: bool
-        boxes: List[Dict[str, Any]]
+        boxes: list[dict[str, Any]]
 
     from pydantic import BaseModel  # noqa
 
@@ -315,20 +320,27 @@ def main():
         description="Annotation Server — Web-based AIS annotation validation tool",
     )
     parser.add_argument(
-        "--data", type=Path,
+        "--data",
+        type=Path,
         default=Path("phase0/data/cvat_annotated_only"),
         help="Path to annotated-only dataset (default: phase0/data/cvat_annotated_only)",
     )
     parser.add_argument(
-        "--port", type=int, default=8765,
+        "--port",
+        type=int,
+        default=8765,
         help="Server port (default: 8765)",
     )
     parser.add_argument(
-        "--host", type=str, default="0.0.0.0",
+        "--host",
+        type=str,
+        default="0.0.0.0",
         help="Bind address (default: 0.0.0.0)",
     )
     parser.add_argument(
-        "-v", "--verbose", action="store_true",
+        "-v",
+        "--verbose",
+        action="store_true",
         help="Verbose logging",
     )
     args = parser.parse_args()

@@ -24,20 +24,11 @@ def test_gcp_interpolation_zero_error_at_control_points():
     # Create a simple regular grid (simulating GCP structure)
     lines = np.array([0, 10, 20, 30])
     pixels = np.array([0, 10, 20, 30])
-    values = np.array([
-        [1.0, 2.0, 3.0, 4.0],
-        [5.0, 6.0, 7.0, 8.0],
-        [9.0, 10.0, 11.0, 12.0],
-        [13.0, 14.0, 15.0, 16.0]
-    ])
+    values = np.array([[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0], [9.0, 10.0, 11.0, 12.0], [13.0, 14.0, 15.0, 16.0]])
 
     # Configure interpolator exactly as in phase0/scripts/sar_preprocessing.py
     interpolator = RegularGridInterpolator(
-        (lines, pixels),
-        values,
-        method='linear',
-        bounds_error=False,
-        fill_value=None
+        (lines, pixels), values, method="linear", bounds_error=False, fill_value=None
     )
 
     # Test at each control point - should have EXACTLY zero error
@@ -50,8 +41,9 @@ def test_gcp_interpolation_zero_error_at_control_points():
             max_error = max(max_error, error)
 
             # Assert exact equality at control points (machine precision)
-            assert np.isclose(interpolated, expected, rtol=0, atol=1e-10), \
+            assert np.isclose(interpolated, expected, rtol=0, atol=1e-10), (
                 f"Interpolation error at GCP ({line}, {pixel}): {interpolated} != {expected}"
+            )
 
     print(f"Maximum interpolation error at control points: {max_error}")
     assert max_error < 1e-9, f"Maximum error {max_error} exceeds tolerance"
@@ -66,16 +58,12 @@ def test_gcp_interpolation_boundary_extrapolates_without_bounds_error():
     """
     lines = np.array([0, 10, 20])
     pixels = np.array([0, 10, 20])
-    values = np.array([
-        [1.0, 2.0, 3.0],
-        [4.0, 5.0, 6.0],
-        [7.0, 8.0, 9.0]
-    ])
+    values = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])
 
     interpolator = RegularGridInterpolator(
         (lines, pixels),
         values,
-        method='linear',
+        method="linear",
         bounds_error=False,
         fill_value=None,
     )

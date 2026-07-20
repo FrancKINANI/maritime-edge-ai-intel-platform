@@ -132,6 +132,32 @@ The failure is **total and universal** under tested conditions (2 scenes, 2 week
 
 **In other words:** the problem is not in preprocessing, it's in the **model weights**, which have never seen real SAR ships.
 
+### 4.4 S1C vs S1D platform comparison
+
+After Phase 0 closure, additional Sentinel-1C (S1C) scenes were downloaded alongside existing S1D scenes. Since these two platforms share the same SAR mode (IW GRD) but differ in sensor hardware and calibration, a statistical comparison of their pixel intensity distributions was performed to validate the decision to mix them in a single fine-tuning dataset.
+
+**Methodology:**
+- Both platforms processed through **Pipeline D** (σ⁰+Lee+log+histeq)
+- **Empty tiles only** (9,155 S1C tiles + 17,706 S1D tiles, excluding all AIS-annotated tiles)
+- Compared via **two-sample KS test** and **Cohen's d** effect size
+- Reservoir sampling (200,000 pixels per platform) for computational tractability
+
+**Results:**
+
+| Metric | S1C | S1D | Difference |
+|--------|:---:|:---:|:----------:|
+| Mean ± Std | 128.975 ± 73.307 | 129.029 ± 73.349 | **−0.054** |
+| Median | 130.0 | 130.0 | **0.0** |
+| P5 / P95 | 13.0 / 242.0 | 13.0 / 242.0 | **Identical** |
+| KS statistic | — | — | **0.00228** |
+| KS p-value | — | — | **0.675** (not significant) |
+| Mann-Whitney U p-value | — | — | **0.322** (not significant) |
+| Cohen's d | — | — | **−0.0007** (negligible) |
+
+**Verdict: S1C and S1D are statistically indistinguishable** after Pipeline D preprocessing. The platform-stratified split (Option B — mixing S1C and S1D tiles with 70/15/15 geographic split per platform) is **well-founded**. Any residual radiometric difference between the two satellite generations is orders of magnitude smaller than the domain shift between simulated and real SAR that Phase 0 documented.
+
+This verification was implemented as `phase0/scripts/compare_platform_distributions.py`, using memory-efficient streaming (Welford's online algorithm + reservoir sampling) to process ~6.9 billion pixels without OOM.
+
 ---
 
 ## 5. Fine-Tuning Cost-Benefit Analysis
@@ -294,6 +320,7 @@ Thresholds: mAP@0.5 > 0.70 → GO Phase 1
 | 2026-07-18 | v3 | GT land/water validation, random baseline, statistical significance. FP32 pipeline tested |
 | **2026-07-19** | **v4** | Final closure document: 8 hypotheses summary, 4-pipeline benchmark + FP32, scope, CVAT + fine-tuning roadmap. A/B/C pipelines generated and benchmarked |
 | **2026-07-19** | **v5** | **CVAT skipped** — AIS used as direct Ground Truth (0% land verified, reliable GPS positions). Revised roadmap: export Colab → fine-tuning → evaluation → Phase 1. Notebook and export ZIP created |
+| **2026-07-21** | **v6** | **S1C vs S1D platform comparison** added (Section 4.4). KS=0.00228, p=0.675, Cohen's d=−0.0007 — platforms statistically indistinguishable, stratified split validated. Script: `compare_platform_distributions.py` |
 
 ---
 

@@ -14,28 +14,30 @@ Covers:
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # Path Traversal
 # ---------------------------------------------------------------------------
 
+
 def test_sentinel_preprocessor_path_traversal_prevention():
     """Verify that path traversal attempts in safe_path are rejected."""
-    from pathlib import Path
     import sys
-    _PREPROC_PATH = Path(__file__).resolve().parents[2] / "services" / "sentinel-preprocessor" / "sar_preprocessing.py"
+    from pathlib import Path
+
+    _PREPROC_PATH = (
+        Path(__file__).resolve().parents[2] / "services" / "sentinel-preprocessor" / "sar_preprocessing_module.py"
+    )
 
     if not _PREPROC_PATH.exists():
-        pytest.skip("sar_preprocessing.py not found")
+        pytest.skip("sar_preprocessing_module.py not found")
 
     sys.path.insert(0, str(_PREPROC_PATH.parent))
     # Import will fail if deps aren't installed — use try/except
     try:
-        from sar_preprocessing import validate_safe_path, SafetyViolation
+        from sar_preprocessing_module import SafetyViolation, validate_safe_path
     except ImportError:
         # If validation isn't implemented, that's a finding too
         pytest.skip("validate_safe_path not found — security feature not implemented")
@@ -69,6 +71,7 @@ def test_sentinel_preprocessor_path_traversal_prevention():
 # Input Injection — Satellite Monitor
 # ---------------------------------------------------------------------------
 
+
 def test_satellite_monitor_norad_id_injection():
     """Verify that NORAD ID parameter is validated against injection patterns."""
     # Load satellite-monitor main to check its parameter handling
@@ -95,7 +98,7 @@ def test_satellite_monitor_norad_id_injection():
     for sid in valid_ids:
         result = test_fn(sid)
         assert isinstance(result, int), f"Expected int, got {type(result)}"
-        assert result > 0, f"Expected positive NORAD ID"
+        assert result > 0, "Expected positive NORAD ID"
 
     # Should reject injection payloads
     invalid_ids = ["; DROP TABLE tle_cache;", "25544 OR 1=1", "../../etc/passwd", ""]
@@ -108,9 +111,10 @@ def test_satellite_monitor_norad_id_injection():
 # JSON Injection — Aggregator
 # ---------------------------------------------------------------------------
 
+
 def test_aggregator_json_payload_integrity():
     """Verify that DetectionEvent schema handles malicious payloads gracefully."""
-    from shared.schemas.events import DetectionEvent, BoundingBox
+    from shared.schemas.events import DetectionEvent
 
     # JSON with overly deep nesting (potential DoS via parser)
     malicious_payloads = [
@@ -152,9 +156,11 @@ def test_aggregator_json_payload_integrity():
 # SSRF Protection — Data Ingestor
 # ---------------------------------------------------------------------------
 
+
 def test_data_ingestor_url_validation():
     """Verify that sentinel fetcher validates URLs to prevent SSRF."""
     from pathlib import Path
+
     _FETCHER = Path(__file__).resolve().parents[2] / "services" / "data-ingestor" / "sentinel_fetcher.py"
     if not _FETCHER.exists():
         pytest.skip("sentinel_fetcher.py not found")
@@ -171,10 +177,8 @@ def test_data_ingestor_url_validation():
     # Check that CDSE API URLs point to expected domains
     cdse_url = getattr(_module, "CDSE_AUTH_URL", None) or getattr(_module, "CDSE_BASE_URL", None)
     if cdse_url:
-        assert "dataspace.copernicus.eu" in cdse_url, \
-            f"CDSE URL does not point to expected domain: {cdse_url}"
-        assert cdse_url.startswith("https://"), \
-            f"CDSE URL is not HTTPS: {cdse_url}"
+        assert "dataspace.copernicus.eu" in cdse_url, f"CDSE URL does not point to expected domain: {cdse_url}"
+        assert cdse_url.startswith("https://"), f"CDSE URL is not HTTPS: {cdse_url}"
     else:
         pytest.skip("No CDSE URL found")
 
@@ -182,6 +186,7 @@ def test_data_ingestor_url_validation():
 # ---------------------------------------------------------------------------
 # Fuzzing —  Input Size Bounds
 # ---------------------------------------------------------------------------
+
 
 def test_event_schema_long_strings_handled_gracefully():
     """Verify that DetectionEvent handles long field values gracefully.
@@ -213,13 +218,10 @@ def test_event_schema_long_strings_handled_gracefully():
 
 def test_event_schema_large_detection_list():
     """Verify that DetectionEvent handles many detections without memory issues."""
-    from shared.schemas.events import DetectionEvent, BoundingBox
+    from shared.schemas.events import BoundingBox, DetectionEvent
 
     # Many detections (DoS via large payload)
-    all_dets = [
-        BoundingBox(x1=i, y1=i, x2=i + 10, y2=i + 10, confidence=0.5)
-        for i in range(10000)
-    ]
+    all_dets = [BoundingBox(x1=i, y1=i, x2=i + 10, y2=i + 10, confidence=0.5) for i in range(10000)]
     try:
         event = DetectionEvent(
             event_id="evt-fuzz-001",

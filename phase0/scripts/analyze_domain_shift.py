@@ -8,7 +8,6 @@ Generates an HTML report with:
   4. Per-tile model output analysis
 """
 
-import json
 import logging
 import random
 from pathlib import Path
@@ -20,7 +19,9 @@ logging.basicConfig(level=logging.INFO, format="%(message)s")
 log = logging.getLogger(__name__)
 
 # Use hardcoded absolute path since we know the project structure
-PROJECT_ROOT = Path("/home/franck/Documents/02_Projets/IA/Projets_IA/cubesat-maritime-project/maritime-intelligence-platform")
+PROJECT_ROOT = Path(
+    "/home/franck/Documents/02_Projets/IA/Projets_IA/cubesat-maritime-project/maritime-intelligence-platform"
+)
 PHASE0 = PROJECT_ROOT / "phase0"
 MODEL_PATH = PROJECT_ROOT / "shared" / "models" / "yolov8n_int8.onnx"
 TILES_ROOT = PHASE0 / "data" / "tiles"
@@ -64,8 +65,9 @@ def sample_tiles(tile_paths: list[Path], annotated: set[str], n: int = 50) -> li
     unann_paths = [p for p in tile_paths if p.stem not in annotated]
     n_ann = min(len(ann_paths), n // 2)
     n_unann = min(len(unann_paths), n - n_ann)
-    selected = (rng.sample(ann_paths, n_ann) if n_ann > 0 else []) + \
-               (rng.sample(unann_paths, n_unann) if n_unann > 0 else [])
+    selected = (rng.sample(ann_paths, n_ann) if n_ann > 0 else []) + (
+        rng.sample(unann_paths, n_unann) if n_unann > 0 else []
+    )
     log.info(f"  Sampled {len(selected)} tiles ({n_ann} ann, {n_unann} empty)")
     return selected
 
@@ -78,6 +80,7 @@ def run_model(session: ort.InferenceSession, tile_data: np.ndarray) -> np.ndarra
 
     # Properly resize 512x512 → 640x640 for model input using PIL
     from PIL import Image
+
     img = Image.fromarray((tile_float * 255).astype(np.uint8))
     img_resized = img.resize((640, 640), Image.LANCZOS)
     resized = np.array(img_resized, dtype=np.float32) / 255.0
@@ -109,8 +112,13 @@ def analyze_tile(session: ort.InferenceSession, npy_path: Path, has_ann: bool) -
         "std": float(pixels.std()),
         "min": int(pixels.min()),
         "max": int(pixels.max()),
-        "p1": float(pcts[0]), "p5": float(pcts[1]), "p25": float(pcts[2]),
-        "p50": float(pcts[3]), "p75": float(pcts[4]), "p95": float(pcts[5]), "p99": float(pcts[6]),
+        "p1": float(pcts[0]),
+        "p5": float(pcts[1]),
+        "p25": float(pcts[2]),
+        "p50": float(pcts[3]),
+        "p75": float(pcts[4]),
+        "p95": float(pcts[5]),
+        "p99": float(pcts[6]),
         "zero_ratio": float(np.sum(pixels == 0) / pixels.size),
         "histogram": hist.tolist(),
         "model_top_conf": float(conf_sorted[0]) if len(conf_sorted) > 0 else 0.0,
@@ -156,13 +164,13 @@ def generate_html(all_results: dict) -> str:
         t_mean_int = avg(s["tiles"], "mean")
         table_rows += f"""
         <tr>
-          <td style="font-size:0.75rem;">{s['scene_id'][:50]}…</td>
+          <td style="font-size:0.75rem;">{s["scene_id"][:50]}…</td>
           <td>{t_n}</td>
           <td>{t_mean_int:.1f}</td>
-          <td>{t_top*100:.2f}%</td>
-          <td>{t_mean*100:.3f}%</td>
+          <td>{t_top * 100:.2f}%</td>
+          <td>{t_mean * 100:.3f}%</td>
           <td>{t_above:.1f}</td>
-          <td>{avg(s['tiles'], 'model_above_0_1'):.1f}</td>
+          <td>{avg(s["tiles"], "model_above_0_1"):.1f}</td>
           <td>{t_ann}</td>
         </tr>"""
 
@@ -176,12 +184,13 @@ def generate_html(all_results: dict) -> str:
 
     # Convert histograms to JSON for JS
     import json as _json
+
     global_hist_json = _json.dumps(global_hist)
     global_conf_hist_json = _json.dumps(global_conf_hist)
     ann_hist_json = _json.dumps(ann_hist)
     empty_hist_json = _json.dumps(empty_hist)
 
-    table_rows_json = _json.dumps(table_rows)
+    _json.dumps(table_rows)
 
     return f"""<!DOCTYPE html>
 <html lang="fr">
@@ -398,7 +407,7 @@ def main():
 
         for i, npy_path in enumerate(selected):
             if i % 10 == 0:
-                log.info(f"  Analyzing tile {i+1}/{len(selected)}...")
+                log.info(f"  Analyzing tile {i + 1}/{len(selected)}...")
             result = analyze_tile(session, npy_path, npy_path.stem in annotated)
             scene_data["tiles"].append(result)
 

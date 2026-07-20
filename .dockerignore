@@ -1,0 +1,43 @@
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+.venv
+venv/
+*.egg
+
+# Data (excluded from Docker images — mounted as volumes)
+phase0/data/
+phase_post0/
+
+# Notebooks
+*.ipynb
+notebooks/
+
+# Tests
+tests/
+*.test.*
+.coverage
+coverage_html/
+
+# Documentation
+docs/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# CI
+.github/

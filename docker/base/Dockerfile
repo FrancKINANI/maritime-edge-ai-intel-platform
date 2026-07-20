@@ -4,7 +4,7 @@
 # Every service Dockerfile starts FROM this base.
 # =============================================================================
 
-FROM python:3.10-slim AS base
+FROM python:3.11-slim AS base
 
 WORKDIR /app
 
@@ -33,5 +33,9 @@ COPY docker/base/requirements.txt /app/
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
 RUN find /usr/local -name '*.pyc' -delete
+
+# Create non-privileged user
+RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
+
 LABEL maintainer="KSF Space Foundation" \
       description="Maritime Intelligence Platform microservice"

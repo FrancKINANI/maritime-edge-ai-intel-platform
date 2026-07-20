@@ -20,11 +20,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gdal-bin \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 COPY services/sentinel-preprocessor/ /app/services/sentinel-preprocessor/
 COPY shared/ /app/shared/
+
+USER appuser
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
 
 EXPOSE 8000
 

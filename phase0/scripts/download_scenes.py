@@ -16,20 +16,20 @@ This module implements OData API interactions with CDSE, Keycloak authentication
 robust streaming downloads with automatic ZIP extraction, and intelligent scene selection.
 """
 
-import os
-import zipfile
-import logging
 import json
+import logging
+import os
 import random
 import time
 import urllib.parse
+import zipfile
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Tuple
-from datetime import datetime, timedelta
+from typing import Any
 
 import httpx
-from tqdm import tqdm
 from dotenv import load_dotenv
+from tqdm import tqdm
 
 # GFW API configuration
 GFW_BASE_URL = "https://gateway.api.globalfishingwatch.org/v3"
@@ -40,10 +40,7 @@ GFW_REPORT = f"{GFW_BASE_URL}/4wings/report"
 AIS_PRESENCE_DATASET = "public-global-presence:latest"
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 # Constants
@@ -64,10 +61,10 @@ TOKEN_EXPIRY_SECONDS = 600  # CDSE tokens expire after 10 minutes
 MOROCCO_BBOX = [-17, 27, -1, 36]  # [lon_min, lat_min, lon_max, lat_max] - Full reference bbox
 
 # AIS density map parameters (PRIMARY method)
-DENSITY_CELL_SIZE_DEG = 0.5      # ~55 km density map granularity
-DENSITY_LOOKBACK_DAYS = 30       # recent period for AIS query
-N_TARGET_ZONES = 5               # number of high-density zones to target
-MAX_TEST_SCENES = 5              # strict test batch size
+DENSITY_CELL_SIZE_DEG = 0.5  # ~55 km density map granularity
+DENSITY_LOOKBACK_DAYS = 30  # recent period for AIS query
+N_TARGET_ZONES = 5  # number of high-density zones to target
+MAX_TEST_SCENES = 5  # strict test batch size
 
 # Targeting traceability (Part B of the protocol)
 # Fields recorded in target_trace.json for each downloaded scene:
@@ -82,30 +79,31 @@ MAX_TEST_SCENES = 5              # strict test batch size
 _N_EMPTY_TILES_PER_SCENE = int(os.getenv("N_EMPTY_TILES_PER_SCENE", "80"))
 _MAX_TILES_PER_SCENE_HARD_CAP = int(os.getenv("MAX_TILES_PER_SCENE_HARD_CAP", "600"))
 
-def generate_coastal_search_bboxes(full_bbox: List[float], coastal_width_km: float = 50.0) -> List[List[float]]:
+
+def generate_coastal_search_bboxes(full_bbox: list[float], coastal_width_km: float = 50.0) -> list[list[float]]:
     """
     Generate coastal search bounding boxes along the Moroccan coastline.
-    
+
     This function creates band-like search areas centered on the coastal region
     rather than using the full land/sea bbox. This is motivated by GFW coverage
     optimization, not operational constraints.
-    
+
     Args:
         full_bbox: Full geographic bounding box [lon_min, lat_min, lon_max, lat_max]
         coastal_width_km: Width of the coastal band in kilometers
-    
+
     Returns:
         List of coastal bounding boxes for CDSE search
-    
+
     Note:
         This is a simplified implementation. A production version would use
         actual coastline geometry from Marine Regions v12 or similar source.
     """
     lon_min, lat_min, lon_max, lat_max = full_bbox
-    
+
     # Approximate conversion: 1 degree ≈ 111 km at equator
     # coastal_width_deg = coastal_width_km / 111.0  # kept for reference
-    
+
     # Generate coastal bands (simplified - actual coastline geometry would be better)
     # Morocco has both Atlantic and Mediterranean coasts
     coastal_bboxes = [
@@ -113,11 +111,14 @@ def generate_coastal_search_bboxes(full_bbox: List[float], coastal_width_km: flo
         [lon_min, lat_min, lon_max, lat_max],  # Full bbox as fallback
         # Future enhancement: Use actual coastline geometry from Marine Regions v12
     ]
-    
+
     logger.info(f"Generated {len(coastal_bboxes)} coastal search boxes (width: {coastal_width_km}km)")
-    logger.warning("NOTE: This uses simplified coastal targeting. Production should use Marine Regions v12 coastline geometry.")
-    
+    logger.warning(
+        "NOTE: This uses simplified coastal targeting. Production should use Marine Regions v12 coastline geometry."
+    )
+
     return coastal_bboxes
+
 
 # Generate coastal search boxes for Morocco
 COASTAL_SEARCH_BBOXES = generate_coastal_search_bboxes(MOROCCO_BBOX)
@@ -130,7 +131,7 @@ SELECTION_CRITERIA = [
         "count": 3,
         "label": "Morocco_Q1_winter",
         "season": "Morocco Q1 Winter",
-        "targeting_rationale": "coastal_gfw_coverage_optimization"
+        "targeting_rationale": "coastal_gfw_coverage_optimization",
     },
     {
         "bbox": COASTAL_SEARCH_BBOXES[0],  # Use coastal targeting
@@ -139,7 +140,7 @@ SELECTION_CRITERIA = [
         "count": 3,
         "label": "Morocco_Q2_spring",
         "season": "Morocco Q2 Spring",
-        "targeting_rationale": "coastal_gfw_coverage_optimization"
+        "targeting_rationale": "coastal_gfw_coverage_optimization",
     },
     {
         "bbox": COASTAL_SEARCH_BBOXES[0],  # Use coastal targeting
@@ -148,7 +149,7 @@ SELECTION_CRITERIA = [
         "count": 3,
         "label": "Morocco_Q3_summer",
         "season": "Morocco Q3 Summer",
-        "targeting_rationale": "coastal_gfw_coverage_optimization"
+        "targeting_rationale": "coastal_gfw_coverage_optimization",
     },
     {
         "bbox": COASTAL_SEARCH_BBOXES[0],  # Use coastal targeting
@@ -157,7 +158,7 @@ SELECTION_CRITERIA = [
         "count": 3,
         "label": "Morocco_Q4_autumn",
         "season": "Morocco Q4 Autumn",
-        "targeting_rationale": "coastal_gfw_coverage_optimization"
+        "targeting_rationale": "coastal_gfw_coverage_optimization",
     },
 ]
 # Total target: 12 Morocco 2025 scenes only
@@ -168,7 +169,9 @@ MAX_RETRIES = 3
 RETRY_BACKOFF = 2  # Exponential backoff multiplier
 
 
-def check_ais_coverage_before_download(bbox: List[float], date_start: str, date_end: str, gfw_token: Optional[str] = None) -> bool:
+def check_ais_coverage_before_download(
+    bbox: list[float], date_start: str, date_end: str, gfw_token: str | None = None
+) -> bool:
     """
     Query GFW AIS Vessel Presence BEFORE launching the full CDSE download.
     If zero AIS results for the candidate bbox/date, log explicitly and skip to the
@@ -194,13 +197,15 @@ def check_ais_coverage_before_download(bbox: List[float], date_start: str, date_
     lon_min, lat_min, lon_max, lat_max = bbox
     geometry = {
         "type": "Polygon",
-        "coordinates": [[
-            [lon_min, lat_min],
-            [lon_max, lat_min],
-            [lon_max, lat_max],
-            [lon_min, lat_max],
-            [lon_min, lat_min],
-        ]]
+        "coordinates": [
+            [
+                [lon_min, lat_min],
+                [lon_max, lat_min],
+                [lon_max, lat_max],
+                [lon_min, lat_max],
+                [lon_min, lat_min],
+            ]
+        ],
     }
 
     # GFW v3 /4wings/report POST: datasets[0], date-range, spatial-resolution,
@@ -226,6 +231,7 @@ def check_ais_coverage_before_download(bbox: List[float], date_start: str, date_
             # a false positive on a nested empty response (entries[0][dataset_key] structure).
             # By normalizing first, we correctly handle the nested structure.
             from phase0.scripts.gfw_annotations import _normalize_response_entries
+
             normalized = _normalize_response_entries(data)
             if normalized and len(normalized) > 0:
                 logger.info("AIS coverage confirmed for this zone/date")
@@ -235,14 +241,19 @@ def check_ais_coverage_before_download(bbox: List[float], date_start: str, date_
         # On failure, allow download to proceed (conservative approach)
         return True
 
-    logger.warning("No GFW AIS coverage for this zone/date -- scene NOT downloaded, invalid test corpus without Ground Truth")
+    logger.warning(
+        "No GFW AIS coverage for this zone/date -- scene NOT downloaded, invalid test corpus without Ground Truth"
+    )
     logger.warning(f"  Zone: {bbox}, Period: {date_start} to {date_end}")
-    logger.warning("  This safeguard saves bandwidth but does NOT solve the root issue if GFW structurally has no coverage")
+    logger.warning(
+        "  This safeguard saves bandwidth but does NOT solve the root issue if GFW structurally has no coverage"
+    )
     return False
 
 
 def retry_with_backoff(func):
     """Decorator for retrying HTTP requests with exponential backoff."""
+
     def wrapper(*args, **kwargs):
         last_exception = None
         for attempt in range(MAX_RETRIES):
@@ -250,14 +261,15 @@ def retry_with_backoff(func):
                 return func(*args, **kwargs)
             except (httpx.HTTPStatusError, httpx.RequestError) as e:
                 last_exception = e
-                wait_time = RETRY_BACKOFF ** attempt
+                wait_time = RETRY_BACKOFF**attempt
                 logger.warning(f"Attempt {attempt + 1}/{MAX_RETRIES} failed: {e}. Retrying in {wait_time}s...")
                 time.sleep(wait_time)
         raise last_exception
+
     return wrapper
 
 
-def get_cdse_token(username: str, password: str) -> Tuple[str, float]:
+def get_cdse_token(username: str, password: str) -> tuple[str, float]:
     """Authenticates with the CDSE Keycloak service to retrieve an access token.
 
     Args:
@@ -281,25 +293,25 @@ def get_cdse_token(username: str, password: str) -> Tuple[str, float]:
         "password": password,
         "grant_type": "password",
     }
-    
+
     @retry_with_backoff
     def _request_token():
         with httpx.Client() as client:
             response = client.post(CDSE_TOKEN_URL, data=data, timeout=30.0)
             response.raise_for_status()
             return response.json()
-    
+
     response_data = _request_token()
     token = response_data.get("access_token")
     if not token:
         raise RuntimeError("Authentication succeeded but no access_token was returned.")
-    
+
     expiry_time = time.time() + TOKEN_EXPIRY_SECONDS
     logger.info("Authentication successful. Token expires in 10 minutes.")
     return token, expiry_time
 
 
-def refresh_token_if_needed(token: str, expiry_time: float, username: str, password: str) -> Tuple[str, float]:
+def refresh_token_if_needed(token: str, expiry_time: float, username: str, password: str) -> tuple[str, float]:
     """Refreshes the CDSE token if it's about to expire.
 
     Args:
@@ -318,13 +330,8 @@ def refresh_token_if_needed(token: str, expiry_time: float, username: str, passw
 
 
 def search_sentinel1_products(
-    token: str,
-    bbox: List[float],
-    date_start: str,
-    date_end: str,
-    max_results: int = 50,
-    prefer_cog: bool = True
-) -> List[Dict[str, Any]]:
+    token: str, bbox: list[float], date_start: str, date_end: str, max_results: int = 50, prefer_cog: bool = True
+) -> list[dict[str, Any]]:
     """Queries the CDSE OData API for Sentinel-1 GRD products matching parameters.
 
     Args:
@@ -344,7 +351,7 @@ def search_sentinel1_products(
     logger.info(f"Searching Sentinel-1 products from {date_start} to {date_end} in bbox {bbox}...")
     lon_min, lat_min, lon_max, lat_max = bbox
     polygon = f"POLYGON(({lon_min} {lat_min}, {lon_max} {lat_min}, {lon_max} {lat_max}, {lon_min} {lat_max}, {lon_min} {lat_min}))"
-    
+
     # Enhanced OData filter with productType specification
     filter_query = (
         f"Collection/Name eq 'SENTINEL-1' and "
@@ -354,14 +361,10 @@ def search_sentinel1_products(
         f"ContentDate/Start le {date_end}T23:59:59.000Z"
     )
 
-    params = {
-        "$filter": filter_query,
-        "$top": max_results,
-        "$orderby": "ContentDate/Start desc"
-    }
+    params = {"$filter": filter_query, "$top": max_results, "$orderby": "ContentDate/Start desc"}
 
     headers = {"Authorization": f"Bearer {token}"}
-    
+
     @retry_with_backoff
     def _search_request():
         with httpx.Client() as client:
@@ -370,27 +373,29 @@ def search_sentinel1_products(
             response = client.get(url, headers=headers, timeout=60.0)
             response.raise_for_status()
             return response.json()
-    
+
     response_data = _search_request()
     results = response_data.get("value", [])
-    
+
     # Extract and normalize metadata
     normalized_results = []
     for product in results:
-        normalized_results.append({
-            "id": product.get("Id"),
-            "name": product.get("Name"),
-            "date": product.get("ContentDate", {}).get("Start"),
-            "size": product.get("ContentLength", 0),
-            "footprint": product.get("ContentGeometry", ""),
-        })
-    
+        normalized_results.append(
+            {
+                "id": product.get("Id"),
+                "name": product.get("Name"),
+                "date": product.get("ContentDate", {}).get("Start"),
+                "size": product.get("ContentLength", 0),
+                "footprint": product.get("ContentGeometry", ""),
+            }
+        )
+
     # Filter for COG variants if requested
     if prefer_cog:
         logger.info("Filtering for COG variants and removing duplicates...")
         cog_results = []
         product_groups = {}  # Group by base identifier
-        
+
         for product in normalized_results:
             name = product["name"]
             # Extract base identifier (timestamp and mission info)
@@ -401,17 +406,17 @@ def search_sentinel1_products(
                 base_id = "_".join(parts[:7])  # S1A_IW_GRDH_1SDV_20240107T064657_20240107T064719
             else:
                 base_id = name
-            
+
             # Group products by base identifier
             if base_id not in product_groups:
                 product_groups[base_id] = []
             product_groups[base_id].append(product)
-        
+
         # For each group, prefer COG variant, otherwise keep standard
         for base_id, group in product_groups.items():
             # Check for COG variant
             cog_variants = [p for p in group if "_COG" in p["name"] or p["name"].endswith("_COG.SAFE")]
-            
+
             if cog_variants:
                 # Use COG variant
                 cog_results.extend(cog_variants)
@@ -420,22 +425,16 @@ def search_sentinel1_products(
                 # Use standard variant (first one)
                 cog_results.append(group[0])
                 logger.debug(f"Using standard variant for {base_id}")
-        
+
         logger.info(f"Filtered to {len(cog_results)} products (COG preferred, duplicates removed)")
         normalized_results = cog_results
-    
+
     logger.info(f"Found {len(normalized_results)} matching Sentinel-1 products.")
     return normalized_results
 
 
 def download_product(
-    token: str,
-    product_id: str,
-    product_name: str,
-    output_dir: str,
-    expiry_time: float,
-    username: str,
-    password: str
+    token: str, product_id: str, product_name: str, output_dir: str, expiry_time: float, username: str, password: str
 ) -> str:
     """Downloads and extracts a Sentinel-1 SAFE product from CDSE.
 
@@ -460,47 +459,48 @@ def download_product(
     """
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
-    
+
     # Refresh token if needed
     token, expiry_time = refresh_token_if_needed(token, expiry_time, username, password)
-    
+
     url = f"{CDSE_DOWNLOAD_URL}({product_id})/$value"
     headers = {"Authorization": f"Bearer {token}"}
     zip_path = output_path / f"{product_name}.zip"
-    
+
     logger.info(f"Starting download for product {product_name}...")
-    
+
     @retry_with_backoff
     def _download_request():
         with httpx.Client() as client:
             response = client.get(url, headers=headers, timeout=120.0, follow_redirects=True)
             response.raise_for_status()
             return response
-    
+
     response = _download_request()
     total_size = int(response.headers.get("Content-Length", 0))
-    
+
     # Stream download with 8192 byte chunks
-    with open(zip_path, "wb") as f, tqdm(
-        total=total_size, unit="B", unit_scale=True, desc=product_name[:20]
-    ) as progress:
+    with (
+        open(zip_path, "wb") as f,
+        tqdm(total=total_size, unit="B", unit_scale=True, desc=product_name[:20]) as progress,
+    ):
         for chunk in response.iter_bytes(chunk_size=8192):
             f.write(chunk)
             progress.update(len(chunk))
-                    
+
     logger.info(f"Download complete: {zip_path}. Extracting archive...")
-    
+
     try:
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+        with zipfile.ZipFile(zip_path, "r") as zip_ref:
             # Debug: list the contents of the zip
             logger.info(f"ZIP contains {len(zip_ref.namelist())} files. First 10: {zip_ref.namelist()[:10]}")
-            
+
             zip_ref.extractall(output_path)
-            
+
             # Find the .SAFE directory name (should be the top-level directory in the zip)
             safe_dirs = [name for name in zip_ref.namelist() if name.endswith(".SAFE/")]
             safe_dir_name = safe_dirs[0].rstrip("/") if safe_dirs else None
-            
+
             # If no .SAFE/ directory found, check for .SAFE without trailing slash
             if not safe_dir_name:
                 safe_dirs = [name for name in zip_ref.namelist() if name.endswith(".SAFE")]
@@ -509,10 +509,10 @@ def download_product(
         logger.error(f"Corrupted ZIP file: {e}")
         zip_path.unlink()
         raise
-    
+
     # Cleanup zip
     zip_path.unlink()
-    
+
     if safe_dir_name:
         safe_path = output_path / safe_dir_name
         logger.info(f"Extraction complete and ZIP removed. Saved to {safe_path}")
@@ -525,7 +525,7 @@ def download_product(
         return str(output_path)
 
 
-def get_scene_base_id(product_name: str) -> Optional[str]:
+def get_scene_base_id(product_name: str) -> str | None:
     """Extracts a stable base identifier for a Sentinel-1 scene name.
 
     The CDSE catalogue can return both standard and COG variants of the same
@@ -545,7 +545,7 @@ def get_scene_base_id(product_name: str) -> Optional[str]:
 def is_scene_downloaded(
     scenes_dir: Path,
     product_name: str,
-    existing_scene_ids: Optional[set] = None,
+    existing_scene_ids: set | None = None,
 ) -> bool:
     """Checks if a scene has already been downloaded.
 
@@ -567,36 +567,36 @@ def is_scene_downloaded(
 
 def get_existing_scene_ids(scenes_dir: Path) -> set:
     """Gets set of existing scene product IDs (base IDs without COG suffix).
-    
+
     This helps avoid downloading duplicate scenes across different regions
     when a scene might overlap multiple bounding boxes.
-    
+
     Args:
         scenes_dir (Path): Directory containing .SAFE folders.
-    
+
     Returns:
         set: Set of base product IDs (without COG suffix).
     """
     existing_ids = set()
-    
+
     for safe_dir in scenes_dir.glob("*.SAFE"):
         if safe_dir.is_dir():
             base_id = get_scene_base_id(safe_dir.stem)
             if base_id:
                 existing_ids.add(base_id)
-    
+
     logger.info(f"Found {len(existing_ids)} existing scene IDs in {scenes_dir}")
     return existing_ids
 
 
 def select_scenes_for_criteria(
     token: str,
-    bbox: List[float],
-    criteria: Dict[str, Any],
+    bbox: list[float],
+    criteria: dict[str, Any],
     username: str,
     password: str,
-    existing_scene_ids: Optional[set] = None,
-) -> List[Dict[str, Any]]:
+    existing_scene_ids: set | None = None,
+) -> list[dict[str, Any]]:
     """Selects scenes for a specific criterion with random sampling.
 
     Args:
@@ -614,11 +614,11 @@ def select_scenes_for_criteria(
     count = criteria["count"]
     season = criteria["season"]
     label = criteria.get("label", season)
-    
+
     logger.info(f"Searching scenes for {label} ({date_start} to {date_end})...")
-    
+
     products = search_sentinel1_products(token, bbox, date_start, date_end, max_results=60, prefer_cog=True)
-    
+
     if not products:
         logger.warning(f"No products found for {season}")
         return []
@@ -636,15 +636,15 @@ def select_scenes_for_criteria(
     if not filtered_products:
         logger.info(f"All products for {season} were already downloaded or duplicated")
         return []
-    
+
     # Random selection from available products
     if len(filtered_products) > count:
         selected = random.sample(filtered_products, count)
     else:
         selected = filtered_products
         logger.warning(f"Only {len(filtered_products)} products available for {season}, requested {count}")
-    
-# Add selection metadata to each product
+
+    # Add selection metadata to each product
     for product in selected:
         product["season"] = season
         product["label"] = label
@@ -655,7 +655,7 @@ def select_scenes_for_criteria(
     return selected
 
 
-def deduplicate_scenes(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def deduplicate_scenes(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Keeps only the first occurrence of each scene, deduped by base ID.
 
     This helps avoid duplicate manifest entries when the same product is seen
@@ -677,7 +677,7 @@ def deduplicate_scenes(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return deduped
 
 
-def save_manifest(scenes_dir: Path, manifest: Dict[str, Any]) -> None:
+def save_manifest(scenes_dir: Path, manifest: dict[str, Any]) -> None:
     """Saves the download manifest to a JSON file.
 
     Args:
@@ -691,7 +691,7 @@ def save_manifest(scenes_dir: Path, manifest: Dict[str, Any]) -> None:
         for region in manifest["regions"].values():
             if isinstance(region, dict) and "scenes" in region:
                 region["scenes"] = deduplicate_scenes(region["scenes"])
-    with open(manifest_path, 'w') as f:
+    with open(manifest_path, "w") as f:
         json.dump(manifest, f, indent=2)
     logger.info(f"Manifest saved to {manifest_path}")
 
@@ -712,7 +712,7 @@ def clean_non_morocco_scenes(scenes_dir: Path) -> None:
         logger.warning("No manifest found at %s", manifest_path)
         return
 
-    with open(manifest_path, 'r', encoding='utf-8') as f:
+    with open(manifest_path, encoding="utf-8") as f:
         manifest = json.load(f)
 
     scenes = manifest.get("scenes", [])
@@ -744,7 +744,7 @@ def clean_non_morocco_scenes(scenes_dir: Path) -> None:
             logger.warning("SAFE path does not exist for scene %s: %s", scene.get("name"), safe_path)
 
     manifest["scenes"] = remaining_scenes
-    with open(manifest_path, 'w', encoding='utf-8') as f:
+    with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2)
 
     logger.info("Archived %s non-Morocco scenes and updated manifest", archived_count)
@@ -756,9 +756,12 @@ def clean_non_morocco_scenes(scenes_dir: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def build_ais_density_map(bbox: List[float], cell_size_deg: float = DENSITY_CELL_SIZE_DEG,
-                          lookback_days: int = DENSITY_LOOKBACK_DAYS,
-                          gfw_token: Optional[str] = None) -> Dict[str, Any]:
+def build_ais_density_map(
+    bbox: list[float],
+    cell_size_deg: float = DENSITY_CELL_SIZE_DEG,
+    lookback_days: int = DENSITY_LOOKBACK_DAYS,
+    gfw_token: str | None = None,
+) -> dict[str, Any]:
     """
     Queries GFW AIS Presence over the full bbox, aggregates positions by grid cell,
     returns a density ranking. Ported from notebook cell 7.
@@ -772,10 +775,10 @@ def build_ais_density_map(bbox: List[float], cell_size_deg: float = DENSITY_CELL
     Returns:
         Dict with 'cells' (sorted by count descending), 'total_positions', etc.
     """
-    from phase0.scripts.gfw_annotations import _normalize_response_entries, _extract_lat_lon
+    from phase0.scripts.gfw_annotations import _extract_lat_lon, _normalize_response_entries
 
     lon_min, lat_min, lon_max, lat_max = bbox
-    end = datetime.utcnow().date()
+    end = datetime.now(UTC).date()
     start = end - timedelta(days=lookback_days)
 
     if not gfw_token:
@@ -789,11 +792,15 @@ def build_ais_density_map(bbox: List[float], cell_size_deg: float = DENSITY_CELL
     headers = {"Authorization": f"Bearer {gfw_token}"}
     geometry = {
         "type": "Polygon",
-        "coordinates": [[
-            [lon_min, lat_min], [lon_max, lat_min],
-            [lon_max, lat_max], [lon_min, lat_max],
-            [lon_min, lat_min],
-        ]]
+        "coordinates": [
+            [
+                [lon_min, lat_min],
+                [lon_max, lat_min],
+                [lon_max, lat_max],
+                [lon_min, lat_max],
+                [lon_min, lat_min],
+            ]
+        ],
     }
 
     query_params = {
@@ -806,8 +813,7 @@ def build_ais_density_map(bbox: List[float], cell_size_deg: float = DENSITY_CELL
     body_params = {"geojson": geometry, "limit": 500}
 
     try:
-        response = httpx.post(GFW_REPORT, headers=headers, params=query_params,
-                              json=body_params, timeout=60.0)
+        response = httpx.post(GFW_REPORT, headers=headers, params=query_params, json=body_params, timeout=60.0)
         if response.status_code != 200:
             logger.warning(f"GFW density query failed ({response.status_code})")
             return {"cells": [], "total_positions": 0}
@@ -837,14 +843,18 @@ def build_ais_density_map(bbox: List[float], cell_size_deg: float = DENSITY_CELL
         for (ci, cj), count in density.items():
             cell_lon_min = lon_min + ci * cell_size_deg
             cell_lat_min = lat_min + cj * cell_size_deg
-            cells.append({
-                "cell_index": ci * n_lat_cells + cj,  # unique index for traceability
-                "cell_bbox": [
-                    cell_lon_min, cell_lat_min,
-                    cell_lon_min + cell_size_deg, cell_lat_min + cell_size_deg
-                ],
-                "count": count,
-            })
+            cells.append(
+                {
+                    "cell_index": ci * n_lat_cells + cj,  # unique index for traceability
+                    "cell_bbox": [
+                        cell_lon_min,
+                        cell_lat_min,
+                        cell_lon_min + cell_size_deg,
+                        cell_lat_min + cell_size_deg,
+                    ],
+                    "count": count,
+                }
+            )
         cells.sort(key=lambda c: c["count"], reverse=True)
 
         result = {
@@ -900,7 +910,7 @@ def _normalize_scene_id(product_name: str) -> str:
     return product_name.rstrip("/").replace(".SAFE", "")
 
 
-def resolve_safe_dir(scenes_dir: Path, product_name: str) -> Optional[Path]:
+def resolve_safe_dir(scenes_dir: Path, product_name: str) -> Path | None:
     """Locate the on-disk .SAFE directory for a product name (handles COG variants)."""
     scene_id = _normalize_scene_id(product_name)
     candidates = [
@@ -924,11 +934,11 @@ def resolve_safe_dir(scenes_dir: Path, product_name: str) -> Optional[Path]:
 def write_target_trace(
     scene_dir: Path,
     cell_index: int,
-    cell_bbox: List[float],
+    cell_bbox: list[float],
     *,
-    scene_id: Optional[str] = None,
-    density_rank: Optional[int] = None,
-    ais_count: Optional[int] = None,
+    scene_id: str | None = None,
+    density_rank: int | None = None,
+    ais_count: int | None = None,
     protocol: str = "PH0-CORR-002_density_targeted",
 ) -> Path:
     """
@@ -968,7 +978,7 @@ def update_target_traces_index(
     scenes_dir: Path,
     scene_id: str,
     safe_dir_name: str,
-    trace: Dict[str, Any],
+    trace: dict[str, Any],
 ) -> Path:
     """
     Update (or create) scenes_dir/target_traces_index.json.
@@ -992,7 +1002,7 @@ def update_target_traces_index(
         index["scenes"] = {}
 
     index["protocol"] = "PH0-CORR-002_density_targeted"
-    index["updated_at"] = datetime.utcnow().isoformat() + "Z"
+    index["updated_at"] = datetime.now(UTC).isoformat().replace("+00:00", "Z")
     index["scenes"][scene_id] = {
         "safe_dir": safe_dir_name,
         "trace_path": f"{safe_dir_name}/target_trace.json",
@@ -1013,12 +1023,12 @@ def write_scene_target_trace(
     scenes_dir: Path,
     safe_path: Path,
     cell_index: int,
-    cell_bbox: List[float],
+    cell_bbox: list[float],
     *,
-    density_rank: Optional[int] = None,
-    ais_count: Optional[int] = None,
+    density_rank: int | None = None,
+    ais_count: int | None = None,
     protocol: str = "PH0-CORR-002_density_targeted",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Write target_trace.json inside a scene and register it in the index.
 
@@ -1051,13 +1061,13 @@ def write_scene_target_trace(
 
 def select_and_download_scenes_from_density(
     token: str,
-    density_map: Dict[str, Any],
+    density_map: dict[str, Any],
     n_scenes: int = MAX_TEST_SCENES,
-    output_dir: Optional[Path] = None,
+    output_dir: Path | None = None,
     username: str = "",
     password: str = "",
-    expiry_time: Optional[float] = None,
-) -> List[str]:
+    expiry_time: float | None = None,
+) -> list[str]:
     """
     Select and download CDSE scenes targeting the highest AIS density zones.
     Ported from notebook cell 10.
@@ -1087,9 +1097,9 @@ def select_and_download_scenes_from_density(
         logger.error("Density map has no cells -- cannot select scenes.")
         return []
 
-    end = datetime.utcnow().date()
+    end = datetime.now(UTC).date()
     start = end - timedelta(days=90)
-    downloaded: List[str] = []
+    downloaded: list[str] = []
     existing_ids = get_existing_scene_ids(output_dir)
 
     for i, cell in enumerate(cells[:n_scenes]):
@@ -1098,23 +1108,18 @@ def select_and_download_scenes_from_density(
         density_rank = i + 1  # 1 = highest density zone targeted
         ais_count = cell.get("count")
         logger.info(
-            f"Targeting Zone {density_rank}/{n_scenes}: "
-            f"cell_index={cell_index}, bbox={bbox}, AIS count={ais_count}"
+            f"Targeting Zone {density_rank}/{n_scenes}: cell_index={cell_index}, bbox={bbox}, AIS count={ais_count}"
         )
 
         # Refresh token before each search (CDSE tokens expire in 10 min)
         if expiry_time is not None:
-            token, expiry_time = refresh_token_if_needed(
-                token, expiry_time, username, password
-            )
+            token, expiry_time = refresh_token_if_needed(token, expiry_time, username, password)
         else:
             if username:
                 token, expiry_time = get_cdse_token(username, password)
 
         try:
-            products = search_sentinel1_products(
-                token, bbox, start.isoformat(), end.isoformat(), max_results=5
-            )
+            products = search_sentinel1_products(token, bbox, start.isoformat(), end.isoformat(), max_results=5)
         except Exception as e:
             logger.warning(f"Search failed for zone {density_rank}: {e}")
             # Retry once with fresh token in case of auth failure
@@ -1159,9 +1164,7 @@ def select_and_download_scenes_from_density(
         if is_scene_downloaded(output_dir, product_name, existing_ids):
             safe_path = resolve_safe_dir(output_dir, product_name)
             if safe_path is None:
-                logger.warning(
-                    f"Scene marked as downloaded but .SAFE not found: {product_name}"
-                )
+                logger.warning(f"Scene marked as downloaded but .SAFE not found: {product_name}")
                 continue
             logger.info(f"Scene already downloaded: {safe_path.name}")
             write_scene_target_trace(
@@ -1183,8 +1186,7 @@ def select_and_download_scenes_from_density(
             dl_username = username if username else os.getenv("CDSE_USERNAME", "")
             dl_password = password if password else os.getenv("CDSE_PASSWORD", "")
             safe_path_str = download_product(
-                token, product["id"], product_name, str(output_dir),
-                time.time() + 600, dl_username, dl_password
+                token, product["id"], product_name, str(output_dir), time.time() + 600, dl_username, dl_password
             )
             safe_path = Path(safe_path_str)
             # download_product can return output_dir on extraction edge-cases
@@ -1211,8 +1213,7 @@ def select_and_download_scenes_from_density(
 
             downloaded.append(str(safe_path))
             logger.info(
-                f"Downloaded: {safe_path.name} "
-                f"(zone {density_rank}, cell_index={cell_index}, AIS count={ais_count})"
+                f"Downloaded: {safe_path.name} (zone {density_rank}, cell_index={cell_index}, AIS count={ais_count})"
             )
 
         except Exception as e:
@@ -1221,8 +1222,7 @@ def select_and_download_scenes_from_density(
     logger.info(f"Density-targeted download: {len(downloaded)}/{n_scenes} scenes")
     if downloaded:
         logger.info(
-            f"Per-scene target_trace.json files are inside each .SAFE; "
-            f"index at {output_dir / TARGET_TRACES_INDEX_NAME}"
+            f"Per-scene target_trace.json files are inside each .SAFE; index at {output_dir / TARGET_TRACES_INDEX_NAME}"
         )
     return downloaded
 
@@ -1241,129 +1241,129 @@ def test_connection() -> None:
     - First 3 products are displayed with metadata
     """
     logger.info("=== CDSE Connection Test ===")
-    
+
     load_dotenv()
     username = os.getenv("CDSE_USERNAME")
     password = os.getenv("CDSE_PASSWORD")
-    
+
     if not username or not password:
         logger.error("CDSE_USERNAME and CDSE_PASSWORD must be set in .env file.")
         return
-    
+
     try:
         # Test authentication
         logger.info("Testing authentication...")
         token, _ = get_cdse_token(username, password)
         logger.info("✓ Authentication successful")
-        
+
         # Test search
         logger.info("Testing product search with COG filtering...")
         bbox_str = os.getenv("REGION_BBOX", "-17,27,-1,36")
         bbox = [float(x) for x in bbox_str.split(",")]
         region_name = os.getenv("REGION_NAME", "Unknown Region")
-        
+
         logger.info(f"Testing for region: {region_name}")
         logger.info(f"Bounding box: {bbox}")
-        
+
         products = search_sentinel1_products(token, bbox, "2024-01-01", "2024-01-31", max_results=10, prefer_cog=True)
-        
+
         if products:
             logger.info(f"✓ Search successful - found {len(products)} products")
             logger.info("First 3 products:")
             for i, product in enumerate(products[:3], 1):
-                is_cog = "COG" in product['name']
+                is_cog = "COG" in product["name"]
                 cog_status = " [COG]" if is_cog else " [Standard]"
                 logger.info(f"  {i}. {product['name']}{cog_status}")
                 logger.info(f"     Date: {product['date']}")
                 logger.info(f"     Size: {product['size'] / (1024**3):.2f} GB")
         else:
             logger.warning("✓ Search successful but no products found")
-        
+
         logger.info("=== All tests passed ===")
-        
+
     except Exception as e:
         logger.error(f"✗ Test failed: {e}")
 
 
 def download_multi_region(
-    token: str,
-    username: str,
-    password: str,
-    scenes_dir: Path,
-    max_scenes_per_region: int = 3
-) -> Dict[str, Any]:
+    token: str, username: str, password: str, scenes_dir: Path, max_scenes_per_region: int = 3
+) -> dict[str, Any]:
     """Downloads scenes from multiple regions defined in .env.
-    
+
     Args:
         token: CDSE authentication token
         username: CDSE username
         password: CDSE password
         scenes_dir: Directory to save scenes
         max_scenes_per_region: Maximum scenes per region
-    
+
     Returns:
         Summary dict with download results from all regions
     """
     regions = {
         "primary": {
             "bbox": [float(x) for x in os.getenv("REGION_BBOX", "-17,27,-1,36").split(",")],
-            "name": os.getenv("REGION_NAME", "Unknown Region")
+            "name": os.getenv("REGION_NAME", "Unknown Region"),
         }
     }
-    
+
     # Add neighboring regions if defined
     if os.getenv("ALGERIA_MED_BBOX"):
         regions["algeria_med"] = {
             "bbox": [float(x) for x in os.getenv("ALGERIA_MED_BBOX").split(",")],
-            "name": os.getenv("ALGERIA_MED_NAME", "Algeria Mediterranean")
+            "name": os.getenv("ALGERIA_MED_NAME", "Algeria Mediterranean"),
         }
-    
+
     if os.getenv("MAURITANIA_ATL_BBOX"):
         regions["mauritania_atl"] = {
             "bbox": [float(x) for x in os.getenv("MAURITANIA_ATL_BBOX").split(",")],
-            "name": os.getenv("MAURITANIA_ATL_NAME", "Mauritania Atlantic")
+            "name": os.getenv("MAURITANIA_ATL_NAME", "Mauritania Atlantic"),
         }
-    
+
     if os.getenv("SPAIN_MED_BBOX"):
         regions["spain_med"] = {
             "bbox": [float(x) for x in os.getenv("SPAIN_MED_BBOX").split(",")],
-            "name": os.getenv("SPAIN_MED_NAME", "Spain Mediterranean")
+            "name": os.getenv("SPAIN_MED_NAME", "Spain Mediterranean"),
         }
-    
+
     if os.getenv("PORTUGAL_ATL_BBOX"):
         regions["portugal_atl"] = {
             "bbox": [float(x) for x in os.getenv("PORTUGAL_ATL_BBOX").split(",")],
-            "name": os.getenv("PORTUGAL_ATL_NAME", "Portugal Atlantic")
+            "name": os.getenv("PORTUGAL_ATL_NAME", "Portugal Atlantic"),
         }
-    
+
     all_results = {}
     expiry_time = 0.0
-    
+
     # Get existing scene IDs to avoid duplicates across regions
     existing_scene_ids = get_existing_scene_ids(scenes_dir)
-    
+
     for region_key, region_config in regions.items():
         # Refresh token before processing each region
         token, expiry_time = refresh_token_if_needed(token, expiry_time, username, password)
-        
+
         logger.info(f"=== Processing region: {region_config['name']} ===")
         bbox = region_config["bbox"]
         region_name = region_config["name"]
-        
+
         # Use simplified criteria for multi-region (fewer scenes per region)
         simplified_criteria = [
-            {"date_start": "2025-01-01", "date_end": "2025-12-31", "count": max_scenes_per_region, "season": f"{region_name} 2025"}
+            {
+                "date_start": "2025-01-01",
+                "date_end": "2025-12-31",
+                "count": max_scenes_per_region,
+                "season": f"{region_name} 2025",
+            }
         ]
-        
+
         region_scenes = []
         total_size = 0
-        
+
         region_success = False
         for criteria in simplified_criteria:
             try:
                 products = search_sentinel1_products(
-                    token, bbox, criteria["date_start"], criteria["date_end"], 
-                    max_results=20, prefer_cog=True
+                    token, bbox, criteria["date_start"], criteria["date_end"], max_results=20, prefer_cog=True
                 )
                 region_success = True
             except httpx.HTTPStatusError as e:
@@ -1376,21 +1376,18 @@ def download_multi_region(
                         "total_size_gb": 0,
                         "successful": 0,
                         "failed": 0,
-                        "error": "403 Forbidden - region not accessible"
+                        "error": "403 Forbidden - region not accessible",
                     }
                     region_success = False
                     break  # Skip this region entirely
                 else:
                     raise  # Re-raise other HTTP errors
-        
+
         if not region_success:
             continue  # Skip to next region if this one failed
-        
-        if len(products) > criteria["count"]:
-            selected = products[:criteria["count"]]
-        else:
-            selected = products
-        
+
+        selected = products[: criteria["count"]] if len(products) > criteria["count"] else products
+
         for product in selected:
             product_id = product["id"]
             product_name = product["name"]
@@ -1399,15 +1396,17 @@ def download_multi_region(
 
             if is_scene_downloaded(scenes_dir, product_name, existing_scene_ids):
                 logger.info(f"  Scene already exists (base ID: {base_id or 'n/a'}): {product_name}")
-                region_scenes.append({
-                    "name": product_name,
-                    "region": region_name,
-                    "date": product["date"],
-                    "size": product["size"],
-                    "status": "already_downloaded"
-                })
+                region_scenes.append(
+                    {
+                        "name": product_name,
+                        "region": region_name,
+                        "date": product["date"],
+                        "size": product["size"],
+                        "status": "already_downloaded",
+                    }
+                )
                 continue
-            
+
             # Check GFW coverage before downloading
             gfw_token = os.getenv("GFW_API_TOKEN")
             if gfw_token:
@@ -1416,55 +1415,60 @@ def download_multi_region(
                     dt = datetime.fromisoformat(product_date.replace("Z", "+00:00"))
                     date_start = dt.strftime("%Y-%m-%d")
                     date_end = dt.strftime("%Y-%m-%d")
-                    
+
                     # Use AIS coverage check per PH0-CORR-002
                     has_ais_coverage = check_ais_coverage_before_download(bbox, date_start, date_end, gfw_token)
-                    
+
                     if not has_ais_coverage:
                         logger.info(f"  Skipping {product_name} - no AIS coverage")
-                        region_scenes.append({
-                            "name": product_name,
-                            "region": region_name,
-                            "date": product["date"],
-                            "size": product["size"],
-                            "status": "skipped_no_ais",
-                            "reason": "No GFW AIS coverage"
-                        })
+                        region_scenes.append(
+                            {
+                                "name": product_name,
+                                "region": region_name,
+                                "date": product["date"],
+                                "size": product["size"],
+                                "status": "skipped_no_ais",
+                                "reason": "No GFW AIS coverage",
+                            }
+                        )
                         continue
                 except Exception as e:
                     logger.warning(f"  AIS coverage check failed for {product_name}: {e} - proceeding with download")
-            
+
             try:
                 safe_path = download_product(
-                    token, product_id, product_name, str(scenes_dir),
-                    time.time() + 600, username, password
+                    token, product_id, product_name, str(scenes_dir), time.time() + 600, username, password
                 )
-                
+
                 if base_id:
                     existing_scene_ids.add(base_id)
-                
-                region_scenes.append({
-                    "name": product_name,
-                    "region": region_name,
-                    "date": product["date"],
-                    "size": product["size"],
-                    "status": "downloaded",
-                    "path": safe_path,
-                    "targeting_rationale": criteria.get("targeting_rationale", "coastal_gfw_coverage_optimization")
-                })
+
+                region_scenes.append(
+                    {
+                        "name": product_name,
+                        "region": region_name,
+                        "date": product["date"],
+                        "size": product["size"],
+                        "status": "downloaded",
+                        "path": safe_path,
+                        "targeting_rationale": criteria.get("targeting_rationale", "coastal_gfw_coverage_optimization"),
+                    }
+                )
                 total_size += product["size"]
-                
+
             except Exception as e:
                 logger.error(f"  Failed to download {product_name}: {e}")
-                region_scenes.append({
-                    "name": product_name,
-                    "region": region_name,
-                    "date": product["date"],
-                    "size": product["size"],
-                    "status": "failed",
-                    "error": str(e)
-                })
-        
+                region_scenes.append(
+                    {
+                        "name": product_name,
+                        "region": region_name,
+                        "date": product["date"],
+                        "size": product["size"],
+                        "status": "failed",
+                        "error": str(e),
+                    }
+                )
+
         region_scenes = deduplicate_scenes(region_scenes)
         all_results[region_key] = {
             "region_name": region_name,
@@ -1472,28 +1476,36 @@ def download_multi_region(
             "scenes": region_scenes,
             "total_size_gb": total_size / (1024**3),
             "successful": len([s for s in region_scenes if s["status"] in ["downloaded", "already_downloaded"]]),
-            "failed": len([s for s in region_scenes if s["status"] == "failed"])
+            "failed": len([s for s in region_scenes if s["status"] == "failed"]),
         }
-        
+
         logger.info(f"Region {region_name}: {all_results[region_key]['successful']} scenes downloaded")
-    
+
     return all_results
 
 
 def main() -> None:
     """Main orchestration for downloading diverse scene dataset."""
     import argparse
-    
+
     parser = argparse.ArgumentParser(description="Download diverse Sentinel-1 scenes for Phase 0")
     parser.add_argument("--test", action="store_true", help="Run connection test only")
     parser.add_argument("--max-scenes", type=int, default=10, help="Maximum number of scenes to download")
     parser.add_argument("--multi-region", action="store_true", help="Download from multiple regions defined in .env")
-    parser.add_argument("--max-scenes-per-region", type=int, default=3, help="Maximum scenes per region (multi-region mode)")
-    parser.add_argument("--clean-non-morocco", action="store_true", help="Archive non-Morocco scenes and remove them from manifest")
-    parser.add_argument("--density", action="store_true", help="Use AIS density map for targeted scene selection (PRIMARY METHOD)")
-    parser.add_argument("--density-n-scenes", type=int, default=MAX_TEST_SCENES, help="Number of density-targeted scenes to download")
+    parser.add_argument(
+        "--max-scenes-per-region", type=int, default=3, help="Maximum scenes per region (multi-region mode)"
+    )
+    parser.add_argument(
+        "--clean-non-morocco", action="store_true", help="Archive non-Morocco scenes and remove them from manifest"
+    )
+    parser.add_argument(
+        "--density", action="store_true", help="Use AIS density map for targeted scene selection (PRIMARY METHOD)"
+    )
+    parser.add_argument(
+        "--density-n-scenes", type=int, default=MAX_TEST_SCENES, help="Number of density-targeted scenes to download"
+    )
     args = parser.parse_args()
-    
+
     if args.test:
         test_connection()
         return
@@ -1524,8 +1536,7 @@ def main() -> None:
 
         # 3. Targeted download
         downloaded = select_and_download_scenes_from_density(
-            token, density_map, args.density_n_scenes,
-            scenes_dir, username, password
+            token, density_map, args.density_n_scenes, scenes_dir, username, password
         )
 
         logger.info(f"Density-targeted download complete: {len(downloaded)} scenes")
@@ -1540,58 +1551,56 @@ def main() -> None:
         # Multi-region download mode
         logger.info("=== Multi-Region Download Mode ===")
         load_dotenv()
-        
+
         username = os.getenv("CDSE_USERNAME")
         password = os.getenv("CDSE_PASSWORD")
-        
+
         if not username or not password:
             logger.error("CDSE_USERNAME and CDSE_PASSWORD must be set")
             return
-        
+
         scenes_dir = Path(__file__).parent / "data" / "scenes"
         scenes_dir.mkdir(parents=True, exist_ok=True)
-        
+
         token, expiry_time = get_cdse_token(username, password)
-        
-        results = download_multi_region(
-            token, username, password, scenes_dir, args.max_scenes_per_region
-        )
-        
+
+        results = download_multi_region(token, username, password, scenes_dir, args.max_scenes_per_region)
+
         # Display multi-region summary
         logger.info("=" * 60)
         logger.info("Multi-Region Download Summary")
         logger.info("=" * 60)
-        
+
         total_scenes = 0
         total_size = 0
-        
-        for region_key, region_result in results.items():
+
+        for _region_key, region_result in results.items():
             logger.info(f"\n{region_result['region_name']}:")
             logger.info(f"  Scenes: {region_result['successful']} (failed: {region_result['failed']})")
             logger.info(f"  Size: {region_result['total_size_gb']:.2f} GB")
-            
-            total_scenes += region_result['successful']
-            total_size += region_result['total_size_gb']
-        
+
+            total_scenes += region_result["successful"]
+            total_size += region_result["total_size_gb"]
+
         logger.info(f"\nTotal: {total_scenes} scenes, {total_size:.2f} GB")
-        
+
         # Save multi-region manifest
         manifest = {
             "download_date": datetime.now().isoformat(),
             "mode": "multi_region",
             "regions": results,
             "total_scenes": total_scenes,
-            "total_size_gb": total_size
+            "total_size_gb": total_size,
         }
-        
+
         save_manifest(scenes_dir, manifest)
         return
-    
+
     load_dotenv()
-    
+
     username = os.getenv("CDSE_USERNAME")
     password = os.getenv("CDSE_PASSWORD")
-    
+
     if not username or not password:
         logger.error("CDSE_USERNAME and CDSE_PASSWORD must be set in the environment or .env file.")
         return
@@ -1600,16 +1609,16 @@ def main() -> None:
     bbox_str = os.getenv("REGION_BBOX", "-17,27,-1,36")
     bbox = [float(x) for x in bbox_str.split(",")]
     region_name = os.getenv("REGION_NAME", "Unknown Region")
-    
+
     logger.info(f"Processing region: {region_name}")
     logger.info(f"Bounding box: {bbox}")
-    
+
     scenes_dir = Path(__file__).parent / "data" / "scenes"
     scenes_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Get initial token
     token, expiry_time = get_cdse_token(username, password)
-    
+
     # Select scenes based on criteria
     existing_scene_ids = get_existing_scene_ids(scenes_dir)
     all_selected_scenes = []
@@ -1623,82 +1632,87 @@ def main() -> None:
             existing_scene_ids=existing_scene_ids,
         )
         all_selected_scenes.extend(selected)
-    
+
     # Limit to max scenes if specified
     if len(all_selected_scenes) > args.max_scenes:
-        all_selected_scenes = all_selected_scenes[:args.max_scenes]
+        all_selected_scenes = all_selected_scenes[: args.max_scenes]
         logger.info(f"Limited selection to {args.max_scenes} scenes")
-    
+
     logger.info(f"Total scenes selected: {len(all_selected_scenes)}")
-    
+
     # Download scenes
     downloaded_scenes = []
     total_size = 0
-    
+
     for product in all_selected_scenes:
         product_id = product["id"]
         product_name = product["name"]
         season = product["season"]
-        
+
         logger.info(f"Processing: {product_name} ({season})")
-        
+
         # Check if already downloaded
         safe_path_existing = str(scenes_dir / f"{product_name}.SAFE")
         if is_scene_downloaded(scenes_dir, product_name, existing_scene_ids):
             logger.info("  Scene already downloaded, skipping")
-            downloaded_scenes.append({
-                "name": product_name,
-                "label": product.get("label", season),
-                "season": season,
-                "date": product["date"],
-                "size": product["size"],
-                "status": "already_downloaded",
-                "safe_path": safe_path_existing,
-                "bbox_used": product.get("bbox_used", bbox),
-                "date_range": product.get("date_range", f"{product['date']}/{product['date']}")
-            })
+            downloaded_scenes.append(
+                {
+                    "name": product_name,
+                    "label": product.get("label", season),
+                    "season": season,
+                    "date": product["date"],
+                    "size": product["size"],
+                    "status": "already_downloaded",
+                    "safe_path": safe_path_existing,
+                    "bbox_used": product.get("bbox_used", bbox),
+                    "date_range": product.get("date_range", f"{product['date']}/{product['date']}"),
+                }
+            )
             continue
-        
+
         try:
             safe_path = download_product(
-                token, product_id, product_name, str(scenes_dir),
-                expiry_time, username, password
+                token, product_id, product_name, str(scenes_dir), expiry_time, username, password
             )
-            
+
             base_id = get_scene_base_id(product_name)
             if base_id:
                 existing_scene_ids.add(base_id)
 
-            downloaded_scenes.append({
-                "name": product_name,
-                "label": product.get("label", season),
-                "season": season,
-                "date": product["date"],
-                "size": product["size"],
-                "status": "downloaded",
-                "safe_path": safe_path,
-                "path": safe_path,
-                "bbox_used": product.get("bbox_used", bbox),
-                "date_range": product.get("date_range", f"{product['date']}/{product['date']}")
-            })
+            downloaded_scenes.append(
+                {
+                    "name": product_name,
+                    "label": product.get("label", season),
+                    "season": season,
+                    "date": product["date"],
+                    "size": product["size"],
+                    "status": "downloaded",
+                    "safe_path": safe_path,
+                    "path": safe_path,
+                    "bbox_used": product.get("bbox_used", bbox),
+                    "date_range": product.get("date_range", f"{product['date']}/{product['date']}"),
+                }
+            )
             total_size += product["size"]
-            
+
         except Exception as e:
             logger.error(f"  Failed to download {product_name}: {e}")
-            downloaded_scenes.append({
-                "name": product_name,
-                "season": season,
-                "date": product["date"],
-                "size": product["size"],
-                "status": "failed",
-                "error": str(e)
-            })
-    
+            downloaded_scenes.append(
+                {
+                    "name": product_name,
+                    "season": season,
+                    "date": product["date"],
+                    "size": product["size"],
+                    "status": "failed",
+                    "error": str(e),
+                }
+            )
+
     # Generate summary
     downloaded_scenes = deduplicate_scenes(downloaded_scenes)
     successful = [s for s in downloaded_scenes if s["status"] in ["downloaded", "already_downloaded"]]
     failed = [s for s in downloaded_scenes if s["status"] == "failed"]
-    
+
     logger.info("=" * 60)
     logger.info(f"✓ Scenes downloaded: {len(successful)}/{len(all_selected_scenes)}")
     logger.info(f"  Region: {region_name}")
@@ -1708,17 +1722,17 @@ def main() -> None:
     logger.info(f"  Successful: {len([s for s in downloaded_scenes if s['status'] == 'downloaded'])}")
     logger.info(f"  Already present: {len([s for s in downloaded_scenes if s['status'] == 'already_downloaded'])}")
     logger.info(f"  Failed: {len(failed)}")
-    
+
     if failed:
         logger.warning("Failed scenes:")
         for scene in failed:
             logger.warning(f"  - {scene['name']} ({scene['season']}) : {scene.get('error', 'Unknown error')}")
-    
+
     logger.info("Scene list:")
     for scene in downloaded_scenes:
         status_symbol = "✓" if scene["status"] != "failed" else "✗"
         logger.info(f"  {status_symbol} {scene['name']} ({scene['season']})")
-    
+
     # Save manifest
     manifest = {
         "download_date": datetime.now().isoformat(),
@@ -1728,7 +1742,7 @@ def main() -> None:
         "successful": len(successful),
         "failed": len(failed),
         "total_size_gb": total_size / (1024**3),
-        "scenes": downloaded_scenes
+        "scenes": downloaded_scenes,
     }
     save_manifest(scenes_dir, manifest)
 

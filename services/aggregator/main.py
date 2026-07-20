@@ -5,18 +5,27 @@ Exposes endpoints for enriching detection events with satellite and AIS status,
 persisting findings in database storage, and querying aggregated metrics.
 """
 
-from fastapi import FastAPI, HTTPException, status
-from contextlib import asynccontextmanager
-from typing import List, Dict, Any, Optional
-from shared.schemas.events import DetectionEvent, BoundingBox
-import sqlite3
 import json
 import logging
-from pathlib import Path
+import os
+import sqlite3
+from contextlib import asynccontextmanager
 from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+from fastapi import FastAPI, HTTPException, status
+
 from shared.config import constants
+from shared.schemas.events import BoundingBox, DetectionEvent
 
 logger = logging.getLogger(__name__)
+
+# Validate required environment variables at startup
+_REQUIRED_ENV_VARS = ["REDIS_URL", "GFW_API_TOKEN"]
+for _var in _REQUIRED_ENV_VARS:
+    if not os.getenv(_var):
+        logger.warning("Missing required environment variable: %s — service will start but may fail at runtime", _var)
 
 
 DB_PATH = Path(__file__).resolve().parent / "data" / "events.db"
@@ -50,7 +59,7 @@ def init_db():
     conn.close()
 
 
-def determine_zone(tile_bbox_latlon: List[float]) -> str:
+def determine_zone(tile_bbox_latlon: list[float]) -> str:
     # Simple heuristic using centroid distance to Morocco bbox (degrees ~ nm/60)
     try:
         lat_min, lon_min, lat_max, lon_max = tile_bbox_latlon
@@ -136,8 +145,10 @@ async def ingest_detection_event(event: DetectionEvent) -> DetectionEvent:
         raise HTTPException(status_code=500, detail="Internal database error")
 
 
-@app.get("/events", response_model=List[DetectionEvent])
-async def list_events(since: Optional[str] = None, zone: Optional[str] = None, priority: Optional[str] = None) -> List[DetectionEvent]:
+@app.get("/events", response_model=list[DetectionEvent])
+async def list_events(
+    since: str | None = None, zone: str | None = None, priority: str | None = None
+) -> list[DetectionEvent]:
     conn = sqlite3.connect(str(DB_PATH))
     cur = conn.cursor()
     q = "SELECT * FROM events"
@@ -157,9 +168,24 @@ async def list_events(since: Optional[str] = None, zone: Optional[str] = None, p
     q += " ORDER BY timestamp DESC LIMIT 1000"
     cur.execute(q, params)
     rows = cur.fetchall()
-    results: List[DetectionEvent] = []
+    results: list[DetectionEvent] = []
     for row in rows:
-        (_event_id, scene_id, timestamp, tile_id, tile_bbox_latlon, detections, vessel_count, dark_vessel_count, priority_level, zone, satellite_id, satellite_position, preprocessing_pipeline, processing_time_ms) = row
+        (
+            _event_id,
+            scene_id,
+            timestamp,
+            tile_id,
+            tile_bbox_latlon,
+            detections,
+            vessel_count,
+            dark_vessel_count,
+            priority_level,
+            zone,
+            satellite_id,
+            satellite_position,
+            preprocessing_pipeline,
+            processing_time_ms,
+        ) = row
         det_list = []
         if detections:
             try:
@@ -189,12 +215,12 @@ async def list_events(since: Optional[str] = None, zone: Optional[str] = None, p
     return results
 
 
-def dict_to_bb(d: Dict[str, Any]) -> Any:
+def dict_to_bb(d: dict[str, Any]) -> Any:
     return type("BB", (), d)()
 
 
-@app.get("/stats", response_model=Dict[str, Any])
-async def get_global_statistics() -> Dict[str, Any]:
+@app.get("/stats", response_model=dict[str, Any])
+async def get_global_statistics() -> dict[str, Any]:
     conn = sqlite3.connect(str(DB_PATH))
     cur = conn.cursor()
     cur.execute("SELECT zone, COUNT(*) FROM events GROUP BY zone")
@@ -205,6 +231,6 @@ async def get_global_statistics() -> Dict[str, Any]:
     return {"by_zone": zones, "by_priority": priorities}
 
 
-@app.get("/health", response_model=Dict[str, str])
-async def health_check() -> Dict[str, str]:
+@app.get("/health", response_model=dict[str, str])
+async def health_check() -> dict[str, str]:
     return {"status": "healthy"}

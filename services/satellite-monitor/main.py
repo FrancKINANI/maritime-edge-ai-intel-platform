@@ -6,15 +6,24 @@ from SatNOGS, and updating orbital coefficients.
 """
 
 import logging
-from datetime import datetime, timedelta
-from fastapi import FastAPI, HTTPException, status
-from typing import Dict, Any, Optional
+import os
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
 import httpx
-from shared.schemas.events import TLEData
-from shared.config.constants import TLE_REFRESH_HOURS
+from fastapi import FastAPI, HTTPException, status
 from skyfield.api import EarthSatellite, load, wgs84
 
+from shared.config.constants import TLE_REFRESH_HOURS
+from shared.schemas.events import TLEData
+
 logger = logging.getLogger(__name__)
+
+# Validate required environment variables at startup
+_REQUIRED_ENV_VARS = ["SENTINEL_HUB_CLIENT_ID", "SENTINEL_HUB_CLIENT_SECRET"]
+for _var in _REQUIRED_ENV_VARS:
+    if not os.getenv(_var):
+        logger.warning("Missing required environment variable: %s — service will start but may fail at runtime", _var)
 
 app = FastAPI(
     title="Maritime Edge AI Intel Platform - Satellite Monitor",
@@ -24,21 +33,21 @@ app = FastAPI(
 
 
 # In-memory TLE cache: norad_id -> {tle1, tle2, name, norad_id, updated_at}
-TLE_CACHE: Dict[int, Dict[str, Any]] = {}
+TLE_CACHE: dict[int, dict[str, Any]] = {}
 
 
-def _is_cache_fresh(cached_at_str: Optional[str]) -> bool:
+def _is_cache_fresh(cached_at_str: str | None) -> bool:
     """Check if cached TLE is within the TTL window."""
     if not cached_at_str:
         return False
     try:
         cached_at = datetime.fromisoformat(cached_at_str)
-        return datetime.utcnow() - cached_at < timedelta(hours=TLE_REFRESH_HOURS)
+        return datetime.now(UTC) - cached_at < timedelta(hours=TLE_REFRESH_HOURS)
     except (ValueError, TypeError):
         return False
 
 
-def _validate_tle_entry(entry: Dict[str, Any]) -> None:
+def _validate_tle_entry(entry: dict[str, Any]) -> None:
     """Validate that a TLE cache entry has all required fields."""
     required = ["tle1", "tle2", "name", "norad_id"]
     missing = [k for k in required if not entry.get(k)]
@@ -54,7 +63,7 @@ def _validate_tle_lines(tle1: str, tle2: str) -> None:
         raise ValueError(f"TLE line 2 does not start with '2 ': {tle2[:30]}...")
 
 
-async def fetch_tle_from_celestrak(norad_id: int) -> Dict[str, Any]:
+async def fetch_tle_from_celestrak(norad_id: int) -> dict[str, Any]:
     """Fetch TLE from Celestrak as fallback for operational satellites.
 
     Endpoint: Celestrak GP (General Perturbations) API
@@ -68,7 +77,7 @@ async def fetch_tle_from_celestrak(norad_id: int) -> Dict[str, Any]:
         r = await client.get(url)
         r.raise_for_status()
         data = r.text
-    lines = data.strip().split('\n')
+    lines = data.strip().split("\n")
     if len(lines) < 3:
         raise ValueError(f"No TLE found for NORAD id {norad_id} in Celestrak")
     name = lines[0].strip()
@@ -80,7 +89,7 @@ async def fetch_tle_from_celestrak(norad_id: int) -> Dict[str, Any]:
         "norad_id": norad_id,
         "tle1": tle1,
         "tle2": tle2,
-        "updated_at": datetime.utcnow().isoformat(),
+        "updated_at": datetime.now(UTC).isoformat(),
         "source": "celestrak",
     }
     TLE_CACHE[norad_id] = entry
@@ -88,7 +97,7 @@ async def fetch_tle_from_celestrak(norad_id: int) -> Dict[str, Any]:
     return entry
 
 
-async def fetch_tle_from_satnogs(norad_id: int) -> Dict[str, Any]:
+async def fetch_tle_from_satnogs(norad_id: int) -> dict[str, Any]:
     """Fetch TLE from SatNOGS DB API (primary source).
 
     Endpoint: SatNOGS DB API /api/tle/
@@ -128,7 +137,7 @@ async def fetch_tle_from_satnogs(norad_id: int) -> Dict[str, Any]:
         "norad_id": norad_id,
         "tle1": tle1,
         "tle2": tle2,
-        "updated_at": datetime.utcnow().isoformat(),
+        "updated_at": datetime.now(UTC).isoformat(),
         "source": "satnogs",
     }
     TLE_CACHE[norad_id] = entry
@@ -136,7 +145,7 @@ async def fetch_tle_from_satnogs(norad_id: int) -> Dict[str, Any]:
     return entry
 
 
-def _tle_entry_to_TLEData(entry: Dict[str, Any]) -> TLEData:
+def _tle_entry_to_TLEData(entry: dict[str, Any]) -> TLEData:
     """Convert a raw TLE cache entry dict to a validated TLEData Pydantic model."""
     _validate_tle_entry(entry)
     return TLEData(
@@ -148,7 +157,7 @@ def _tle_entry_to_TLEData(entry: Dict[str, Any]) -> TLEData:
     )
 
 
-async def _fetch_tle_with_fallback(norad_id: int) -> Dict[str, Any]:
+async def _fetch_tle_with_fallback(norad_id: int) -> dict[str, Any]:
     """Fetch TLE with SatNOGS primary, Celestrak fallback.
 
     Returns the raw cache entry dict.
@@ -163,8 +172,8 @@ async def _fetch_tle_with_fallback(norad_id: int) -> Dict[str, Any]:
         logger.info("Cache STALE for NORAD %s — refreshing", norad_id)
 
     # Try SatNOGS first, then Celestrak
-    satnogs_error: Optional[str] = None
-    celestrak_error: Optional[str] = None
+    satnogs_error: str | None = None
+    celestrak_error: str | None = None
 
     try:
         return await fetch_tle_from_satnogs(norad_id)
@@ -197,8 +206,8 @@ async def get_current_tle(norad_id: int) -> TLEData:
     return _tle_entry_to_TLEData(entry)
 
 
-@app.get("/position", response_model=Dict[str, Any])
-async def get_satellite_position(satellite_id: str, timestamp: datetime) -> Dict[str, Any]:
+@app.get("/position", response_model=dict[str, Any])
+async def get_satellite_position(satellite_id: str, timestamp: datetime) -> dict[str, Any]:
     # Resolve satellite_id to NORAD integer
     try:
         norad = int(satellite_id)
@@ -213,7 +222,7 @@ async def get_satellite_position(satellite_id: str, timestamp: datetime) -> Dict
             raise HTTPException(
                 status_code=400,
                 detail=f"satellite_id '{satellite_id}' is not a valid NORAD ID and no cached satellite matches this name. "
-                       f"Use a numeric NORAD ID (e.g., 39634 for Sentinel-1A) or query /tle/{{norad_id}} first.",
+                f"Use a numeric NORAD ID (e.g., 39634 for Sentinel-1A) or query /tle/{{norad_id}} first.",
             )
 
     entry = await _fetch_tle_with_fallback(norad)
@@ -249,16 +258,16 @@ async def get_satellite_position(satellite_id: str, timestamp: datetime) -> Dict
     }
 
 
-@app.post("/refresh-tle", status_code=status.HTTP_200_OK, response_model=Dict[str, str])
-async def force_refresh_tles() -> Dict[str, str]:
+@app.post("/refresh-tle", status_code=status.HTTP_200_OK, response_model=dict[str, str])
+async def force_refresh_tles() -> dict[str, str]:
     count = len(TLE_CACHE)
     TLE_CACHE.clear()
     logger.info("TLE cache cleared (%s entries)", count)
     return {"status": "ok", "detail": f"TLE cache cleared ({count} entries flushed)"}
 
 
-@app.get("/health", response_model=Dict[str, str])
-async def health_check() -> Dict[str, str]:
+@app.get("/health", response_model=dict[str, str])
+async def health_check() -> dict[str, str]:
     fresh = sum(1 for e in TLE_CACHE.values() if _is_cache_fresh(e.get("updated_at")))
     return {
         "status": "healthy",
@@ -270,6 +279,7 @@ async def health_check() -> Dict[str, str]:
 # --------------------------------------------------------------------------
 # Input Validation
 # --------------------------------------------------------------------------
+
 
 def parse_satellite_id(satellite_id: str) -> int:
     """
@@ -300,9 +310,22 @@ def parse_satellite_id(satellite_id: str) -> int:
     # Reject injection patterns: SQL, path traversal, etc.
     # A valid NORAD ID is purely numeric (possibly with leading zeros)
     injection_patterns = [
-        "OR", "--", ";", "DROP", "SELECT", "INSERT", "DELETE",
-        "ALTER", "CREATE", "EXEC", "UNION", "'", '"',
-        "/", "\\", "..",
+        "OR",
+        "--",
+        ";",
+        "DROP",
+        "SELECT",
+        "INSERT",
+        "DELETE",
+        "ALTER",
+        "CREATE",
+        "EXEC",
+        "UNION",
+        "'",
+        '"',
+        "/",
+        "\\",
+        "..",
     ]
     for pattern in injection_patterns:
         if pattern in stripped.upper() and pattern != "":

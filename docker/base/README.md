@@ -10,7 +10,7 @@ docker build -f docker/base/Dockerfile -t maritime-intel-base:latest .
 
 ## Contents
 
-- **Python 3.10-slim** runtime
+- **Python 3.11-slim** runtime
 - **System packages**: libgl1, libglib2.0-0 (OpenCV/ML dependencies)
 - **Python packages**: fastapi, uvicorn, pydantic, httpx, numpy
 
