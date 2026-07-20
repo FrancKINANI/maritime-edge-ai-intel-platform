@@ -1056,6 +1056,7 @@ def select_and_download_scenes_from_density(
     output_dir: Optional[Path] = None,
     username: str = "",
     password: str = "",
+    expiry_time: Optional[float] = None,
 ) -> List[str]:
     """
     Select and download CDSE scenes targeting the highest AIS density zones.
@@ -1101,13 +1102,35 @@ def select_and_download_scenes_from_density(
             f"cell_index={cell_index}, bbox={bbox}, AIS count={ais_count}"
         )
 
+        # Refresh token before each search (CDSE tokens expire in 10 min)
+        if expiry_time is not None:
+            token, expiry_time = refresh_token_if_needed(
+                token, expiry_time, username, password
+            )
+        else:
+            if username:
+                token, expiry_time = get_cdse_token(username, password)
+
         try:
             products = search_sentinel1_products(
                 token, bbox, start.isoformat(), end.isoformat(), max_results=5
             )
         except Exception as e:
             logger.warning(f"Search failed for zone {density_rank}: {e}")
-            continue
+            # Retry once with fresh token in case of auth failure
+            if username:
+                try:
+                    new_token, expiry_time = get_cdse_token(username, password)
+                    products = search_sentinel1_products(
+                        new_token, bbox, start.isoformat(), end.isoformat(), max_results=5
+                    )
+                    token = new_token
+                    logger.info(f"  Retry succeeded for zone {density_rank} with fresh token")
+                except Exception as e2:
+                    logger.warning(f"  Retry also failed for zone {density_rank}: {e2}")
+                    continue
+            else:
+                continue
 
         if not products:
             logger.warning(f"No products found for zone {density_rank}: {bbox}")

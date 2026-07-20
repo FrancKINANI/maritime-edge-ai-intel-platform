@@ -9,7 +9,9 @@ exports CVAT XML and YOLO label files, and writes scene-level reports.
 import csv
 import json
 import logging
+import math
 import os
+import random
 import re
 import shutil
 import time
@@ -419,6 +421,13 @@ class GFWClient:
             return []
 
 # ---------------------------------------------------------------------------
+# Shared seeded RNG for reproducible bbox size sampling
+# NOTE: Module-level RNG ensures state advances across calls to
+# estimate_bbox_yolo(), giving different sizes for each detection.
+# A new RNG per call (as previously implemented) would produce
+# identical sequences for all detections with the same vessel_type.
+_RNG_BBOX = random.Random(42)
+# ---------------------------------------------------------------------------
 # Scene metadata and projection helpers
 # ---------------------------------------------------------------------------
 
@@ -517,28 +526,108 @@ def latlon_to_tile_pixel(lat: float, lon: float, tile: Dict[str, Any], tile_size
     return x, y
 
 
+def _sample_vessel_dimensions(
+    vessel_type: Optional[str],
+    rng: random.Random,
+) -> Tuple[float, float]:
+    """Sample realistic vessel length (m) and aspect ratio.
+
+    Categories are based on IHS Maritime / GFW vessel type classification.
+    Lengths include a SAR blooming factor (~2-3x physical size) to account
+    for bright point target spreading in SAR imagery.
+
+    Returns (effective_length_m, aspect_ratio_length_width).
+    """
+    if vessel_type:
+        vt = vessel_type.lower()
+        if any(kw in vt for kw in ["tanker", "cargo", "container"]):
+            length_min, length_max = 100.0, 350.0  # large commercial
+        elif any(kw in vt for kw in ["fishing", "trawler", "longliner"]):
+            length_min, length_max = 10.0, 40.0     # small fishing
+        elif any(kw in vt for kw in ["passenger", "pleasure", "yacht"]):
+            length_min, length_max = 30.0, 150.0    # medium passenger
+        elif any(kw in vt for kw in ["tug", "supply", "offshore"]):
+            length_min, length_max = 20.0, 80.0     # service vessels
+        else:
+            length_min, length_max = 10.0, 300.0    # unknown — broad
+    else:
+        # No vessel type: global distribution (60% small, 30% medium, 10% large)
+        roll = rng.random()
+        if roll < 0.60:
+            length_min, length_max = 10.0, 40.0
+        elif roll < 0.90:
+            length_min, length_max = 40.0, 120.0
+        else:
+            length_min, length_max = 120.0, 350.0
+
+    # Log-uniform sample (more realistic for vessel sizes than uniform)
+    log_min = math.log(length_min)
+    log_max = math.log(length_max)
+    physical_length_m = math.exp(rng.uniform(log_min, log_max))
+
+    # SAR blooming: physical length * 1.8-3.5x for point target spread
+    # Plus ±20% jitter for natural variation
+    bloom_factor = rng.uniform(1.8, 3.5)
+    jitter = rng.uniform(0.8, 1.2)
+    effective_length_m = physical_length_m * bloom_factor * jitter
+
+    # Aspect ratio: ships are 3-6x longer than wide
+    aspect_ratio = rng.uniform(3.0, 6.0)
+
+    return effective_length_m, aspect_ratio
+
+
 def estimate_bbox_yolo(
     center_x: float,
     center_y: float,
     tile_size: int = 512,
     vessel_type: Optional[str] = None,
 ) -> Tuple[float, float, float, float]:
-    length_m = 50.0
-    if vessel_type:
-        vt = vessel_type.lower()
-        if any(keyword in vt for keyword in ["tanker", "cargo", "container"]):
-            length_m = 150.0
-        elif any(keyword in vt for keyword in ["fishing", "trawler", "longliner"]):
-            length_m = 40.0
-        elif any(keyword in vt for keyword in ["passenger", "pleasure", "yacht"]):
-            length_m = 80.0
+    """
+    Estimate a YOLO bounding box for a vessel from its AIS position.
 
-    approx_size_px = min(tile_size, max(8.0, length_m / 10.0))
-    width = approx_size_px / tile_size
-    height = max(0.02, approx_size_px / tile_size * 0.5)
+    Since only the AIS position (lat/lon) is known, not the actual SAR
+    signal extent, the box size is ESTIMATED from a statistical distribution
+    of vessel dimensions per type, with multiplicative SAR blooming factors.
+
+    This is a KNOWN LIMITATION: box sizes are NOT measured from the image
+    signal. They are statistically plausible estimates. A more rigorous
+    approach (signal-based segmentation) is deferred to a future cycle.
+
+    Uses a module-level seeded RNG (``_RNG_BBOX``) for reproducibility.
+    The RNG state advances across calls, giving different sizes per detection.
+
+    See the Phase 0 / Phase Post-0 report for full discussion.
+
+    Args:
+        center_x: Pixel x-coordinate of AIS position within tile.
+        center_y: Pixel y-coordinate of AIS position within tile.
+        tile_size: Dimension of the square tile in pixels (default 512).
+        vessel_type: Optional vessel type string from AIS/GIW.
+
+    Returns:
+        (x_center, y_center, width, height) in YOLO normalized coords [0, 1].
+    """
+    # Use module-level RNG that advances per call, NOT a new Random(seed)
+    # which would produce identical sequences for the same vessel_type.
+    effective_length_m, aspect_ratio = _sample_vessel_dimensions(vessel_type, _RNG_BBOX)
+
+    # Convert to pixels at 10m/pixel Sentinel-1 GRD resolution
+    length_px = effective_length_m / 10.0
+    width_px = length_px / aspect_ratio
+
+    # Enforce minimum size: YOLO struggles with objects < 3 pixels
+    length_px = max(3.0, length_px)
+    width_px = max(1.5, width_px)
+
+    # Convert to YOLO normalized coordinates [0, 1]
+    w = min(1.0, max(0.001, length_px / tile_size))
+    h = min(1.0, max(0.001, width_px / tile_size))
+
     x_center = max(0.0, min(1.0, center_x / tile_size))
     y_center = max(0.0, min(1.0, center_y / tile_size))
-    return x_center, y_center, width, height
+
+    return x_center, y_center, w, h
 
 
 def project_detections_to_tiles(

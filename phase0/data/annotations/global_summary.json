@@ -5,12 +5,12 @@
       "pipeline": "D",
       "acquisition_time": "2026-07-17T06:18:25Z",
       "tile_count": 6402,
-      "annotated_tiles": 0,
-      "ais_presence_seeds": 0,
+      "annotated_tiles": 3625,
+      "ais_presence_seeds": 11471,
       "dark_vessel_candidates": 0,
-      "total_annotations": 0,
+      "total_annotations": 56834,
       "class_counts": {
-        "AIS_confirmed": 0,
+        "AIS_confirmed": 56834,
         "visual_only": 0,
         "dark_vessel_candidate": 0
       },
@@ -32,12 +32,12 @@
       "pipeline": "D",
       "acquisition_time": "2026-07-17T06:18:50Z",
       "tile_count": 6402,
-      "annotated_tiles": 0,
-      "ais_presence_seeds": 0,
+      "annotated_tiles": 24,
+      "ais_presence_seeds": 54,
       "dark_vessel_candidates": 0,
-      "total_annotations": 0,
+      "total_annotations": 96,
       "class_counts": {
-        "AIS_confirmed": 0,
+        "AIS_confirmed": 96,
         "visual_only": 0,
         "dark_vessel_candidate": 0
       },
@@ -83,15 +83,123 @@
     },
     {
       "scene_id": "S1D_IW_GRDH_1SDV_20260716T190458_20260716T190523_003703_006A03_9C83",
+      "pipeline": "A",
+      "acquisition_time": "2026-07-16T19:04:58Z",
+      "tile_count": 6452,
+      "annotated_tiles": 2828,
+      "ais_presence_seeds": 3978,
+      "dark_vessel_candidates": 0,
+      "total_annotations": 9689,
+      "class_counts": {
+        "AIS_confirmed": 9689,
+        "visual_only": 0,
+        "dark_vessel_candidate": 0
+      },
+      "traceability": {
+        "target_density_cell_index": 56,
+        "target_cell_bbox": [
+          -15.5,
+          28.0,
+          -15.0,
+          28.5
+        ],
+        "targeting_protocol": "PH0-CORR-002_density_targeted"
+      },
+      "protocol": "PH0-CORR-002_hybrid",
+      "note": "All annotations require human validation in CVAT before becoming Ground Truth"
+    },
+    {
+      "scene_id": "S1D_IW_GRDH_1SDV_20260716T190458_20260716T190523_003703_006A03_9C83",
+      "pipeline": "B",
+      "acquisition_time": "2026-07-16T19:04:58Z",
+      "tile_count": 6452,
+      "annotated_tiles": 2828,
+      "ais_presence_seeds": 3978,
+      "dark_vessel_candidates": 0,
+      "total_annotations": 9689,
+      "class_counts": {
+        "AIS_confirmed": 9689,
+        "visual_only": 0,
+        "dark_vessel_candidate": 0
+      },
+      "traceability": {
+        "target_density_cell_index": 56,
+        "target_cell_bbox": [
+          -15.5,
+          28.0,
+          -15.0,
+          28.5
+        ],
+        "targeting_protocol": "PH0-CORR-002_density_targeted"
+      },
+      "protocol": "PH0-CORR-002_hybrid",
+      "note": "All annotations require human validation in CVAT before becoming Ground Truth"
+    },
+    {
+      "scene_id": "S1D_IW_GRDH_1SDV_20260716T190458_20260716T190523_003703_006A03_9C83",
+      "pipeline": "C",
+      "acquisition_time": "2026-07-16T19:04:58Z",
+      "tile_count": 6452,
+      "annotated_tiles": 2828,
+      "ais_presence_seeds": 3978,
+      "dark_vessel_candidates": 0,
+      "total_annotations": 9689,
+      "class_counts": {
+        "AIS_confirmed": 9689,
+        "visual_only": 0,
+        "dark_vessel_candidate": 0
+      },
+      "traceability": {
+        "target_density_cell_index": 56,
+        "target_cell_bbox": [
+          -15.5,
+          28.0,
+          -15.0,
+          28.5
+        ],
+        "targeting_protocol": "PH0-CORR-002_density_targeted"
+      },
+      "protocol": "PH0-CORR-002_hybrid",
+      "note": "All annotations require human validation in CVAT before becoming Ground Truth"
+    },
+    {
+      "scene_id": "S1D_IW_GRDH_1SDV_20260716T190458_20260716T190523_003703_006A03_9C83",
       "pipeline": "D",
       "acquisition_time": "2026-07-16T19:04:58Z",
       "tile_count": 6452,
-      "annotated_tiles": 1534,
-      "ais_presence_seeds": 1309,
+      "annotated_tiles": 2828,
+      "ais_presence_seeds": 3978,
       "dark_vessel_candidates": 0,
-      "total_annotations": 3263,
+      "total_annotations": 9689,
       "class_counts": {
-        "AIS_confirmed": 3263,
+        "AIS_confirmed": 9689,
+        "visual_only": 0,
+        "dark_vessel_candidate": 0
+      },
+      "traceability": {
+        "target_density_cell_index": 56,
+        "target_cell_bbox": [
+          -15.5,
+          28.0,
+          -15.0,
+          28.5
+        ],
+        "targeting_protocol": "PH0-CORR-002_density_targeted"
+      },
+      "protocol": "PH0-CORR-002_hybrid",
+      "note": "All annotations require human validation in CVAT before becoming Ground Truth"
+    },
+    {
+      "scene_id": "S1D_IW_GRDH_1SDV_20260719T065351_20260719T065422_003739_006B3E_7ADB",
+      "pipeline": "D",
+      "acquisition_time": "2026-07-19T06:53:51Z",
+      "tile_count": 7684,
+      "annotated_tiles": 0,
+      "ais_presence_seeds": 0,
+      "dark_vessel_candidates": 0,
+      "total_annotations": 0,
+      "class_counts": {
+        "AIS_confirmed": 0,
         "visual_only": 0,
         "dark_vessel_candidate": 0
       },
@@ -110,11 +218,11 @@
     }
   ],
   "global_counts": {
-    "AIS_confirmed": 3321,
+    "AIS_confirmed": 95744,
     "visual_only": 0,
     "dark_vessel_candidate": 0
   },
-  "total_annotations": 3321,
+  "total_annotations": 95744,
   "traceability_summary": {
     "target_density_cell_index": 431,
     "target_cell_bbox": [

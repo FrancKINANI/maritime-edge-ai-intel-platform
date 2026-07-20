@@ -2,16 +2,14 @@
 # Maritime Edge AI Platform — .gitignore
 # =============================================================================
 
+
 # --- Phase 0 data (generated, large) ---
-/phase0/data/scenes/
-/phase0/data/tiles/
-/phase0/data/cvat_annotated_only/
-/phase0/data/colab_export/
-/phase0/data/annotations/*/cvat_import/
-/phase0/data/annotations/*/images/
-/phase0/data/results/
-/phase0/data/samples/
-/phase0/data/analysis/
+/phase_post0/dataset_finetune/
+/phase_post0/models/
+/phase0/data/
+/phase0/docs/
+/docs/
+/data/
 
 # --- Images (generated tiles, never committed) ---
 *.png
