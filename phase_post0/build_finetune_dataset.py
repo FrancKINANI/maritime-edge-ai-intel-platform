@@ -839,31 +839,71 @@ def main() -> None:
         print("=" * 60)
         print("  DRY RUN — Scenes discovered")
         print("=" * 60)
-        n_images = sum(s["n_labels"] for s in scenes)
         for i, scene in enumerate(scenes):
             split_label = split_plan[i] if split_plan else "auto"
+            platform = get_satellite_platform(scene["scene_id"])
             print(f"  [{i}] {scene['scene_id']}")
-            print(f"      Labels:  {scene['n_labels']} files")
-            print(f"      Boxes:   {scene['total_boxes']} annotations")
-            print(f"      Images:  {scene['n_images']} PNGs in cvat_import/")
-            print(f"      Split:   {split_label}")
+            print(f"      Satellite: {platform}")
+            print(f"      Labels:    {scene['n_labels']} files")
+            print(f"      Boxes:     {scene['total_boxes']} annotations")
+            print(f"      Images:    {scene['n_images']} PNGs in cvat_import/")
+            print(f"      Split:     {split_label}")
             print()
         total_boxes = sum(s["total_boxes"] for s in scenes)
         print(f"  Total: {len(scenes)} scenes, {total_boxes} boxes")
         print()
+
         # Estimate split outcome
-        if len(scenes) >= 3:
-            n_train = max(1, int(len(scenes) * 0.6))
+        if args.stratify:
+            # Per-platform stratified estimation
+            platform_counts: Dict[str, int] = {}
+            for scene in scenes:
+                plat = get_satellite_platform(scene["scene_id"])
+                platform_counts[plat] = (
+                    platform_counts.get(plat, 0) + scene["n_labels"]
+                )
+
+            print("  Estimated stratified split (per platform, 70/15/15):")
+            header = f"  {'Platform':<10} {'Total':>8} {'Train':>8} {'Val':>8} {'Test':>8}"
+            print(header)
+            print(f"  {'-'*10} {'-'*8} {'-'*8} {'-'*8} {'-'*8}")
+
+            total_train, total_val, total_test = 0, 0, 0
+            for plat in sorted(platform_counts.keys()):
+                n = platform_counts[plat]
+                n_train = int(n * 70 / 100)
+                n_val = int(n * 15 / 100)
+                n_test = n - n_train - n_val
+                total_train += n_train
+                total_val += n_val
+                total_test += n_test
+                print(f"  {plat:<10} {n:>8} {n_train:>8} {n_val:>8} {n_test:>8}")
+
+            print(f"  {'-'*10} {'-'*8} {'-'*8} {'-'*8} {'-'*8}")
+            total = total_train + total_val + total_test
+            print(f"  {'TOTAL':<10} {total:>8} {total_train:>8} {total_val:>8} {total_test:>8}")
+            print()
+
+            if total_train < 30:
+                logger.warning(
+                    f"Estimated training set: ~{total_train} images — too few for "
+                    f"meaningful fine-tuning. Download at least 3-5 more scenes "
+                    f"before training (target: 100+ training images)."
+                )
         else:
-            n_train = 1 if len(scenes) >= 1 else 0
-        train_scenes = scenes[:n_train]
-        train_images = sum(s["n_labels"] for s in train_scenes)
-        if train_images < 30:
-            logger.warning(
-                f"Estimated training set: {train_images} images — too few for "
-                f"meaningful fine-tuning. Download at least 3-5 more scenes "
-                f"before training (target: 100+ training images)."
-            )
+            # Existing simple estimation (by scene count)
+            if len(scenes) >= 3:
+                n_train = max(1, int(len(scenes) * 0.6))
+            else:
+                n_train = 1 if len(scenes) >= 1 else 0
+            train_scenes = scenes[:n_train]
+            train_images = sum(s["n_labels"] for s in train_scenes)
+            if train_images < 30:
+                logger.warning(
+                    f"Estimated training set: ~{train_images} images — too few for "
+                    f"meaningful fine-tuning. Download at least 3-5 more scenes "
+                    f"before training (target: 100+ training images)."
+                )
         print("=" * 60)
         return
 
