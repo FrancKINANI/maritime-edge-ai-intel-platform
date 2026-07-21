@@ -103,11 +103,11 @@ jobs:
           python -c "from tqdm import tqdm; print('tqdm OK')" 2>&1 || echo 'FAIL: tqdm'
           python -c "from scipy.interpolate import RegularGridInterpolator; print('scipy OK')" 2>&1 || echo 'FAIL: scipy'
           echo '=== Import research modules ==='
-          cd /home/runner/work/maritime-edge-ai-intel-platform/maritime-edge-ai-intel-platform
+          cd $GITHUB_WORKSPACE
           export PYTHONPATH=.
           python -c "import sys; sys.path.insert(0, 'research/scripts'); import download_scenes; print('download_scenes OK')" 2>&1 || echo 'FAIL: download_scenes'
-          python -c "import sys; sys.path.insert(0, 'research/scripts'); from research.scripts.gfw_annotations import GFWClient; print('gfw_annotations OK')" 2>&1 || echo 'FAIL: gfw_annotations'
-          python -c "from research.scripts.sar_preprocessing import GCPGeoreferencer; print('sar_preprocessing OK')" 2>&1 || echo 'FAIL: sar_preprocessing'
+          python -c "import sys; sys.path.insert(0, '.'); from research.scripts.gfw_annotations import GFWClient; print('gfw_annotations OK')" 2>&1 || echo 'FAIL: gfw_annotations'
+          python -c "import sys; sys.path.insert(0, '.'); from research.scripts.sar_preprocessing import GCPGeoreferencer; print('sar_preprocessing OK')" 2>&1 || echo 'FAIL: sar_preprocessing'
           echo '=== Test collection ==='
           python -m pytest research/tests/ --collect-only -q 2>&1 || echo 'COLLECTION FAILED'
       - name: Run tests with coverage
