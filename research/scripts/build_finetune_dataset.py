@@ -38,13 +38,13 @@ Output::
 """
 
 import argparse
+import contextlib
 import json
 import logging
 import shutil
 import sys
 import zipfile
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
 
 import numpy as np
 from PIL import Image
@@ -63,7 +63,7 @@ NODATA_THRESHOLD = 0.3  # max 30% black/zero pixels
 # Scene discovery
 # ---------------------------------------------------------------------------
 
-def discover_scenes(annotations_root: Path, allowed_satellites: Optional[List[str]] = None) -> List[Dict]:
+def discover_scenes(annotations_root: Path, allowed_satellites: list[str] | None = None) -> list[dict]:
     """Scan annotations root and return list of scene dicts.
 
     Each scene dict contains::
@@ -110,10 +110,8 @@ def discover_scenes(annotations_root: Path, allowed_satellites: Optional[List[st
         # Count total annotation lines
         total_boxes = 0
         for lf in label_files:
-            try:
+            with contextlib.suppress(Exception):
                 total_boxes += len(lf.read_text().strip().splitlines())
-            except Exception:
-                pass
 
         # Build a short ID from the first 3 parts of the scene name
         parts = scene_id.split("_")
@@ -143,7 +141,7 @@ def discover_scenes(annotations_root: Path, allowed_satellites: Optional[List[st
 
 def check_bbox_bounds(
     label_path: Path,
-) -> Tuple[bool, List[str]]:
+) -> tuple[bool, list[str]]:
     """Check all bboxes in a label file are within [0, 1] bounds.
 
     Only structural failures cause the tile to be skipped:
@@ -194,7 +192,7 @@ def check_bbox_bounds(
     return not structural_failure, issues
 
 
-def check_nodata_ratio(image_path: Path, threshold: float = NODATA_THRESHOLD) -> Tuple[bool, float]:
+def check_nodata_ratio(image_path: Path, threshold: float = NODATA_THRESHOLD) -> tuple[bool, float]:
     """Check if image has excessive NoData (black/zero) pixels.
 
     Returns (is_valid, nodata_ratio).
@@ -210,7 +208,7 @@ def check_nodata_ratio(image_path: Path, threshold: float = NODATA_THRESHOLD) ->
     return zero_ratio <= threshold, zero_ratio
 
 
-def find_duplicate_boxes(label_path: Path) -> List[str]:
+def find_duplicate_boxes(label_path: Path) -> list[str]:
     """Detect duplicate bounding boxes in a label file.
 
     Two boxes are considered duplicates if their coordinates
@@ -226,7 +224,7 @@ def find_duplicate_boxes(label_path: Path) -> List[str]:
     except Exception:
         return issues
 
-    seen: Set[str] = set()
+    seen: set[str] = set()
     for i, line in enumerate(lines):
         parts = line.strip().split()
         if len(parts) == 5:
@@ -239,10 +237,10 @@ def find_duplicate_boxes(label_path: Path) -> List[str]:
 
 
 def filter_scene_tiles(
-    scene: Dict,
+    scene: dict,
     check_nodata: bool = True,
     skip_empty_labels: bool = True,
-) -> List[Tuple[str, Path, Path]]:
+) -> list[tuple[str, Path, Path]]:
     """Return list of valid (tile_id, image_path, label_path) for this scene.
 
     Applies:
@@ -252,7 +250,7 @@ def filter_scene_tiles(
     4. NoData ratio check (optional)
     5. Duplicate box removal (fixes the file in place)
     """
-    valid_tiles: List[Tuple[str, Path, Path]] = []
+    valid_tiles: list[tuple[str, Path, Path]] = []
     label_dir = scene["label_dir"]
     image_dir = scene["image_dir"]
 
@@ -279,7 +277,7 @@ def filter_scene_tiles(
         if dup_issues:
             # Remove duplicates in-place
             lines = label_path.read_text().strip().splitlines()
-            seen: Set[str] = set()
+            seen: set[str] = set()
             clean_lines = []
             for line in lines:
                 parts = line.strip().split()
@@ -328,9 +326,9 @@ def get_satellite_platform(scene_id: str) -> str:
 
 
 def _split_tile_list_geographic(
-    tiles: List[Tuple[str, Path, Path]],
-    ratios: Tuple[float, float, float],
-) -> Tuple[List, List, List]:
+    tiles: list[tuple[str, Path, Path]],
+    ratios: tuple[float, float, float],
+) -> tuple[list, list, list]:
     """Split a tile list geographically by contiguous chunks.
 
     Tiles are sorted by tile_id (which encodes spatial position in
@@ -362,10 +360,10 @@ def _split_tile_list_geographic(
 
 
 def _stratify_by_platform(
-    scenes: List[Dict],
-    valid_by_scene: Dict[str, List],
-    ratios: Tuple[float, float, float] = (70, 15, 15),
-) -> Dict[str, List[Tuple[str, Path, Path]]]:
+    scenes: list[dict],
+    valid_by_scene: dict[str, list],
+    ratios: tuple[float, float, float] = (70, 15, 15),
+) -> dict[str, list[tuple[str, Path, Path]]]:
     """Stratify split by satellite platform.
 
     Groups scenes by platform (S1C, S1D, etc.), then applies a geographic
@@ -381,17 +379,17 @@ def _stratify_by_platform(
     Returns:
         assigned dict with keys 'train', 'val', 'test'.
     """
-    assigned: Dict[str, List] = {"train": [], "val": [], "test": []}
+    assigned: dict[str, list] = {"train": [], "val": [], "test": []}
 
     # Group tiles by platform
-    platform_tiles: Dict[str, List] = {}
+    platform_tiles: dict[str, list] = {}
     for scene in scenes:
         sid = scene["scene_id"]
         plat = get_satellite_platform(sid)
         platform_tiles.setdefault(plat, []).extend(valid_by_scene.get(sid, []))
 
     logger.info(
-        f"Stratified split by platform: "
+        "Stratified split by platform: "
         + ", ".join(f"{p}: {len(t)} tiles" for p, t in sorted(platform_tiles.items()))
     )
 
@@ -410,7 +408,7 @@ def _stratify_by_platform(
         tiles = assigned[split_name]
         if not tiles:
             continue
-        counts: Dict[str, int] = {}
+        counts: dict[str, int] = {}
         for tile_id, _, _ in tiles:
             plat = get_satellite_platform(tile_id)
             counts[plat] = counts.get(plat, 0) + 1
@@ -421,12 +419,12 @@ def _stratify_by_platform(
 
 
 def assign_splits_by_scene(
-    scenes: List[Dict],
-    valid_by_scene: Dict[str, List],
-    split_plan: List[str],
-    geo_split: Optional[Dict[str, Tuple[float, float, float]]] = None,
+    scenes: list[dict],
+    valid_by_scene: dict[str, list],
+    split_plan: list[str],
+    geo_split: dict[str, tuple[float, float, float]] | None = None,
     stratify: bool = False,
-) -> Dict[str, List[Tuple[str, Path, Path]]]:
+) -> dict[str, list[tuple[str, Path, Path]]]:
     """Assign each scene to a split bucket based on the split plan.
 
     If ``stratify=True``, scenes are grouped by satellite platform and each
@@ -453,7 +451,7 @@ def assign_splits_by_scene(
         for scene in scenes
     }
 
-    assigned: Dict[str, List] = {"train": [], "val": [], "test": []}
+    assigned: dict[str, list] = {"train": [], "val": [], "test": []}
 
     # Stratified by platform takes highest priority
     if stratify:
@@ -461,7 +459,7 @@ def assign_splits_by_scene(
 
     if split_plan and len(split_plan) == len(scenes):
         for scene_id, split_name in zip(
-            [s["scene_id"] for s in scenes], split_plan
+            [s["scene_id"] for s in scenes], split_plan, strict=False
         ):
             if scene_id in (geo_split or {}):
                 ratios = geo_split[scene_id]
@@ -528,14 +526,14 @@ def assign_splits_by_scene(
 
 
 def build_dataset(
-    scenes: List[Dict],
+    scenes: list[dict],
     output_dir: Path,
-    split_plan: Optional[List[str]] = None,
-    geo_split: Optional[Dict[str, Tuple[float, float, float]]] = None,
+    split_plan: list[str] | None = None,
+    geo_split: dict[str, tuple[float, float, float]] | None = None,
     stratify: bool = False,
     check_nodata: bool = True,
     force: bool = False,
-) -> Dict:
+) -> dict:
     """Build the full YOLO dataset.
 
     Args:
@@ -562,7 +560,7 @@ def build_dataset(
             )
 
     # Filter tiles per scene
-    valid_by_scene: Dict[str, List] = {}
+    valid_by_scene: dict[str, list] = {}
     total_before = 0
     total_after = 0
 
@@ -604,10 +602,8 @@ def build_dataset(
     total_boxes = 0
     for split_name in ["train", "val", "test"]:
         for _, _, label_path in assigned.get(split_name, []):
-            try:
+            with contextlib.suppress(Exception):
                 total_boxes += len(label_path.read_text().strip().splitlines())
-            except Exception:
-                pass
 
     # Write data.yaml
     # NOTE: path='.' makes all paths relative to the YAML file's directory.
@@ -676,7 +672,7 @@ def build_dataset(
     print("=" * 60)
     print(f"  Total images: {total_images}")
     print(f"  Total boxes:  {total_boxes}")
-    print(f"  Classes:      1 (vessel)")
+    print("  Classes:      1 (vessel)")
     print(f"  Image size:   {TILE_SIZE}x{TILE_SIZE}")
     for split_name in ["train", "val", "test"]:
         n = len(assigned.get(split_name, []))
@@ -805,7 +801,7 @@ def main() -> None:
     logger.info(f"Found {len(scenes)} scene(s) to process")
 
     # Parse geo-split specs
-    geo_split: Optional[Dict[str, Tuple[float, float, float]]] = None
+    geo_split: dict[str, tuple[float, float, float]] | None = None
     if args.geo_split:
         geo_split = {}
         for spec in args.geo_split:
@@ -856,7 +852,7 @@ def main() -> None:
         # Estimate split outcome
         if args.stratify:
             # Per-platform stratified estimation
-            platform_counts: Dict[str, int] = {}
+            platform_counts: dict[str, int] = {}
             for scene in scenes:
                 plat = get_satellite_platform(scene["scene_id"])
                 platform_counts[plat] = (
@@ -892,10 +888,7 @@ def main() -> None:
                 )
         else:
             # Existing simple estimation (by scene count)
-            if len(scenes) >= 3:
-                n_train = max(1, int(len(scenes) * 0.6))
-            else:
-                n_train = 1 if len(scenes) >= 1 else 0
+            n_train = max(1, int(len(scenes) * 0.6)) if len(scenes) >= 3 else 1 if len(scenes) >= 1 else 0
             train_scenes = scenes[:n_train]
             train_images = sum(s["n_labels"] for s in train_scenes)
             if train_images < 30:
@@ -908,7 +901,7 @@ def main() -> None:
         return
 
     # Build
-    summary = build_dataset(
+    build_dataset(
         scenes,
         output_dir,
         split_plan=split_plan,

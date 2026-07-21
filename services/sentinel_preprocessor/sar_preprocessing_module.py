@@ -14,7 +14,7 @@ from scipy.interpolate import RegularGridInterpolator
 
 # Reuse the robust windowed pipeline implementation from phase0 when available.
 try:
-    from phase0.scripts.sar_preprocessing import (
+    from research.scripts.sar_preprocessing import (
         _lee_filter_windowed,
         process_safe_windowed,
     )
@@ -297,7 +297,7 @@ def tile_image(
     return tiles
 
 
-def pipeline_A(safe_path: str, output_dir: str | None = None) -> dict[str, Any]:
+def pipeline_a(safe_path: str, output_dir: str | None = None) -> dict[str, Any]:
     """Pipeline A: baseline using phase0 implementation when available.
     Returns manifest dictionary with tile metadata.
     """
@@ -306,19 +306,19 @@ def pipeline_A(safe_path: str, output_dir: str | None = None) -> dict[str, Any]:
     raise NotImplementedError("phase0 implementation not available in workspace")
 
 
-def pipeline_B(safe_path: str, output_dir: str | None = None) -> dict[str, Any]:
+def pipeline_b(safe_path: str, output_dir: str | None = None) -> dict[str, Any]:
     if _HAS_PHASE0:
         return process_safe_windowed(safe_path, "B", output_dir or "data/tiles")
     raise NotImplementedError("phase0 implementation not available in workspace")
 
 
-def pipeline_C(safe_path: str, output_dir: str | None = None) -> dict[str, Any]:
+def pipeline_c(safe_path: str, output_dir: str | None = None) -> dict[str, Any]:
     if _HAS_PHASE0:
         return process_safe_windowed(safe_path, "C", output_dir or "data/tiles")
     raise NotImplementedError("phase0 implementation not available in workspace")
 
 
-def pipeline_D(safe_path: str, output_dir: str | None = None) -> dict[str, Any]:
+def pipeline_d(safe_path: str, output_dir: str | None = None) -> dict[str, Any]:
     if _HAS_PHASE0:
         return process_safe_windowed(safe_path, "D", output_dir or "data/tiles")
     raise NotImplementedError("phase0 implementation not available in workspace")
@@ -329,7 +329,7 @@ def pipeline_D(safe_path: str, output_dir: str | None = None) -> dict[str, Any]:
 # --------------------------------------------------------------------------
 
 
-class SafetyViolation(Exception):
+class SafetyViolationError(Exception):
     """Raised when a file path attempts to escape allowed directories."""
 
     pass
@@ -363,7 +363,7 @@ def validate_safe_path(path: str) -> str:
         SafetyViolation: If the path is deemed unsafe.
     """
     if not path:
-        raise SafetyViolation("Empty path is not allowed")
+        raise SafetyViolationError("Empty path is not allowed")
 
     # Normalize the path to resolve any '..' or '.' components
     resolved = Path(path).resolve()
@@ -371,13 +371,13 @@ def validate_safe_path(path: str) -> str:
     # Reject paths with unresolved '..' or traversal patterns
     # (Path.resolve() eliminates these, but we also check the raw path)
     if ".." in path.split(os.sep):
-        raise SafetyViolation(f"Path contains '..' traversal: {path}")
+        raise SafetyViolationError(f"Path contains '..' traversal: {path}")
 
     # Reject system file paths
     system_dirs = ["/etc", "/proc", "/dev", "/tmp", "/var", "/sys", "/boot", "/root"]
     for sys_dir in system_dirs:
         if str(resolved).startswith(sys_dir) or path.startswith(sys_dir):
-            raise SafetyViolation(f"Path references system directory: {path}")
+            raise SafetyViolationError(f"Path references system directory: {path}")
 
     # Check that the resolved path falls within an allowed base directory
     # If the path is relative and doesn't start with /, allow it only if
@@ -385,6 +385,6 @@ def validate_safe_path(path: str) -> str:
     if path.startswith("/"):
         allowed = any(str(resolved).startswith(str(base_dir.resolve())) for base_dir in _ALLOWED_BASE_DIRS)
         if not allowed:
-            raise SafetyViolation(f"Path is outside allowed directories: {path}")
+            raise SafetyViolationError(f"Path is outside allowed directories: {path}")
 
     return str(resolved)

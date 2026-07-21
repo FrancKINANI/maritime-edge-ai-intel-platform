@@ -145,7 +145,7 @@ async def fetch_tle_from_satnogs(norad_id: int) -> dict[str, Any]:
     return entry
 
 
-def _tle_entry_to_TLEData(entry: dict[str, Any]) -> TLEData:
+def _tle_entry_to_tle_data(entry: dict[str, Any]) -> TLEData:
     """Convert a raw TLE cache entry dict to a validated TLEData Pydantic model."""
     _validate_tle_entry(entry)
     return TLEData(
@@ -203,7 +203,7 @@ async def _fetch_tle_with_fallback(norad_id: int) -> dict[str, Any]:
 @app.get("/tle/{norad_id}", response_model=TLEData)
 async def get_current_tle(norad_id: int) -> TLEData:
     entry = await _fetch_tle_with_fallback(norad_id)
-    return _tle_entry_to_TLEData(entry)
+    return _tle_entry_to_tle_data(entry)
 
 
 @app.get("/position", response_model=dict[str, Any])
@@ -242,7 +242,7 @@ async def get_satellite_position(satellite_id: str, timestamp: datetime) -> dict
         alt_m = subpoint.elevation.m
     except Exception as e:
         logger.error("SGP4 propagation error for NORAD %s: %s", norad, e, exc_info=True)
-        raise HTTPException(status_code=500, detail="SGP4 propagation error")
+        raise HTTPException(status_code=500, detail="SGP4 propagation error") from e
 
     tle_fresh = _is_cache_fresh(entry.get("updated_at"))
     return {

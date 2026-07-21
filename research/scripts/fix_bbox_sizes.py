@@ -37,7 +37,6 @@ import math
 import random
 import sys
 from pathlib import Path
-from typing import List, Optional, Tuple
 
 logging.basicConfig(
     level=logging.INFO,
@@ -55,7 +54,7 @@ ANNOTATIONS_ROOT = Path("phase0/data/annotations")
 # Statistical vessel size model (same as gfw_annotations.py)
 # ---------------------------------------------------------------------------
 
-def _sample_vessel_dimensions(rng: random.Random) -> Tuple[float, float]:
+def _sample_vessel_dimensions(rng: random.Random) -> tuple[float, float]:
     """Sample vessel dimensions WITHOUT type info (global distribution).
 
     Same model as `_sample_vessel_dimensions()` in gfw_annotations.py
@@ -85,7 +84,7 @@ def _sample_vessel_dimensions(rng: random.Random) -> Tuple[float, float]:
     return effective_length_m, aspect_ratio
 
 
-def sample_bbox_size(rng: random.Random) -> Tuple[float, float]:
+def sample_bbox_size(rng: random.Random) -> tuple[float, float]:
     """Sample a realistic (width, height) in YOLO normalized coordinates.
 
     Returns (w, h) both in [0.001, 1.0].
@@ -232,7 +231,7 @@ def fix_scene_labels(scene_dir: Path, rng: random.Random, dry_run: bool = False)
             try:
                 cls_id = int(parts[0])
                 cx, cy = float(parts[1]), float(parts[2])
-                w_old, h_old = float(parts[3]), float(parts[4])
+                _w_old, _h_old = float(parts[3]), float(parts[4])
             except ValueError:
                 new_lines.append(line)
                 continue
@@ -315,9 +314,9 @@ def main():
 
     if args.dry_run:
         logger.info("[DRY-RUN] Running fix without writing...")
-    
-    total_fixed = fix_all_scenes(dry_run=args.dry_run)
-    
+
+    fix_all_scenes(dry_run=args.dry_run)
+
     # Step 3: Verify fix
     if not args.dry_run:
         new_stats = analyze_distribution()

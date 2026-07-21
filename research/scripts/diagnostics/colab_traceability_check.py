@@ -83,13 +83,13 @@ from pathlib import Path
 
 # NOTE: logging.basicConfig is called by the imported modules themselves
 # at import time. Do NOT call it again here to avoid duplicate handlers.
-from phase0.scripts.download_scenes import (
+from research.scripts.download_scenes import (
     MOROCCO_BBOX,
     build_ais_density_map,
     get_cdse_token,
     select_and_download_scenes_from_density,
 )
-from phase0.scripts.sar_preprocessing import process_safe_windowed
+from research.scripts.sar_preprocessing import process_safe_windowed
 
 SCENES_DIR = Path("phase0/data/scenes")
 SCENES_DIR.mkdir(parents=True, exist_ok=True)

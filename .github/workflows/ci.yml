@@ -22,11 +22,11 @@ jobs:
       - name: Install linters
         run: pip install ruff bandit
       - name: Ruff check
-        run: ruff check services/ phase0/ shared/
+        run: ruff check services/ research/ shared/
       - name: Bandit SAST scan
         run: |
           bandit -r services/ -f sarif -o bandit-results.sarif || true
-          bandit -r phase0/ --quiet || true
+          bandit -r research/ --quiet || true
       - name: Upload Bandit results
         uses: github/codeql-action/upload-sarif@v3
         with:
@@ -43,13 +43,13 @@ jobs:
           echo "=== Docker base image ==="
           test -f docker/base/Dockerfile && echo "  ✅ Base"
           echo "=== Core services ==="
-          for d in services/data-ingestor services/sentinel-preprocessor services/detector \
-                   services/satellite-monitor services/aggregator services/ground-dashboard; do
+          for d in services/data_ingestor services/sentinel_preprocessor services/detector \
+                   services/satellite_monitor services/aggregator services/ground_dashboard; do
             test -d "$d" && echo "  ✅ $d" || exit 1
           done
           echo "=== Tests ==="
-          for d in services/data-ingestor/tests services/aggregator/tests services/detector/tests \
-                   services/satellite-monitor/tests services/sentinel-preprocessor/tests shared/tests; do
+          for d in services/data_ingestor/tests services/aggregator/tests services/detector/tests \
+                   services/satellite_monitor/tests services/sentinel_preprocessor/tests shared/tests; do
             test -d "$d" && echo "  ✅ $d"
           done
           echo "Structure OK"
@@ -60,15 +60,15 @@ jobs:
     strategy:
       matrix:
         suite:
-          - phase0/tests/
-          - services/sentinel-preprocessor/tests/
+          - research/tests/
+          - services/sentinel_preprocessor/tests/
           - services/aggregator/tests/
           - services/detector/tests/
-          - services/satellite-monitor/tests/
-          - services/data-ingestor/tests/
+          - services/satellite_monitor/tests/
+          - services/data_ingestor/tests/
           - shared/tests/
           - tests/integration/
-          - tests/ground_dashboard/
+          - services/ground_dashboard/tests/
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -79,12 +79,12 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libgl1 libglib2.0-0
       - name: Install test dependencies
         run: |
-          pip install -r services/sentinel-preprocessor/requirements.txt \
+          pip install                      -r services/sentinel_preprocessor/requirements.txt \
                       -r services/aggregator/requirements.txt \
-                      -r services/data-ingestor/requirements.txt \
+                      -r services/data_ingestor/requirements.txt \
                       -r services/detector/requirements.txt \
-                      -r services/satellite-monitor/requirements.txt \
-                      -r phase0/requirements.txt \
+                      -r services/satellite_monitor/requirements.txt \
+                      -r research/requirements.txt \
                       -r docker/base/requirements.txt
           pip install pytest pytest-asyncio pytest-cov pytest-timeout
       - name: Run tests with coverage
@@ -121,7 +121,7 @@ jobs:
           output: trivy-results.sarif
           severity: HIGH,CRITICAL
           exit-code: 0
-          skip-dirs: phase0/data,phase_post0
+          skip-dirs: research/data,research/dataset_finetune
       - name: Upload Trivy results
         uses: github/codeql-action/upload-sarif@v3
         with:

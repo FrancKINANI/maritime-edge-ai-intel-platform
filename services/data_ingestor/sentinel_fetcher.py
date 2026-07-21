@@ -1,4 +1,4 @@
-# services/data-ingestor/sentinel_fetcher.py
+# services/data_ingestor/sentinel_fetcher.py
 """Sentinel-1 SAFE Product Fetcher.
 
 Helper interface containing download and API query functions to fetch files from Copernicus.
@@ -7,7 +7,7 @@ Helper interface containing download and API query functions to fetch files from
 import os
 from typing import Any
 
-from phase0.scripts.download_scenes import download_product, get_cdse_token, search_sentinel1_products
+from research.scripts.download_scenes import download_product, get_cdse_token, search_sentinel1_products
 
 
 def search_cdse_odata(

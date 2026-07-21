@@ -52,7 +52,7 @@ def test_gcp_interpolation_zero_error_at_control_points():
 def test_gcp_interpolation_boundary_extrapolates_without_bounds_error():
     """Document that bare RegularGridInterpolator(bounds_error=False) extrapolates.
 
-    Production code must NOT rely on this path: services/sentinel-preprocessor
+    Production code must NOT rely on this path: services/sentinel_preprocessor
     raises GCPOutOfBoundsError for pixels outside the GCP grid instead.
     This test only locks the scipy default behavior used historically in Phase 0.
     """

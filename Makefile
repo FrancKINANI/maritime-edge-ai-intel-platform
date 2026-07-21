@@ -25,18 +25,18 @@ test-all:
 	@# Single invocation with importlib mode avoids namespace collisions.
 	@echo "=== Running all tests ==="
 	uv run python -m pytest services/aggregator/tests/ services/detector/tests/ \
-		services/satellite-monitor/tests/ services/data-ingestor/tests/ \
-		services/sentinel-preprocessor/tests/ phase0/tests/ shared/tests/ \
-		tests/integration/ tests/ground_dashboard/ -v -q
+		services/satellite_monitor/tests/ services/data_ingestor/tests/ \
+		services/sentinel_preprocessor/tests/ research/tests/ shared/tests/ \
+		tests/integration/ services/ground_dashboard/tests/ -v -q
 
 test-services:
 	@echo "=== Service tests ==="
-	uv run python -m pytest phase0/tests/ -q
-	uv run python -m pytest services/sentinel-preprocessor/tests/ -q
+	uv run python -m pytest research/tests/ -q
+	uv run python -m pytest services/sentinel_preprocessor/tests/ -q
 	uv run python -m pytest services/aggregator/tests/ -q
 	uv run python -m pytest services/detector/tests/ -q
-	uv run python -m pytest services/satellite-monitor/tests/ -q
-	uv run python -m pytest services/data-ingestor/tests/ -q
+	uv run python -m pytest services/satellite_monitor/tests/ -q
+	uv run python -m pytest services/data_ingestor/tests/ -q
 	uv run python -m pytest shared/tests/ -q
 
 test-integration:
@@ -50,12 +50,12 @@ test-coverage:
 	uv run python -m pytest services/aggregator/tests/ services/detector/tests/ \
 		services/satellite-monitor/tests/ services/data-ingestor/tests/ \
 		services/sentinel-preprocessor/tests/ phase0/tests/ shared/tests/ \
-		tests/integration/ tests/ground_dashboard/ -q \
+		tests/integration/ services/ground_dashboard/tests/ -q \
 		--cov=. --cov-report=term --cov-report=html:coverage_html \
 		--cov-fail-under=60
 
 lint:
-	ruff check services/ phase0/ shared/
+	ruff check services/ research/ shared/
 
 sast:
 	bandit -r services/ --quiet || true

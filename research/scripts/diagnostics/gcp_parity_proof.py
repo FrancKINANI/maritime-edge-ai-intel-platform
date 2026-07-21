@@ -20,10 +20,10 @@ sys.path.insert(0, ".")
 # 1. Load service module via importlib (hyphen-proof)
 spec = importlib.util.spec_from_file_location(
     "service_sar",
-    "services/sentinel-preprocessor/sar_preprocessing_module.py",
+    "services/sentinel_preprocessor/sar_preprocessing_module.py",
 )
 if spec is None:
-    print("FATAL: could not locate services/sentinel-preprocessor/sar_preprocessing_module.py")
+    print("FATAL: could not locate services/sentinel_preprocessor/sar_preprocessing_module.py")
     sys.exit(1)
 
 mod = importlib.util.module_from_spec(spec)
@@ -34,7 +34,7 @@ print("SUCCESS: Service module loaded via importlib")
 ServiceGCPGeoreferencer = mod.GCPGeoreferencer
 
 # 2. Import phase0 implementation
-from phase0.scripts.sar_preprocessing import GCPGeoreferencer as Phase0GCPGeoreferencer  # noqa: E402
+from research.scripts.sar_preprocessing import GCPGeoreferencer as Phase0GCPGeoreferencer  # noqa: E402
 
 # 3. Same synthetic GCP set as the test
 n_lines, n_pixels = 5, 5

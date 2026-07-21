@@ -15,7 +15,6 @@ Output:
 import json
 import os
 import sys
-from collections import defaultdict
 
 
 def analyze_dataset(dataset_dir: str) -> None:

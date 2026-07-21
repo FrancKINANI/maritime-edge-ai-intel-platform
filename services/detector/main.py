@@ -145,7 +145,7 @@ async def detect_vessels(req: DetectRequest) -> DetectionEvent:
             logger.error("Failed to load tile from path %s: %s", req.tile_path, e, exc_info=True)
             raise HTTPException(
                 status_code=400, detail="Unable to load tile from the provided path. Ensure it is a valid .npy file."
-            )
+            ) from e
     elif req.tile_b64:
         try:
             raw = base64.b64decode(req.tile_b64)
@@ -155,7 +155,7 @@ async def detect_vessels(req: DetectRequest) -> DetectionEvent:
             raise HTTPException(
                 status_code=400,
                 detail="Unable to decode the provided base64 tile. Ensure it is a valid .npy file encoded in base64.",
-            )
+            ) from e
     else:
         raise HTTPException(status_code=400, detail="Either tile_path or tile_b64 must be provided")
 
@@ -166,7 +166,7 @@ async def detect_vessels(req: DetectRequest) -> DetectionEvent:
         outputs = DETECTOR_SESSION.run(None, {input_name: inp})
     except Exception as e:
         logger.error(f"ONNX runtime error during inference: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Model inference error")
+        raise HTTPException(status_code=500, detail="Model inference error") from e
     # YOLOv8 style output: (1, n, 85) or list
     preds = outputs[0]
     preds = np.squeeze(preds)
@@ -217,7 +217,7 @@ async def detect_vessels(req: DetectRequest) -> DetectionEvent:
     event = DetectionEvent(
         event_id=str(uuid.uuid4()),
         scene_id=req.scene_id or "unknown",
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
         tile_id=req.tile_id or str(uuid.uuid4()),
         tile_bbox_latlon=[0.0, 0.0, 0.0, 0.0],
         detections=detections,

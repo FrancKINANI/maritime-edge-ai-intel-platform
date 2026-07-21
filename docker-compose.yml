@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   redis:
     image: redis:7-alpine
@@ -15,7 +13,7 @@ services:
   data-ingestor:
     build:
       context: .
-      dockerfile: services/data-ingestor/Dockerfile
+      dockerfile: services/data_ingestor/Dockerfile
     container_name: maritime-data-ingestor
     ports:
       - "8001:8001"
@@ -43,7 +41,7 @@ services:
   sentinel-preprocessor:
     build:
       context: .
-      dockerfile: services/sentinel-preprocessor/Dockerfile
+      dockerfile: services/sentinel_preprocessor/Dockerfile
     container_name: maritime-sentinel-preprocessor
     ports:
       - "8000:8000"
@@ -90,7 +88,7 @@ services:
   satellite-monitor:
     build:
       context: .
-      dockerfile: services/satellite-monitor/Dockerfile
+      dockerfile: services/satellite_monitor/Dockerfile
     container_name: maritime-satellite-monitor
     ports:
       - "8004:8000"
@@ -134,7 +132,7 @@ services:
   ground-dashboard:
     build:
       context: .
-      dockerfile: services/ground-dashboard/Dockerfile
+      dockerfile: services/ground_dashboard/Dockerfile
     container_name: maritime-ground-dashboard
     ports:
       - "8501:8501"

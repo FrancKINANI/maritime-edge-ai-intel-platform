@@ -1,0 +1,1 @@
+"""Satellite monitor service package."""

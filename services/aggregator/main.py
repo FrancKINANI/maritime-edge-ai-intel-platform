@@ -142,7 +142,7 @@ async def ingest_detection_event(event: DetectionEvent) -> DetectionEvent:
         return event
     except Exception as e:
         logger.error(f"Database error in ingest_detection_event: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal database error")
+        raise HTTPException(status_code=500, detail="Internal database error") from e
 
 
 @app.get("/events", response_model=list[DetectionEvent])

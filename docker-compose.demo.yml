@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # ── Shared base image (build once, used by all services) ──
   maritime-base:
@@ -62,7 +60,7 @@ services:
   sentinel-preprocessor:
     build:
       context: .
-      dockerfile: services/sentinel-preprocessor/Dockerfile
+      dockerfile: services/sentinel_preprocessor/Dockerfile
     container_name: maritime-preprocessor-demo
     ports:
       - "8000:8000"
@@ -85,7 +83,7 @@ services:
   satellite-monitor:
     build:
       context: .
-      dockerfile: services/satellite-monitor/Dockerfile
+      dockerfile: services/satellite_monitor/Dockerfile
     container_name: maritime-satmon-demo
     ports:
       - "8004:8000"
@@ -105,7 +103,7 @@ services:
   data-ingestor:
     build:
       context: .
-      dockerfile: services/data-ingestor/Dockerfile
+      dockerfile: services/data_ingestor/Dockerfile
     container_name: maritime-ingestor-demo
     ports:
       - "8001:8000"
@@ -128,7 +126,7 @@ services:
   ground-dashboard:
     build:
       context: .
-      dockerfile: services/ground-dashboard/Dockerfile
+      dockerfile: services/ground_dashboard/Dockerfile
     container_name: maritime-ground-dashboard-demo
     ports:
       - "8501:8501"

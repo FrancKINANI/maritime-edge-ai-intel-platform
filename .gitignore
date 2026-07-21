@@ -3,11 +3,11 @@
 # =============================================================================
 
 
-# --- Phase 0 data (generated, large) ---
-/phase_post0/dataset_finetune/
-/phase_post0/models/
-/phase0/data/
-/phase0/docs/
+# --- Research data (generated, large) ---
+/research/dataset_finetune/
+/research/models/
+/research/data/
+/research/docs/
 /docs/
 /data/
 

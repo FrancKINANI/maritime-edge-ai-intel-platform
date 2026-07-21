@@ -29,7 +29,7 @@ Architecture:
 Note on GCP duplication:
     GCP logic intentionally duplicated (no phase0<->services dependency).
     The GCPGeoreferencer and GCPOutOfBoundsError classes below are a standalone
-    copy from services/sentinel-preprocessor/sar_preprocessing.py.
+    copy from services/sentinel_preprocessor/sar_preprocessing.py.
     ASSUMED RISK: any bug fix here must be manually replicated
     in the other file (and vice versa).
 """
@@ -37,7 +37,7 @@ Note on GCP duplication:
 # Note on GCP duplication:
 # GCP logic intentionally duplicated (no phase0<->services dependency).
 # The GCPGeoreferencer and GCPOutOfBoundsError classes below are a standalone
-# copy from services/sentinel-preprocessor/sar_preprocessing.py.
+# copy from services/sentinel_preprocessor/sar_preprocessing.py.
 # ASSUMED RISK: any bug fix here must be manually replicated
 # in the other file (and vice versa).
 
@@ -92,7 +92,7 @@ class GCPOutOfBoundsError(Exception):
     - Document and accept the extrapolation behavior
 
     (Standalone copy -- report bug fixes in
-     services/sentinel-preprocessor/sar_preprocessing.py)
+     services/sentinel_preprocessor/sar_preprocessing.py)
     """
 
     pass
@@ -119,7 +119,7 @@ class GCPGeoreferencer:
         improvising border management.
 
     (Standalone copy -- report bug fixes in
-     services/sentinel-preprocessor/sar_preprocessing.py)
+     services/sentinel_preprocessor/sar_preprocessing.py)
     """
 
     def __init__(self, gcps: np.ndarray, image_shape: tuple[int, int]):

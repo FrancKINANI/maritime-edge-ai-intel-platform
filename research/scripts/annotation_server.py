@@ -135,7 +135,7 @@ def create_app(data_root: Path) -> FastAPI:
 
     @app.get("/", response_class=HTMLResponse)
     async def index():
-        return INDEX_HTML
+        return HTML_DISPLAY
 
     # ------------------------------------------------------------------
     # API: List scenes
@@ -243,7 +243,6 @@ def create_app(data_root: Path) -> FastAPI:
         validated: bool
         boxes: list[dict[str, Any]]
 
-    from pydantic import BaseModel  # noqa
 
     @app.post("/api/scenes/{scene_id}/tiles/{tile_id}/decision")
     async def save_decision(scene_id: str, tile_id: str, decision: DecisionRequest):

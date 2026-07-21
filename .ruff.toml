@@ -4,7 +4,7 @@
 target-version = "py311"
 line-length = 120
 
-exclude = ["*.ipynb", "coverage_html", "phase0/data", "phase_post0"]
+exclude = ["*.ipynb", "coverage_html", "research/data", "research/dataset_finetune"]
 
 [lint]
 # S = flake8-bandit, I = isort, N = pep8-naming, D = pydocstyle
@@ -28,8 +28,8 @@ ignore = [
 
 [lint.per-file-ignores]
 "services/**/main.py" = ["S310"]  # HTTP URLs allowed for internal service calls
-"phase0/scripts/*.py" = ["S310", "S311", "S607", "S301"]
-"phase0/notebooks/*.py" = ["S310", "S311", "S607"]
+"research/scripts/*.py" = ["S310", "S311", "S607", "S301"]
+"research/notebooks/*.py" = ["S310", "S311", "S607"]
 "tests/**" = ["S101", "S311"]
 "shared/**" = ["S310"]
 

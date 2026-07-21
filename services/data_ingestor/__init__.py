@@ -1,0 +1,1 @@
+"""Data ingestor service package."""

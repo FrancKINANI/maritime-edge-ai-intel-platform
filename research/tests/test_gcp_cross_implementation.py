@@ -2,7 +2,7 @@
 
 Verifies that the standalone GCPGeoreferencer implementation in
 phase0/scripts/sar_preprocessing.py produces IDENTICAL results
-to the original implementation in services/sentinel-preprocessor/sar_preprocessing.py
+to the original implementation in services/sentinel_preprocessor/sar_preprocessing.py
 on the same input data.
 
 This test meets the prompt.md (Part A.1) requirement:
@@ -21,10 +21,10 @@ import numpy as np
 import pytest
 
 # Import phase0 implementation
-from phase0.scripts.sar_preprocessing import (
+from research.scripts.sar_preprocessing import (
     GCPGeoreferencer as Phase0GCPGeoreferencer,
 )
-from phase0.scripts.sar_preprocessing import (
+from research.scripts.sar_preprocessing import (
     GCPOutOfBoundsError as Phase0GCPOutOfBoundsError,
 )
 
@@ -141,7 +141,7 @@ def test_gcp_cross_implementation_parity() -> None:
     if not _SERVICE_IMPORT_OK:
         pytest.skip(
             "Service implementation not available — cannot compare. "
-            "The directory 'services/sentinel-preprocessor/' contains a "
+            "The directory 'services/sentinel_preprocessor/' contains a "
             "hyphen which prevents regular Python imports. "
             "Use importlib.util.spec_from_file_location() to load it."
         )

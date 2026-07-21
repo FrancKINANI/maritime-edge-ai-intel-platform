@@ -905,7 +905,7 @@ def convert_npy_tiles_to_png(
     try:
         from PIL import Image
     except ImportError:
-        raise ImportError("Pillow is required for PNG conversion. Install it with: pip install Pillow")
+        raise ImportError from None("Pillow is required for PNG conversion. Install it with: pip install Pillow")
     import numpy as np
     from tqdm import tqdm
 

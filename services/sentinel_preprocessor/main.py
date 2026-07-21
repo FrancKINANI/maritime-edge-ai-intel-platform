@@ -60,18 +60,18 @@ async def preprocess_scene(safe_path: str, pipeline: str = None, output_dir: str
 
     try:
         if pipeline == "A":
-            result = sar_preprocessing.pipeline_A(safe_path, output_dir)
+            result = sar_preprocessing.pipeline_a(safe_path, output_dir)
         elif pipeline == "B":
-            result = sar_preprocessing.pipeline_B(safe_path, output_dir)
+            result = sar_preprocessing.pipeline_b(safe_path, output_dir)
         elif pipeline == "C":
-            result = sar_preprocessing.pipeline_C(safe_path, output_dir)
+            result = sar_preprocessing.pipeline_c(safe_path, output_dir)
         else:
-            result = sar_preprocessing.pipeline_D(safe_path, output_dir)
+            result = sar_preprocessing.pipeline_d(safe_path, output_dir)
     except NotImplementedError as e:
-        raise HTTPException(status_code=501, detail=str(e))
+        raise HTTPException(status_code=501, detail=str(e)) from e
     except Exception as e:
         logger.error("Preprocessing failed: %s", e, exc_info=True)
-        raise HTTPException(status_code=500, detail="Preprocessing failed")
+        raise HTTPException(status_code=500, detail="Preprocessing failed") from e
 
     return result
 

@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from phase0.scripts.gfw_annotations import GFWClient, _normalize_response_entries
+from research.scripts.gfw_annotations import GFWClient, _normalize_response_entries
 
 
 @pytest.fixture

@@ -13,8 +13,8 @@ venv/
 *.egg
 
 # Data (excluded from Docker images — mounted as volumes)
-phase0/data/
-phase_post0/
+research/data/
+research/dataset_finetune/
 
 # Notebooks
 *.ipynb
