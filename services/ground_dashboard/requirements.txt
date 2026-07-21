@@ -87,7 +87,7 @@ pandas==2.3.3
     # via
     #   -r services/ground-dashboard/requirements.in
     #   streamlit
-pillow==12.2.0
+pillow==12.3.0
     # via streamlit
 plotly==6.8.0
     # via -r services/ground-dashboard/requirements.in
