@@ -89,9 +89,7 @@ jobs:
           pip install pytest pytest-asyncio pytest-cov pytest-timeout
       - name: Install research dependencies
         if: contains(matrix.suite, 'research')
-        run: |
-          sudo apt-get update && sudo apt-get install -y libgdal-dev
-          pip install scipy rasterio
+        run: pip install scipy
       - name: Run tests with coverage
         env:
           PYTHONPATH: .

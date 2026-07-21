@@ -50,8 +50,13 @@ from typing import Any
 
 import numpy as np
 import psutil
-import rasterio
-from rasterio.windows import Window
+
+try:
+    import rasterio
+    from rasterio.windows import Window
+except ImportError:
+    rasterio = None  # type: ignore
+    Window = None  # type: ignore
 from scipy.interpolate import RegularGridInterpolator
 from scipy.ndimage import uniform_filter
 from tqdm import tqdm
@@ -227,8 +232,12 @@ def extract_gcps_from_geotiff(tiff_path: str) -> tuple[np.ndarray, tuple[int, in
     Raises:
         ValueError: If the GeoTIFF contains no GCPs or if the GCPs do not
             form a regular grid.
+        ImportError: If rasterio is not installed.
     """
-    import rasterio
+    if rasterio is None:
+        raise ImportError(
+            "rasterio is required for extract_gcps_from_geotiff. Install with: pip install rasterio"
+        )
 
     with rasterio.open(tiff_path) as src:
         image_shape = (src.height, src.width)
