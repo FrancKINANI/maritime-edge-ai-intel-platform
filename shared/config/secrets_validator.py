@@ -75,12 +75,13 @@ def validate_secrets(
         if error_on_missing:
             raise SecretsValidationError(error_msg)
         else:
-            warnings.warn(f"WARNING: {error_msg}")
+            warnings.warn(f"WARNING: {error_msg}", stacklevel=2)
 
     # Report missing optional variables
     if missing_optional:
         warnings.warn(
             f"WARNING: Missing optional environment variables: {', '.join(missing_optional)}",
+            stacklevel=2,
         )
 
     return env_values

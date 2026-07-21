@@ -374,7 +374,7 @@ def validate_safe_path(path: str) -> str:
         raise SafetyViolationError(f"Path contains '..' traversal: {path}")
 
     # Reject system file paths
-    system_dirs = ["/etc", "/proc", "/dev", "/tmp", "/var", "/sys", "/boot", "/root"]
+    system_dirs = ["/etc", "/proc", "/dev", "/tmp", "/var", "/sys", "/boot", "/root"]  # noqa: S108
     for sys_dir in system_dirs:
         if str(resolved).startswith(sys_dir) or path.startswith(sys_dir):
             raise SafetyViolationError(f"Path references system directory: {path}")

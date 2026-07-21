@@ -224,11 +224,12 @@ async def get_satellite_position(satellite_id: str, timestamp: datetime) -> dict
                 norad = k
                 break
         if norad is None:
-            raise HTTPException(
-                status_code=400,
-                detail=f"satellite_id '{satellite_id}' is not a valid NORAD ID and no cached satellite matches this name. "
-                f"Use a numeric NORAD ID (e.g., 39634 for Sentinel-1A) or query /tle/{{norad_id}} first.",
-            ) from None
+            msg = (
+                f"satellite_id '{satellite_id}' is not a valid NORAD ID and no cached "
+                f"satellite matches this name. Use a numeric NORAD ID (e.g., 39634 "
+                f"for Sentinel-1A) or query /tle/{{norad_id}} first."
+            )
+            raise HTTPException(status_code=400, detail=msg) from None
 
     entry = await _fetch_tle_with_fallback(norad)
     _validate_tle_entry(entry)

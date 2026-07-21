@@ -36,7 +36,7 @@ spec.loader.exec_module(sar_preprocessing)
 
 app = FastAPI(
     title="Maritime Edge AI Intel Platform - Sentinel Preprocessor",
-    description="Microservice responsible for calibrating, filtering, scaling, and tiling SAR images.",
+    description="Microservice for calibrating, filtering, scaling, and tiling SAR images.",
     version="1.0.0",
 )
 

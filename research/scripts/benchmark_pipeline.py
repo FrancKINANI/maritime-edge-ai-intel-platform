@@ -206,11 +206,8 @@ def run_inference(
 
         # Load tile uint8, grayscale
         tile_uint8 = np.load(npy_path).astype(np.uint8)
-        if tile_uint8.ndim == 2:
-            # Convert grayscale to 3-channel RGB (stack identical channels)
-            tile_rgb = np.stack([tile_uint8] * 3, axis=-1)
-        else:
-            tile_rgb = tile_uint8
+        # Convert grayscale to 3-channel RGB (stack identical channels)
+        tile_rgb = np.stack([tile_uint8] * 3, axis=-1) if tile_uint8.ndim == 2 else tile_uint8
 
         # Real resize 512x512 -> input_size x input_size (not slice assignment)
         img = Image.fromarray(tile_rgb)
@@ -358,6 +355,7 @@ def compute_ks_distance(
                 data = np.load(str(tile_path))
                 pixels.extend(data.flatten().tolist())
             except Exception:
+                logger.warning("Failed to load tile %s, skipping", tile_path)
                 continue
         if pixels:
             samples[pipeline] = pixels

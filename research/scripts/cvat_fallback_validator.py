@@ -235,6 +235,7 @@ class ValidationSession:
                 matplotlib.use(backend, force=True)
                 break
             except Exception:
+                logger.debug("matplotlib backend %s not available, trying next", backend)
                 continue
         else:
             # No GUI backend found
