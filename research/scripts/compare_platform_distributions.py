@@ -282,7 +282,9 @@ def compare_platforms(
             empty_paths = [p for p in tile_paths if p.stem not in annotated_tiles]
             n_skipped = len(tile_paths) - len(empty_paths)
             tile_paths = empty_paths
-            logger.info(f"  {platform}: excluded {n_skipped} annotated tiles, {len(tile_paths)} empty tiles remaining")
+            logger.info(
+                f"  {platform}: excluded {n_skipped} annotated tiles, {len(tile_paths)} empty tiles remaining"
+            )
 
         logger.info(f"  Processing {len(tile_paths)} tiles for {platform} (streaming)...")
         runner = RunningStats(max_subsample=200_000, rng_seed=42)
@@ -294,10 +296,14 @@ def compare_platforms(
                 logger.warning(f"  Failed to load {npy_path}: {e}")
             if (i + 1) % 10000 == 0:
                 n_pixels_so_far = runner.count
-                logger.info(f"    ... processed {i + 1} / {len(tile_paths)} tiles ({n_pixels_so_far:,} pixels so far)")
+                logger.info(
+                    f"    ... processed {i + 1} / {len(tile_paths)} tiles ({n_pixels_so_far:,} pixels so far)"
+                )
 
         all_stats[platform] = runner
-        logger.info(f"  {platform}: {runner.count:,} total pixels, {len(runner._subsample):,} in subsample")
+        logger.info(
+            f"  {platform}: {runner.count:,} total pixels, {len(runner._subsample):,} in subsample"
+        )
 
     # 4. Compute statistics
     if len(all_stats) < 2:
@@ -422,7 +428,9 @@ Interpretation: {"No significant difference" if ks_pval >= 0.05 else ("Significa
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Compare S1C vs S1D intensity distributions (Pipeline D)")
+    parser = argparse.ArgumentParser(
+        description="Compare S1C vs S1D intensity distributions (Pipeline D)"
+    )
     parser.add_argument(
         "--tiles-root",
         default="phase0/data/tiles",
@@ -455,7 +463,9 @@ def main() -> None:
     use_empty_only = not args.all_tiles
     annotations_root = Path(args.annotations_root) if use_empty_only else None
     if use_empty_only and not annotations_root.is_dir():
-        logger.warning(f"Annotations root not found: {annotations_root}; falling back to all-tiles comparison")
+        logger.warning(
+            f"Annotations root not found: {annotations_root}; falling back to all-tiles comparison"
+        )
         use_empty_only = False
         annotations_root = None
 

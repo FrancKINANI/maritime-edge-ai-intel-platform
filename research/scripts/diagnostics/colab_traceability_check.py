@@ -35,12 +35,26 @@ from pathlib import Path
 
 # Install project dependencies
 subprocess.check_call(
-    [sys.executable, "-m", "pip", "install", "httpx", "numpy", "rasterio", "scipy", "tqdm", "psutil", "python-dotenv"]
+    [
+        sys.executable,
+        "-m",
+        "pip",
+        "install",
+        "httpx",
+        "numpy",
+        "rasterio",
+        "scipy",
+        "tqdm",
+        "psutil",
+        "python-dotenv",
+    ]
 )
 
 # Clone the repository (or mount Google Drive if already cloned)
 if not Path("maritime-intelligence-platform").exists():
-    subprocess.check_call(["git", "clone", "https://github.com/FrancKINANI/maritime-edge-ai-intel-platform.git"])
+    subprocess.check_call(
+        ["git", "clone", "https://github.com/FrancKINANI/maritime-edge-ai-intel-platform.git"]
+    )
     os.chdir("maritime-intelligence-platform")
 else:
     os.chdir("maritime-intelligence-platform")
@@ -114,7 +128,9 @@ print(f"Period: {density_map.get('period', 'N/A')}")
 
 top_cells = density_map.get("cells", [])[:5]
 for i, cell in enumerate(top_cells):
-    print(f"  Zone {i + 1}: cell_index={cell['cell_index']}, bbox={cell['cell_bbox']}, AIS count={cell['count']}")
+    print(
+        f"  Zone {i + 1}: cell_index={cell['cell_index']}, bbox={cell['cell_bbox']}, AIS count={cell['count']}"
+    )
 
 if not density_map.get("cells"):
     raise RuntimeError(
@@ -178,7 +194,9 @@ if trace_path.exists():
     print("=" * 60)
 
     # Verify structure
-    assert "target_density_cell_index" in target_trace, "Missing target_density_cell_index in target_trace.json"
+    assert "target_density_cell_index" in target_trace, (
+        "Missing target_density_cell_index in target_trace.json"
+    )
     assert "target_cell_bbox" in target_trace, "Missing target_cell_bbox in target_trace.json"
     assert len(target_trace["target_cell_bbox"]) == 4, (
         f"target_cell_bbox must have 4 elements, got {len(target_trace['target_cell_bbox'])}"
@@ -248,9 +266,13 @@ print("=" * 60)
 with open(trace_path) as f:
     target_trace = json.load(f)
 
-print(f"  target_trace.json → target_density_cell_index: {target_trace['target_density_cell_index']}")
+print(
+    f"  target_trace.json → target_density_cell_index: {target_trace['target_density_cell_index']}"
+)
 print(f"  metadata.json     → target_density_cell_index: {metadata['target_density_cell_index']}")
-print(f"  MATCH: {target_trace['target_density_cell_index'] == metadata['target_density_cell_index']}")
+print(
+    f"  MATCH: {target_trace['target_density_cell_index'] == metadata['target_density_cell_index']}"
+)
 
 print()
 print(f"  target_trace.json → target_cell_bbox: {target_trace['target_cell_bbox']}")

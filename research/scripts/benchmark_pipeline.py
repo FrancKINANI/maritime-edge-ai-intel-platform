@@ -100,7 +100,9 @@ def load_ground_truth(annotations_dir: str) -> dict[str, list[dict[str, Any]]]:
                     )
         ground_truth[tile_id] = boxes
 
-    logger.info(f"Loaded ground truth: {len(ground_truth)} tiles, {sum(len(v) for v in ground_truth.values())} boxes")
+    logger.info(
+        f"Loaded ground truth: {len(ground_truth)} tiles, {sum(len(v) for v in ground_truth.values())} boxes"
+    )
     return ground_truth
 
 
@@ -109,7 +111,9 @@ def load_ground_truth(annotations_dir: str) -> dict[str, list[dict[str, Any]]]:
 # ---------------------------------------------------------------------------
 
 
-def nms_suppress(detections: list[dict[str, Any]], iou_threshold: float = NMS_IOU_THRESHOLD) -> list[dict[str, Any]]:
+def nms_suppress(
+    detections: list[dict[str, Any]], iou_threshold: float = NMS_IOU_THRESHOLD
+) -> list[dict[str, Any]]:
     """Apply Non-Maximum Suppression to remove duplicate boxes for the same vessel.
 
     Sorts by confidence descending, keeps the highest-confidence box, and removes
@@ -134,7 +138,9 @@ def nms_suppress(detections: list[dict[str, Any]], iou_threshold: float = NMS_IO
         best = sorted_dets.pop(0)
         kept.append(best)
         # Remove any remaining detection with IoU > threshold against the kept one
-        sorted_dets = [d for d in sorted_dets if compute_iou(best["bbox"], d["bbox"]) < iou_threshold]
+        sorted_dets = [
+            d for d in sorted_dets if compute_iou(best["bbox"], d["bbox"]) < iou_threshold
+        ]
 
     return kept
 
@@ -323,7 +329,9 @@ def compute_metrics(
 # ---------------------------------------------------------------------------
 
 
-def compute_ks_distance(tiles: dict[str, list[dict[str, Any]]], reference_dataset: str | None = None) -> float:
+def compute_ks_distance(
+    tiles: dict[str, list[dict[str, Any]]], reference_dataset: str | None = None
+) -> float:
     """Calculate Kolmogorov-Smirnov distance between intensity distributions.
 
     Evaluates covariate shift by comparing pixel intensity distributions
@@ -338,7 +346,9 @@ def compute_ks_distance(tiles: dict[str, list[dict[str, Any]]], reference_datase
         KS test statistic (max inter-pipeline distance).
     """
     if reference_dataset:
-        logger.warning("Reference dataset comparison not implemented yet. KS test is inter-pipelines only.")
+        logger.warning(
+            "Reference dataset comparison not implemented yet. KS test is inter-pipelines only."
+        )
 
     samples: dict[str, list[float]] = {}
     for pipeline, tile_list in tiles.items():
@@ -417,14 +427,18 @@ def benchmark_all_pipelines(metadata_path: str, gt_path: str, model_path: str) -
         # Restrict to annotated tiles so load count matches GT tile count
         tile_files = [f for f in all_npy if f.stem in gt_tile_ids]
         tiles_by_pipeline[p] = [str(f) for f in tile_files]
-        logger.info(f"Pipeline {p}: {len(tile_files)} annotated tiles (of {len(all_npy)} npy) from {pipeline_dir}")
+        logger.info(
+            f"Pipeline {p}: {len(tile_files)} annotated tiles (of {len(all_npy)} npy) from {pipeline_dir}"
+        )
 
     # Run inference per pipeline
     predictions_by_pipeline: dict[str, dict[str, list[dict[str, Any]]]] = {}
     for p in PIPELINES:
         tile_paths = tiles_by_pipeline.get(p, [])
         if not tile_paths:
-            logger.warning(f"Pipeline {p}: no tiles found — skipping inference (results will be 0.0)")
+            logger.warning(
+                f"Pipeline {p}: no tiles found — skipping inference (results will be 0.0)"
+            )
             predictions_by_pipeline[p] = {}
             continue
         tile_items = [(Path(t).stem, t) for t in tile_paths]
@@ -518,16 +532,22 @@ def export_results(results: dict[str, Any], output_dir: str) -> dict[str, str]:
 def main() -> None:
     import argparse
 
-    parser = argparse.ArgumentParser(description="Pipeline benchmarking and domain shift evaluation")
+    parser = argparse.ArgumentParser(
+        description="Pipeline benchmarking and domain shift evaluation"
+    )
     parser.add_argument("--metadata", required=True, help="Path to scene metadata.json")
-    parser.add_argument("--ground-truth", required=True, help="Directory with YOLO label .txt files")
+    parser.add_argument(
+        "--ground-truth", required=True, help="Directory with YOLO label .txt files"
+    )
     parser.add_argument(
         "--model",
         default="shared/models/yolov8n_int8.onnx",
         help="Path to ONNX model (default: shared/models/yolov8n_int8.onnx)",
     )
     parser.add_argument(
-        "--output-dir", default=None, help="Output directory for results (default: phase0/data/results/)"
+        "--output-dir",
+        default=None,
+        help="Output directory for results (default: phase0/data/results/)",
     )
 
     args = parser.parse_args()

@@ -257,7 +257,9 @@ class GFWClient:
             "datasets[0]": AIS_PRESENCE_DATASET,
             "limit": min(limit, 50),
         }
-        return _request_with_retry("GET", GFW_VESSELS_SEARCH, self.headers, params=params).get("entries", [])
+        return _request_with_retry("GET", GFW_VESSELS_SEARCH, self.headers, params=params).get(
+            "entries", []
+        )
 
     # DELETED: get_sar_detections() and related SAR functions per PH0-CORR-002
     # The SAR Vessel Detections dataset (public-global-sar-presence:latest) returns
@@ -291,7 +293,9 @@ class GFWClient:
             "group-by": "MMSI",
         }
 
-        response = _request_with_retry("POST", GFW_REPORT, self.headers, params=query_params, json_body=body_params)
+        response = _request_with_retry(
+            "POST", GFW_REPORT, self.headers, params=query_params, json_body=body_params
+        )
         return _normalize_response_entries(response)
 
     def gfw_get_ais_presence(
@@ -324,7 +328,9 @@ class GFWClient:
           "requires_human_validation": True,
         }
         """
-        logger.info("Fetching GFW AIS Vessel Presence for bbox=%s %s->%s", bbox, date_start, date_end)
+        logger.info(
+            "Fetching GFW AIS Vessel Presence for bbox=%s %s->%s", bbox, date_start, date_end
+        )
 
         # GFW v3 API requires datasets and date-range as query params, not in POST body
         # Verified empirically: datasets[0] as query param passes validation
@@ -346,7 +352,9 @@ class GFWClient:
         }
 
         try:
-            response = _request_with_retry("POST", GFW_REPORT, self.headers, params=query_params, json_body=body_params)
+            response = _request_with_retry(
+                "POST", GFW_REPORT, self.headers, params=query_params, json_body=body_params
+            )
             entries = _normalize_response_entries(response)
 
             # Normalize entries to the expected format
@@ -374,7 +382,9 @@ class GFWClient:
 
         except Exception as e:
             logger.error(f"Failed to fetch AIS Vessel Presence: {e}")
-            logger.warning("The endpoint for AIS Vessel Presence may need verification against GFW documentation")
+            logger.warning(
+                "The endpoint for AIS Vessel Presence may need verification against GFW documentation"
+            )
             return []
 
     def get_dark_vessel_events(
@@ -384,7 +394,9 @@ class GFWClient:
         end_date: str,
         limit: int = 200,
     ) -> list[dict[str, Any]]:
-        logger.info("Fetching GFW dark vessel events for bbox=%s %s->%s", bbox, start_date, end_date)
+        logger.info(
+            "Fetching GFW dark vessel events for bbox=%s %s->%s", bbox, start_date, end_date
+        )
         try:
             # Use GET without geometry filter, then filter in code if needed
             params: dict[str, Any] = {
@@ -408,9 +420,13 @@ class GFWClient:
                         pos = {}
                     lat = pos.get("lat")
                     lon = pos.get("lon")
-                    if lat is not None and lon is not None:
-                        if lat_min <= lat <= lat_max and lon_min <= lon <= lon_max:
-                            filtered.append(event)
+                    if (
+                        lat is not None
+                        and lon is not None
+                        and lat_min <= lat <= lat_max
+                        and lon_min <= lon <= lon_max
+                    ):
+                        filtered.append(event)
                 logger.info(
                     "Retrieved %d dark vessel events (%d after spatial filter)",
                     len(events),
@@ -463,7 +479,9 @@ def load_scene_metadata(scene_path: str | Path, polarization: str = "vv") -> dic
             break
 
     if not tiff_files:
-        raise FileNotFoundError(f"No GeoTIFF found for polarization '{polarization}' in {scene_path}")
+        raise FileNotFoundError(
+            f"No GeoTIFF found for polarization '{polarization}' in {scene_path}"
+        )
 
     tiff_path = tiff_files[0]
     import rasterio
@@ -520,7 +538,9 @@ def point_in_tile(lat: float, lon: float, tile: dict[str, Any]) -> bool:
     return lat_min <= lat <= lat_max and lon_min <= lon <= lon_max
 
 
-def latlon_to_tile_pixel(lat: float, lon: float, tile: dict[str, Any], tile_size: int = 512) -> tuple[float, float]:
+def latlon_to_tile_pixel(
+    lat: float, lon: float, tile: dict[str, Any], tile_size: int = 512
+) -> tuple[float, float]:
     geo = tile.get("geo_bbox")
     if not geo or len(geo) != 4:
         raise ValueError("Tile metadata is missing geo_bbox")
@@ -703,7 +723,11 @@ def project_detections_to_tiles(
         if not matched_tile:
             ignored += 1
 
-    logger.info("Projected %s detections to tiles, ignored %s detections outside tile coverage", projected, ignored)
+    logger.info(
+        "Projected %s detections to tiles, ignored %s detections outside tile coverage",
+        projected,
+        ignored,
+    )
     return tile_annotations
 
 
@@ -733,7 +757,11 @@ def export_geojson(records: list[dict[str, Any]], output_path: str | Path) -> st
         lat, lon = _extract_lat_lon(record)
         if lat is None or lon is None:
             continue
-        properties = {k: v for k, v in record.items() if k not in ("lat", "lon", "latitude", "longitude", "geometry")}
+        properties = {
+            k: v
+            for k, v in record.items()
+            if k not in ("lat", "lon", "latitude", "longitude", "geometry")
+        }
         features.append(
             {
                 "type": "Feature",
@@ -747,7 +775,9 @@ def export_geojson(records: list[dict[str, Any]], output_path: str | Path) -> st
     out_path = Path(output_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w", encoding="utf-8") as handle:
-        json.dump({"type": "FeatureCollection", "features": features}, handle, indent=2, default=str)
+        json.dump(
+            {"type": "FeatureCollection", "features": features}, handle, indent=2, default=str
+        )
     logger.info("Exported %s GeoJSON features to %s", len(features), out_path)
     return str(out_path)
 
@@ -774,7 +804,11 @@ def export_to_cvat_xml(
     task = ET.SubElement(meta, "task")
     ET.SubElement(task, "name").text = scene_id
     labels = ET.SubElement(task, "labels")
-    for label_name in ["vessel_AIS_confirmed", "vessel_visual_only", "vessel_dark_vessel_candidate"]:
+    for label_name in [
+        "vessel_AIS_confirmed",
+        "vessel_visual_only",
+        "vessel_dark_vessel_candidate",
+    ]:
         label = ET.SubElement(labels, "label")
         ET.SubElement(label, "name").text = label_name
         ET.SubElement(label, "color").text = "#FF0000"
@@ -905,7 +939,9 @@ def convert_npy_tiles_to_png(
     try:
         from PIL import Image
     except ImportError:
-        raise ImportError from None("Pillow is required for PNG conversion. Install it with: pip install Pillow")
+        raise ImportError from None(
+            "Pillow is required for PNG conversion. Install it with: pip install Pillow"
+        )
     import numpy as np
     from tqdm import tqdm
 
@@ -926,7 +962,9 @@ def convert_npy_tiles_to_png(
 
         # Validate array dimensions before conversion
         if arr.ndim != 2:
-            raise ValueError(f"Tile {tile_id} has {arr.ndim} dimensions (expected 2) — check the SAR pipeline output.")
+            raise ValueError(
+                f"Tile {tile_id} has {arr.ndim} dimensions (expected 2) — check the SAR pipeline output."
+            )
 
         # Pad edge tiles that are smaller than tile_size to maintain
         # consistent dimensions for CVAT annotation alignment.
@@ -1116,14 +1154,18 @@ def annotate_scene(
     # Combine both sources with distinct labels for CVAT
     detections: list[dict[str, Any]] = []
     detections.extend(
-        {**event, "source": "ais_presence_amorce", "label": "ais_presence_amorce"} for event in ais_presence_seeds
+        {**event, "source": "ais_presence_amorce", "label": "ais_presence_amorce"}
+        for event in ais_presence_seeds
     )
     detections.extend(
-        {**event, "source": "ais_off_candidate", "label": "ais_off_candidate"} for event in dark_vessel_candidates
+        {**event, "source": "ais_off_candidate", "label": "ais_off_candidate"}
+        for event in dark_vessel_candidates
     )
 
     tile_size = metadata.get("tile_size", 512)
-    tile_annotations = project_detections_to_tiles(detections, metadata.get("tiles", []), tile_size=tile_size)
+    tile_annotations = project_detections_to_tiles(
+        detections, metadata.get("tiles", []), tile_size=tile_size
+    )
 
     scene_output = Path(output_dir) / scene_id
     scene_output.mkdir(parents=True, exist_ok=True)
@@ -1157,13 +1199,22 @@ def annotate_scene(
         "total_annotations": sum(len(anns) for anns in tile_annotations.values()),
         "class_counts": {
             "AIS_confirmed": sum(
-                1 for anns in tile_annotations.values() for ann in anns if ann["label"] == "AIS_confirmed"
+                1
+                for anns in tile_annotations.values()
+                for ann in anns
+                if ann["label"] == "AIS_confirmed"
             ),
             "visual_only": sum(
-                1 for anns in tile_annotations.values() for ann in anns if ann["label"] == "visual_only"
+                1
+                for anns in tile_annotations.values()
+                for ann in anns
+                if ann["label"] == "visual_only"
             ),
             "dark_vessel_candidate": sum(
-                1 for anns in tile_annotations.values() for ann in anns if ann["label"] == "dark_vessel_candidate"
+                1
+                for anns in tile_annotations.values()
+                for ann in anns
+                if ann["label"] == "dark_vessel_candidate"
             ),
         },
         "traceability": traceability,
@@ -1246,7 +1297,9 @@ def test_sar_endpoint(token: str) -> None:
     new hybrid protocol (AIS Vessel Presence + Dark Vessel Events).
     """
     logger.warning("test_sar_endpoint() is DEPRECATED per PH0-CORR-002")
-    logger.warning("SAR Vessel Detections dataset returns grid aggregates, not individual positions")
+    logger.warning(
+        "SAR Vessel Detections dataset returns grid aggregates, not individual positions"
+    )
     logger.warning("Use test_gfw_connection() to test the new hybrid protocol")
     raise NotImplementedError("SAR endpoint testing deprecated per PH0-CORR-002")
 

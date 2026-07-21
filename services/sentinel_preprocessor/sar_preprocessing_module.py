@@ -383,7 +383,9 @@ def validate_safe_path(path: str) -> str:
     # If the path is relative and doesn't start with /, allow it only if
     # it doesn't contain traversal patterns (already checked above)
     if path.startswith("/"):
-        allowed = any(str(resolved).startswith(str(base_dir.resolve())) for base_dir in _ALLOWED_BASE_DIRS)
+        allowed = any(
+            str(resolved).startswith(str(base_dir.resolve())) for base_dir in _ALLOWED_BASE_DIRS
+        )
         if not allowed:
             raise SafetyViolationError(f"Path is outside allowed directories: {path}")
 

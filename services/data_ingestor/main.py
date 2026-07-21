@@ -1,4 +1,4 @@
-# services/data-ingestor/main.py
+# services/data_ingestor/main.py
 """Data Ingestor FastAPI Service.
 
 Exposes endpoints for querying Copernicus Sentinel-1 catalog products, starting ingestion
@@ -6,20 +6,26 @@ jobs, and monitoring ingestion tasks.
 """
 
 import logging
-import os
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, status
 
+from shared.config import SecretsValidationError, validate_service_secrets
 from shared.schemas.events import IngestRequest
 
 logger = logging.getLogger(__name__)
 
 # Validate required environment variables at startup
-_REQUIRED_ENV_VARS = ["CDSE_USERNAME", "CDSE_PASSWORD", "REDIS_URL"]
-for _var in _REQUIRED_ENV_VARS:
-    if not os.getenv(_var):
-        logger.warning("Missing required environment variable: %s — service will start but may fail at runtime", _var)
+# NOTE: We warn instead of sys.exit() to allow test imports without env vars.
+# The service will fail gracefully at runtime if Redis/CDSE credentials are missing.
+try:
+    validate_service_secrets("data_ingestor")
+    logger.info("Secrets validation passed")
+except SecretsValidationError as e:
+    logger.error("Secrets validation failed: %s", e)
+    logger.warning(
+        "Service will start but may fail at runtime — set CDSE_USERNAME, CDSE_PASSWORD, REDIS_URL in .env"
+    )
 
 app = FastAPI(
     title="Maritime Edge AI Intel Platform - Data Ingestor",
@@ -61,7 +67,9 @@ async def get_ingestion_status(job_id: str) -> dict[str, Any]:
 
 
 @app.get("/products", response_model=list[dict[str, Any]])
-async def list_available_products(bbox: str, date_start: str, date_end: str) -> list[dict[str, Any]]:
+async def list_available_products(
+    bbox: str, date_start: str, date_end: str
+) -> list[dict[str, Any]]:
     """Lists Sentinel-1 products matching search criteria from Copernicus Data Space.
 
     Args:

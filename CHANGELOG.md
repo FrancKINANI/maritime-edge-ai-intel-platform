@@ -2,7 +2,7 @@
 
 All notable changes to the Maritime Intelligence Platform will be documented in this file.
 
-## [0.2.0] — 2026-07-21
+## [2.0.0] — 2026-07-21
 
 ### Added
 - `pyproject.toml` with project metadata and Python 3.11+ target
@@ -24,11 +24,23 @@ All notable changes to the Maritime Intelligence Platform will be documented in 
 - Improved dataset builder with `--stratify` and `--satellites` flags
 - Fixed dry-run estimation for stratified splits
 - Ground-dashboard env var defaults point to Docker service names
+- **Project restructuring:** Fixed all Dockerfile paths (hyphens → underscores),
+  unified Ruff configuration in pyproject.toml, removed stale .ruff.toml,
+  cleaned project root (removed egg-info, moved data/ → docs/),
+  updated .pre-commit versions, fixed broken Makefile paths,
+  fixed pytest collection crash on missing secrets
+- 223 Ruff lint errors fixed across codebase
 
 ### Fixed
 - 36 ruff linting errors (unused imports, variables, f-strings)
 - Broken symlinks in phase_post0 directory
 - Ground-dashboard test file location
+- Dockerfile COPY paths using hyphens instead of underscores
+- Makefile test targets referencing non-existent paths
+- Pytest SystemExit crash due to module-level secrets validation
+- Obsolete gitignore entries referencing deleted directories
+- .env.example extraneous [TEMPLATE] markers
+- CI workflow test matrix invalid path
 
 ## [0.1.0] — 2026-07-19
 

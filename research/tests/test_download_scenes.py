@@ -105,7 +105,8 @@ def test_write_scene_target_trace_registers_index_per_scene(tmp_path):
     assert index["scenes"][SCENE_B]["target_density_cell_index"] == 20
     # No ambiguity: different scenes map to different cells
     assert (
-        index["scenes"][SCENE_A]["target_density_cell_index"] != index["scenes"][SCENE_B]["target_density_cell_index"]
+        index["scenes"][SCENE_A]["target_density_cell_index"]
+        != index["scenes"][SCENE_B]["target_density_cell_index"]
     )
 
 

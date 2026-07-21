@@ -40,7 +40,9 @@ def test_celestrak_fallback_when_satnogs_empty():
     async def _run():
         with (
             patch.object(satmon, "fetch_tle_from_satnogs", new_callable=AsyncMock) as mock_satnogs,
-            patch.object(satmon, "fetch_tle_from_celestrak", new_callable=AsyncMock) as mock_celestrak,
+            patch.object(
+                satmon, "fetch_tle_from_celestrak", new_callable=AsyncMock
+            ) as mock_celestrak,
         ):
             mock_satnogs.side_effect = ValueError("No TLE found for NORAD id 39634 in SatNOGS")
             mock_celestrak.return_value = celestrak_entry
@@ -68,7 +70,9 @@ def test_satnogs_success_skips_celestrak():
     async def _run():
         with (
             patch.object(satmon, "fetch_tle_from_satnogs", new_callable=AsyncMock) as mock_satnogs,
-            patch.object(satmon, "fetch_tle_from_celestrak", new_callable=AsyncMock) as mock_celestrak,
+            patch.object(
+                satmon, "fetch_tle_from_celestrak", new_callable=AsyncMock
+            ) as mock_celestrak,
         ):
             mock_satnogs.return_value = satnogs_entry
             entry = await satmon._fetch_tle_with_fallback(25544)

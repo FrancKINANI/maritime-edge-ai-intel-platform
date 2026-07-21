@@ -739,7 +739,9 @@ def generate_report(scene_dir: Path, output_path: Path) -> None:
         badges = []
         for b in active:
             cls_tag = "AIS" if b["class_id"] == 0 else ("visual" if b["class_id"] == 1 else "dark")
-            badges.append(f'<span class="badge badge-{cls_tag}">{CLASS_NAMES[b["class_id"]][:10]}</span>')
+            badges.append(
+                f'<span class="badge badge-{cls_tag}">{CLASS_NAMES[b["class_id"]][:10]}</span>'
+            )
         if n_pending > 0:
             badges.append(f'<span class="badge badge-pending">{n_pending} pending</span>')
 

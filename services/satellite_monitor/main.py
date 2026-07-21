@@ -6,7 +6,6 @@ from SatNOGS, and updating orbital coefficients.
 """
 
 import logging
-import os
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -14,16 +13,22 @@ import httpx
 from fastapi import FastAPI, HTTPException, status
 from skyfield.api import EarthSatellite, load, wgs84
 
+from shared.config import SecretsValidationError, validate_service_secrets
 from shared.config.constants import TLE_REFRESH_HOURS
 from shared.schemas.events import TLEData
 
 logger = logging.getLogger(__name__)
 
 # Validate required environment variables at startup
-_REQUIRED_ENV_VARS = ["SENTINEL_HUB_CLIENT_ID", "SENTINEL_HUB_CLIENT_SECRET"]
-for _var in _REQUIRED_ENV_VARS:
-    if not os.getenv(_var):
-        logger.warning("Missing required environment variable: %s — service will start but may fail at runtime", _var)
+# NOTE: We warn instead of sys.exit() to allow test imports without env vars.
+try:
+    validate_service_secrets("satellite_monitor")
+    logger.info("Secrets validation passed")
+except SecretsValidationError as e:
+    logger.error("Secrets validation failed: %s", e)
+    logger.warning(
+        "Service will start but may fail at runtime — set SENTINEL_HUB_CLIENT_ID/SECRET and REDIS_URL in .env"
+    )
 
 app = FastAPI(
     title="Maritime Edge AI Intel Platform - Satellite Monitor",
@@ -223,7 +228,7 @@ async def get_satellite_position(satellite_id: str, timestamp: datetime) -> dict
                 status_code=400,
                 detail=f"satellite_id '{satellite_id}' is not a valid NORAD ID and no cached satellite matches this name. "
                 f"Use a numeric NORAD ID (e.g., 39634 for Sentinel-1A) or query /tle/{{norad_id}} first.",
-            )
+            ) from None
 
     entry = await _fetch_tle_with_fallback(norad)
     _validate_tle_entry(entry)

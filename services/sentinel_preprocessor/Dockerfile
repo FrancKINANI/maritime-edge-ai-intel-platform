@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gdal-bin libgdal-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY services/sentinel-preprocessor/requirements.txt .
+COPY services/sentinel_preprocessor/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Runtime stage — GDAL runtime only (no dev headers)
@@ -23,7 +23,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-COPY services/sentinel-preprocessor/ /app/services/sentinel-preprocessor/
+COPY services/sentinel_preprocessor/ /app/services/sentinel_preprocessor/
 COPY shared/ /app/shared/
 
 USER appuser
@@ -33,4 +33,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 EXPOSE 8000
 
-CMD ["uvicorn", "services.sentinel-preprocessor.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "services.sentinel_preprocessor.main:app", "--host", "0.0.0.0", "--port", "8000"]

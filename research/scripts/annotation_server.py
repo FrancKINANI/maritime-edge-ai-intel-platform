@@ -42,6 +42,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, Response
+from pydantic import BaseModel
 
 logger = logging.getLogger("annotation_server")
 
@@ -135,7 +136,7 @@ def create_app(data_root: Path) -> FastAPI:
 
     @app.get("/", response_class=HTMLResponse)
     async def index():
-        return HTML_DISPLAY
+        return _HTML_TEMPLATE
 
     # ------------------------------------------------------------------
     # API: List scenes
@@ -239,10 +240,9 @@ def create_app(data_root: Path) -> FastAPI:
     # API: Save decision for a tile
     # ------------------------------------------------------------------
 
-    class DecisionRequest(BaseModel):
+    class DecisionRequest(BaseModel):  # noqa: N801 — Pydantic model class name
         validated: bool
         boxes: list[dict[str, Any]]
-
 
     @app.post("/api/scenes/{scene_id}/tiles/{tile_id}/decision")
     async def save_decision(scene_id: str, tile_id: str, decision: DecisionRequest):
@@ -371,6 +371,97 @@ def main():
 
     app = create_app(data_root)
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")
+
+
+# ---------------------------------------------------------------------------
+# HTML Template (minimal annotation validation UI)
+# ---------------------------------------------------------------------------
+
+_HTML_TEMPLATE = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maritime Annotation Server</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #1a1a2e; color: #eee; padding: 20px; }
+  h1 { color: #4CAF50; margin-bottom: 20px; }
+  .container { max-width: 1400px; margin: 0 auto; }
+  .scene-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+  .scene-card { background: #16213e; border-radius: 12px; padding: 20px; cursor: pointer; border: 2px solid transparent; transition: all 0.2s; }
+  .scene-card:hover { border-color: #4CAF50; transform: translateY(-2px); }
+  .scene-card h3 { color: #e94560; margin-bottom: 8px; }
+  .scene-card .stats { color: #888; font-size: 14px; }
+  .tile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; margin-top: 20px; }
+  .tile-card { background: #16213e; border-radius: 8px; overflow: hidden; position: relative; }
+  .tile-card img { width: 100%; display: block; }
+  .tile-card .info { padding: 8px 12px; font-size: 12px; color: #aaa; display: flex; justify-content: space-between; }
+  .tile-card .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin: 1px; }
+  .badge-validated { background: #4CAF50; color: #fff; }
+  .badge-pending { background: #FF9800; color: #fff; }
+  .btn { background: #e94560; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
+  .btn:hover { opacity: 0.9; }
+  .back { margin-bottom: 16px; display: inline-block; color: #4CAF50; cursor: pointer; }
+  .back:hover { text-decoration: underline; }
+  #progress-bar { height: 4px; background: #333; border-radius: 2px; margin: 12px 0; }
+  #progress-fill { height: 100%; background: #4CAF50; border-radius: 2px; transition: width 0.3s; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>📡 Maritime Annotation Validator</h1>
+  <div id="app"></div>
+</div>
+<script>
+const API = '';
+let currentScene = null;
+
+async function loadScenes() {
+  const r = await fetch(API + '/api/scenes');
+  const data = await r.json();
+  let html = '<div class="scene-grid">';
+  data.scenes.forEach(s => {
+    const pct = s.tile_count > 0 ? Math.round(s.validated / s.tile_count * 100) : 0;
+    html += `<div class="scene-card" onclick="openScene('${s.id}')">
+      <h3>${s.name}</h3>
+      <div class="stats">${s.validated}/${s.tile_count} validated (${pct}%)</div>
+      <div id="progress-bar"><div id="progress-fill" style="width:${pct}%"></div></div>
+    </div>`;
+  });
+  html += '</div>';
+  document.getElementById('app').innerHTML = html;
+}
+
+async function openScene(sceneId) {
+  currentScene = sceneId;
+  const r = await fetch(API + '/api/scenes/' + sceneId + '/tiles');
+  const data = await r.json();
+  let html = `<a class="back" onclick="loadScenes()">← Back to scenes</a>
+    <h2>${data.scene} <span style="font-size:14px;color:#888;">(${data.validated}/${data.total} validated)</span></h2>
+    <div id="progress-bar"><div id="progress-fill" style="width:${data.total > 0 ? (data.validated/data.total*100) : 0}%"></div></div>
+    <div class="tile-grid">`;
+  data.tiles.forEach(t => {
+    html += `<div class="tile-card">
+      <img src="${API}/api/scenes/${sceneId}/tiles/${t.id}/image" alt="${t.id}" loading="lazy">
+      <div class="info">
+        <span>${t.id}</span>
+        <span class="badge ${t.validated ? 'badge-validated' : 'badge-pending'}">${t.validated ? '✅ Validated' : '⏳ Pending'}</span>
+      </div>
+      <div style="padding:4px 12px 8px">
+        <span style="font-size:11px;color:#888;">${t.boxes.length} boxes</span>
+      </div>
+    </div>`;
+  });
+  html += '</div>';
+  document.getElementById('app').innerHTML = html;
+}
+
+loadScenes();
+</script>
+</body>
+</html>
+"""
 
 
 if __name__ == "__main__":

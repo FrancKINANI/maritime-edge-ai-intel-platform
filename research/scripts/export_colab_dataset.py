@@ -77,7 +77,9 @@ def build_flat_dataset(input_dir: Path, output_dir: Path, split: tuple[float, fl
         sys.exit(1)
 
     logger.info(
-        "Found %d image-label pairs across %d scenes", len(pairs), len([d for d in input_dir.iterdir() if d.is_dir()])
+        "Found %d image-label pairs across %d scenes",
+        len(pairs),
+        len([d for d in input_dir.iterdir() if d.is_dir()]),
     )
 
     # Shuffle deterministically
@@ -96,7 +98,12 @@ def build_flat_dataset(input_dir: Path, output_dir: Path, split: tuple[float, fl
         "test": pairs[n_train + n_val :],
     }
 
-    logger.info("Split: train=%d, val=%d, test=%d", len(splits["train"]), len(splits["val"]), len(splits["test"]))
+    logger.info(
+        "Split: train=%d, val=%d, test=%d",
+        len(splits["train"]),
+        len(splits["val"]),
+        len(splits["test"]),
+    )
 
     # Copy files into flat structure
     temp_path = output_dir / TEMP_DIR

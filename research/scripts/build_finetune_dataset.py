@@ -63,18 +63,21 @@ NODATA_THRESHOLD = 0.3  # max 30% black/zero pixels
 # Scene discovery
 # ---------------------------------------------------------------------------
 
-def discover_scenes(annotations_root: Path, allowed_satellites: list[str] | None = None) -> list[dict]:
+
+def discover_scenes(
+    annotations_root: Path, allowed_satellites: list[str] | None = None
+) -> list[dict]:
     """Scan annotations root and return list of scene dicts.
 
     Each scene dict contains::
         {
-            "scene_id": str,           # directory name
-            "short_id": str,           # short name (first 3 underscore parts)
-            "label_dir": Path,         # labels/ with .txt files
-            "image_dir": Path,         # cvat_import/images/ with .png files
-            "n_labels": int,           # number of label files
-            "n_images": int,           # number of PNG images in cvat_import/
-            "total_boxes": int,        # total annotation lines across all labels
+            "scene_id": str,  # directory name
+            "short_id": str,  # short name (first 3 underscore parts)
+            "label_dir": Path,  # labels/ with .txt files
+            "image_dir": Path,  # cvat_import/images/ with .png files
+            "n_labels": int,  # number of label files
+            "n_images": int,  # number of PNG images in cvat_import/
+            "total_boxes": int,  # total annotation lines across all labels
         }
     """
     scenes = []
@@ -90,7 +93,9 @@ def discover_scenes(annotations_root: Path, allowed_satellites: list[str] | None
         # Filter by allowed satellites if specified
         scene_platform = get_satellite_platform(scene_id)
         if allowed_satellites and scene_platform not in allowed_satellites:
-            logger.info(f"Skipping {scene_id}: platform {scene_platform} not in allowed list {allowed_satellites}")
+            logger.info(
+                f"Skipping {scene_id}: platform {scene_platform} not in allowed list {allowed_satellites}"
+            )
             continue
 
         label_dir = child / "labels"
@@ -139,6 +144,7 @@ def discover_scenes(annotations_root: Path, allowed_satellites: list[str] | None
 # Quality filters
 # ---------------------------------------------------------------------------
 
+
 def check_bbox_bounds(
     label_path: Path,
 ) -> tuple[bool, list[str]]:
@@ -163,30 +169,30 @@ def check_bbox_bounds(
     for i, line in enumerate(lines):
         parts = line.strip().split()
         if len(parts) != 5:
-            issues.append(f"Line {i+1}: expected 5 parts, got {len(parts)}")
+            issues.append(f"Line {i + 1}: expected 5 parts, got {len(parts)}")
             structural_failure = True
             continue
         try:
             cls_id = int(parts[0])
             cx, cy, w, h = map(float, parts[1:5])
         except ValueError:
-            issues.append(f"Line {i+1}: non-numeric values")
+            issues.append(f"Line {i + 1}: non-numeric values")
             structural_failure = True
             continue
 
         if cls_id < 0:
-            issues.append(f"Line {i+1}: negative class ID (will be clamped to 0)")
+            issues.append(f"Line {i + 1}: negative class ID (will be clamped to 0)")
             # Do NOT mark as structural failure — can be fixed
 
         # Bbox values must be in [0, 1]
         for name, val in [("cx", cx), ("cy", cy), ("w", w), ("h", h)]:
             if val < 0.0 or val > 1.0:
-                issues.append(f"Line {i+1}: {name}={val} outside [0, 1]")
+                issues.append(f"Line {i + 1}: {name}={val} outside [0, 1]")
                 structural_failure = True
 
         # Bbox must have positive size
         if w <= 0.0 or h <= 0.0:
-            issues.append(f"Line {i+1}: zero or negative size w={w}, h={h}")
+            issues.append(f"Line {i + 1}: zero or negative size w={w}, h={h}")
             structural_failure = True
 
     return not structural_failure, issues
@@ -230,7 +236,7 @@ def find_duplicate_boxes(label_path: Path) -> list[str]:
         if len(parts) == 5:
             coords = " ".join(parts[1:5])  # cx cy w h
             if coords in seen:
-                issues.append(f"Line {i+1}: duplicate bbox ({coords})")
+                issues.append(f"Line {i + 1}: duplicate bbox ({coords})")
             seen.add(coords)
 
     return issues
@@ -302,8 +308,7 @@ def filter_scene_tiles(
             nd_ok, nd_ratio = check_nodata_ratio(png_path)
             if not nd_ok:
                 logger.info(
-                    f"  Skip {tile_id}: {nd_ratio:.1%} NoData "
-                    f"(threshold {NODATA_THRESHOLD:.0%})"
+                    f"  Skip {tile_id}: {nd_ratio:.1%} NoData (threshold {NODATA_THRESHOLD:.0%})"
                 )
                 continue
 
@@ -315,6 +320,7 @@ def filter_scene_tiles(
 # ---------------------------------------------------------------------------
 # Dataset assembly
 # ---------------------------------------------------------------------------
+
 
 def get_satellite_platform(scene_id: str) -> str:
     """Extract satellite platform from scene ID (e.g., 'S1C', 'S1D', 'S1A')."""
@@ -353,8 +359,8 @@ def _split_tile_list_geographic(
     n_val = int(n * val_pct / total)
 
     train = sorted_tiles[:n_train]
-    val = sorted_tiles[n_train:n_train + n_val]
-    test = sorted_tiles[n_train + n_val:]
+    val = sorted_tiles[n_train : n_train + n_val]
+    test = sorted_tiles[n_train + n_val :]
 
     return train, val, test
 
@@ -399,9 +405,7 @@ def _stratify_by_platform(
         assigned["train"].extend(t)
         assigned["val"].extend(v)
         assigned["test"].extend(te)
-        logger.info(
-            f"  {plat}: {len(tiles)} tiles → train({len(t)}) val({len(v)}) test({len(te)})"
-        )
+        logger.info(f"  {plat}: {len(tiles)} tiles → train({len(t)}) val({len(v)}) test({len(te)})")
 
     # Log final composition per split
     for split_name in ["train", "val", "test"]:
@@ -412,7 +416,9 @@ def _stratify_by_platform(
         for tile_id, _, _ in tiles:
             plat = get_satellite_platform(tile_id)
             counts[plat] = counts.get(plat, 0) + 1
-        summary = ", ".join(f"{p}: {c} ({100*c/len(tiles):.0f}%)" for p, c in sorted(counts.items()))
+        summary = ", ".join(
+            f"{p}: {c} ({100 * c / len(tiles):.0f}%)" for p, c in sorted(counts.items())
+        )
         logger.info(f"  {split_name}: {len(tiles)} tiles → {summary}")
 
     return assigned
@@ -446,10 +452,7 @@ def assign_splits_by_scene(
     Or uses a proportional split if no plan is given.
     """
     # Build lookup: scene_id -> valid tiles
-    scene_tiles = {
-        scene["scene_id"]: valid_by_scene[scene["scene_id"]]
-        for scene in scenes
-    }
+    scene_tiles = {scene["scene_id"]: valid_by_scene[scene["scene_id"]] for scene in scenes}
 
     assigned: dict[str, list] = {"train": [], "val": [], "test": []}
 
@@ -458,14 +461,10 @@ def assign_splits_by_scene(
         return _stratify_by_platform(scenes, valid_by_scene)
 
     if split_plan and len(split_plan) == len(scenes):
-        for scene_id, split_name in zip(
-            [s["scene_id"] for s in scenes], split_plan, strict=False
-        ):
+        for scene_id, split_name in zip([s["scene_id"] for s in scenes], split_plan, strict=False):
             if scene_id in (geo_split or {}):
                 ratios = geo_split[scene_id]
-                t, v, te = _split_tile_list_geographic(
-                    scene_tiles.get(scene_id, []), ratios
-                )
+                t, v, te = _split_tile_list_geographic(scene_tiles.get(scene_id, []), ratios)
                 assigned["train"].extend(t)
                 assigned["val"].extend(v)
                 assigned["test"].extend(te)
@@ -555,8 +554,7 @@ def build_dataset(
             shutil.rmtree(output_dir)
         else:
             raise FileExistsError(
-                f"Output directory {output_dir} already exists. "
-                "Use --force to overwrite."
+                f"Output directory {output_dir} already exists. Use --force to overwrite."
             )
 
     # Filter tiles per scene
@@ -571,14 +569,17 @@ def build_dataset(
         valid_by_scene[sid] = valid
         total_before += scene["n_labels"]
         total_after += len(valid)
-        logger.info(f"  → {len(valid)}/{scene['n_labels']} tiles passed filters "
-                    f"({scene['total_boxes']} boxes)")
+        logger.info(
+            f"  → {len(valid)}/{scene['n_labels']} tiles passed filters "
+            f"({scene['total_boxes']} boxes)"
+        )
 
     logger.info(f"Total: {total_after}/{total_before} tiles passed filters")
 
     # Assign splits
-    assigned = assign_splits_by_scene(scenes, valid_by_scene, split_plan or [],
-                                       geo_split=geo_split, stratify=stratify)
+    assigned = assign_splits_by_scene(
+        scenes, valid_by_scene, split_plan or [], geo_split=geo_split, stratify=stratify
+    )
 
     # Create directory structure and copy files
     for split_name in ["train", "val", "test"]:
@@ -636,8 +637,12 @@ def build_dataset(
             "test": len(assigned.get("test", [])),
         },
         "scenes": [
-            {"id": s["scene_id"], "short_id": s["short_id"],
-             "labels": s["n_labels"], "boxes": s["total_boxes"]}
+            {
+                "id": s["scene_id"],
+                "short_id": s["short_id"],
+                "labels": s["n_labels"],
+                "boxes": s["total_boxes"],
+            }
             for s in scenes
         ],
         "filters": {
@@ -690,52 +695,60 @@ def build_dataset(
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Build YOLO fine-tuning dataset from AIS annotations"
     )
     parser.add_argument(
-        "--annotations", "-a",
+        "--annotations",
+        "-a",
         default="phase0/data/annotations",
         help="Root annotations directory (default: phase0/data/annotations/)",
     )
     parser.add_argument(
-        "--output", "-o",
+        "--output",
+        "-o",
         default="phase_post0/dataset_finetune",
         help="Output directory for YOLO dataset (default: phase_post0/dataset_finetune/)",
     )
     parser.add_argument(
-        "--split", "-s",
+        "--split",
+        "-s",
         nargs="+",
         default=None,
         help="Explicit split plan per scene in order: train train val test ... "
-             "(must match number of discovered scenes)",
+        "(must match number of discovered scenes)",
     )
     parser.add_argument(
-        "--satellites", "-L",
+        "--satellites",
+        "-L",
         nargs="+",
         default=["S1A", "S1B", "S1C", "S1D"],
         help="Allowed satellite platforms (e.g. S1D or S1C,S1D). Scenes from "
-             "other platforms are skipped. Default: all Sentinel-1 (S1A/B/C/D).",
+        "other platforms are skipped. Default: all Sentinel-1 (S1A/B/C/D).",
     )
     parser.add_argument(
-        "--stratify", "-t",
+        "--stratify",
+        "-t",
         action="store_true",
         help="Stratify split by satellite platform (S1C, S1D, etc.). Each platform "
-             "receives its own geographic split, ensuring consistent platform "
-             "proportions across train/val/test. Use this when mixing scenes from "
-             "different Sentinel-1 satellites (S1A, S1B, S1C, S1D).",
+        "receives its own geographic split, ensuring consistent platform "
+        "proportions across train/val/test. Use this when mixing scenes from "
+        "different Sentinel-1 satellites (S1A, S1B, S1C, S1D).",
     )
     parser.add_argument(
-        "--geo-split", "-g",
+        "--geo-split",
+        "-g",
         nargs="+",
         default=None,
         help="Geographic split within a scene: scene_id:train:val:test "
-             "(e.g. S1D_scene_id:70:15:15). Splits tiles by contiguous "
-             "geographic chunks based on tile ID order.",
+        "(e.g. S1D_scene_id:70:15:15). Splits tiles by contiguous "
+        "geographic chunks based on tile ID order.",
     )
     parser.add_argument(
-        "--scenes", "-S",
+        "--scenes",
+        "-S",
         nargs="+",
         default=None,
         help="Only use specific scenes (by short_id prefix, e.g. S1D_20260711)",
@@ -746,17 +759,20 @@ def main() -> None:
         help="Skip NoData ratio check (speeds up processing)",
     )
     parser.add_argument(
-        "--dry-run", "-n",
+        "--dry-run",
+        "-n",
         action="store_true",
         help="Discover scenes and report counts without building",
     )
     parser.add_argument(
-        "--force", "-f",
+        "--force",
+        "-f",
         action="store_true",
         help="Overwrite output directory if it exists",
     )
     parser.add_argument(
-        "--zip", "-z",
+        "--zip",
+        "-z",
         action="store_true",
         help="Create a ZIP archive of the dataset for Colab upload",
     )
@@ -816,15 +832,16 @@ def main() -> None:
                 logger.error(f"Invalid ratios in geo-split spec: '{spec}'")
                 sys.exit(1)
             geo_split[scene_id] = ratios
-            logger.info(f"Geo-split: {scene_id[:30]}... → {ratios[0]:.0f}/{ratios[1]:.0f}/{ratios[2]:.0f}")
+            logger.info(
+                f"Geo-split: {scene_id[:30]}... → {ratios[0]:.0f}/{ratios[1]:.0f}/{ratios[2]:.0f}"
+            )
 
     # Validate split plan
     split_plan = args.split
     if split_plan and len(split_plan) != len(scenes):
         logger.error(
             f"Split plan has {len(split_plan)} entries but "
-            f"{len(scenes)} scenes found: "
-            + ", ".join(s["short_id"] for s in scenes)
+            f"{len(scenes)} scenes found: " + ", ".join(s["short_id"] for s in scenes)
         )
         logger.error("Either adjust --split or omit it for auto-assignment.")
         sys.exit(1)
@@ -855,14 +872,12 @@ def main() -> None:
             platform_counts: dict[str, int] = {}
             for scene in scenes:
                 plat = get_satellite_platform(scene["scene_id"])
-                platform_counts[plat] = (
-                    platform_counts.get(plat, 0) + scene["n_labels"]
-                )
+                platform_counts[plat] = platform_counts.get(plat, 0) + scene["n_labels"]
 
             print("  Estimated stratified split (per platform, 70/15/15):")
             header = f"  {'Platform':<10} {'Total':>8} {'Train':>8} {'Val':>8} {'Test':>8}"
             print(header)
-            print(f"  {'-'*10} {'-'*8} {'-'*8} {'-'*8} {'-'*8}")
+            print(f"  {'-' * 10} {'-' * 8} {'-' * 8} {'-' * 8} {'-' * 8}")
 
             total_train, total_val, total_test = 0, 0, 0
             for plat in sorted(platform_counts.keys()):
@@ -875,7 +890,7 @@ def main() -> None:
                 total_test += n_test
                 print(f"  {plat:<10} {n:>8} {n_train:>8} {n_val:>8} {n_test:>8}")
 
-            print(f"  {'-'*10} {'-'*8} {'-'*8} {'-'*8} {'-'*8}")
+            print(f"  {'-' * 10} {'-' * 8} {'-' * 8} {'-' * 8} {'-' * 8}")
             total = total_train + total_val + total_test
             print(f"  {'TOTAL':<10} {total:>8} {total_train:>8} {total_val:>8} {total_test:>8}")
             print()
@@ -888,7 +903,9 @@ def main() -> None:
                 )
         else:
             # Existing simple estimation (by scene count)
-            n_train = max(1, int(len(scenes) * 0.6)) if len(scenes) >= 3 else 1 if len(scenes) >= 1 else 0
+            n_train = (
+                max(1, int(len(scenes) * 0.6)) if len(scenes) >= 3 else 1 if len(scenes) >= 1 else 0
+            )
             train_scenes = scenes[:n_train]
             train_images = sum(s["n_labels"] for s in train_scenes)
             if train_images < 30:
@@ -915,7 +932,7 @@ def main() -> None:
     if args.zip:
         zip_path = output_dir.parent / f"{output_dir.name}.zip"
         logger.info(f"Creating ZIP archive: {zip_path}")
-        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
             for fpath in output_dir.rglob("*"):
                 if fpath.is_file():
                     arcname = fpath.relative_to(output_dir.parent)

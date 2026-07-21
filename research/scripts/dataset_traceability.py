@@ -69,7 +69,9 @@ def analyze_dataset(dataset_dir: str) -> None:
         print("  (labels directory not found for per-split breakdown)")
     else:
         print("--- Per-split composition ---")
-        header = f"  {'Split':<8} {'S1C':>6} {'S1D':>6} {'Total':>6}  {'S1C%':>6} {'S1D%':>6}  Dominance"
+        header = (
+            f"  {'Split':<8} {'S1C':>6} {'S1D':>6} {'Total':>6}  {'S1C%':>6} {'S1D%':>6}  Dominance"
+        )
         print(header)
         print("  " + "-" * (len(header) - 2))
 
@@ -78,13 +80,17 @@ def analyze_dataset(dataset_dir: str) -> None:
             if not os.path.isdir(split_dir):
                 continue
 
-            s1c = sum(1 for f in os.listdir(split_dir)
-                      if f.startswith("S1C") and f.endswith(".txt"))
-            s1d = sum(1 for f in os.listdir(split_dir)
-                      if f.startswith("S1D") and f.endswith(".txt"))
-            other = sum(1 for f in os.listdir(split_dir)
-                        if not f.startswith("S1C") and not f.startswith("S1D")
-                        and f.endswith(".txt"))
+            s1c = sum(
+                1 for f in os.listdir(split_dir) if f.startswith("S1C") and f.endswith(".txt")
+            )
+            s1d = sum(
+                1 for f in os.listdir(split_dir) if f.startswith("S1D") and f.endswith(".txt")
+            )
+            other = sum(
+                1
+                for f in os.listdir(split_dir)
+                if not f.startswith("S1C") and not f.startswith("S1D") and f.endswith(".txt")
+            )
             total = s1c + s1d + other
             pct_s1c = 100.0 * s1c / total if total > 0 else 0.0
             pct_s1d = 100.0 * s1d / total if total > 0 else 0.0
@@ -97,8 +103,10 @@ def analyze_dataset(dataset_dir: str) -> None:
             if other > 0:
                 alert += f" (+{other} OTHER)"
 
-            print(f"  {split:<8} {s1c:>6} {s1d:>6} {total:>6}  "
-                  f"{pct_s1c:>5.0f}% {pct_s1d:>5.0f}% {alert}")
+            print(
+                f"  {split:<8} {s1c:>6} {s1d:>6} {total:>6}  "
+                f"{pct_s1c:>5.0f}% {pct_s1d:>5.0f}% {alert}"
+            )
 
         print()
 

@@ -41,7 +41,9 @@ def get_sample_tiles(meta: dict, n: int = 9) -> list[dict]:
     return samples
 
 
-def create_annotated_png(npy_path: str, output_path: Path, tile_info: dict, annotations: list | None = None) -> None:
+def create_annotated_png(
+    npy_path: str, output_path: Path, tile_info: dict, annotations: list | None = None
+) -> None:
     """Create a PNG with optional annotation overlay."""
     arr = np.load(npy_path)
     img = Image.fromarray(arr, mode="L")
@@ -336,7 +338,11 @@ def main():
                         parts = line.strip().split()
                         if len(parts) == 5:
                             cls_id, xc, yc, w, h = parts
-                            label_map = {"0": "AIS_confirmed", "1": "visual_only", "2": "dark_vessel_candidate"}
+                            label_map = {
+                                "0": "AIS_confirmed",
+                                "1": "visual_only",
+                                "2": "dark_vessel_candidate",
+                            }
                             annotations.append(
                                 {
                                     "label": label_map.get(cls_id, "unknown"),
@@ -397,7 +403,9 @@ def main():
                 "n_annotations": sum(len(a) for a in ann_lookup.values()),
                 "n_annotated_tiles": len(ann_lookup),
                 "ais_seeds": report.get("ais_presence_seeds", 0) if report else 0,
-                "bbox": report.get("traceability", {}).get("target_cell_bbox", "N/A") if report else "N/A",
+                "bbox": report.get("traceability", {}).get("target_cell_bbox", "N/A")
+                if report
+                else "N/A",
                 "samples": scene_samples,
             }
         )

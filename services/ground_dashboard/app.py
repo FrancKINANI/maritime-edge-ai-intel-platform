@@ -162,7 +162,11 @@ def render_query_mode() -> None:
     if st.button("Get Position"):
         try:
             with httpx.Client() as client:
-                r = client.get(f"{SATMON_URL}/position", params={"satellite_id": sat_id, "timestamp": ts}, timeout=20.0)
+                r = client.get(
+                    f"{SATMON_URL}/position",
+                    params={"satellite_id": sat_id, "timestamp": ts},
+                    timeout=20.0,
+                )
                 r.raise_for_status()
                 pos = r.json()
             st.success("Position retrieved")
@@ -173,7 +177,9 @@ def render_query_mode() -> None:
 
 def render_monitoring_mode() -> None:
     st.header("Mode 3 — Continuous Monitoring")
-    st.write("Fetch aggregator statistics and recent events filtered by zone, priority, and time range.")
+    st.write(
+        "Fetch aggregator statistics and recent events filtered by zone, priority, and time range."
+    )
 
     # Geographic zone definition
     st.subheader("Geographic Zone Definition")

@@ -35,7 +35,10 @@ _SERVICE_IMPORT_OK = False
 ServiceGCPGeoreferencer = None
 try:
     _service_path = (
-        Path(__file__).resolve().parent.parent.parent / "services" / "sentinel-preprocessor" / "sar_preprocessing.py"
+        Path(__file__).resolve().parent.parent.parent
+        / "services"
+        / "sentinel-preprocessor"
+        / "sar_preprocessing.py"
     )
     _spec = importlib.util.spec_from_file_location("sentinel_preprocessor_sar", str(_service_path))
     if _spec is not None:
@@ -107,7 +110,9 @@ def test_gcp_phase0_self_consistency() -> None:
             lat_p0, lon_p0 = phase0_gcp.pixel_to_latlon(line_gcp, pixel_gcp)
             expected_lat = _gcps[i, j, 0]
             expected_lon = _gcps[i, j, 1]
-            assert abs(lat_p0 - expected_lat) < 1e-10, f"phase0 error at GCP ({i},{j}): {lat_p0} != {expected_lat}"
+            assert abs(lat_p0 - expected_lat) < 1e-10, (
+                f"phase0 error at GCP ({i},{j}): {lat_p0} != {expected_lat}"
+            )
             assert abs(lon_p0 - expected_lon) < 1e-10
 
     # 1c — GCPOutOfBoundsError raised for out-of-bounds pixels
@@ -153,8 +158,12 @@ def test_gcp_cross_implementation_parity() -> None:
     for line, pixel in CONTROL_POINTS:
         lat_p0, lon_p0 = phase0_gcp.pixel_to_latlon(line, pixel)
         lat_svc, lon_svc = service_gcp.pixel_to_latlon(line, pixel)
-        assert np.isclose(lat_p0, lat_svc, atol=1e-10), f"lat mismatch at ({line},{pixel}): {lat_p0} != {lat_svc}"
-        assert np.isclose(lon_p0, lon_svc, atol=1e-10), f"lon mismatch at ({line},{pixel}): {lon_p0} != {lon_svc}"
+        assert np.isclose(lat_p0, lat_svc, atol=1e-10), (
+            f"lat mismatch at ({line},{pixel}): {lat_p0} != {lat_svc}"
+        )
+        assert np.isclose(lon_p0, lon_svc, atol=1e-10), (
+            f"lon mismatch at ({line},{pixel}): {lon_p0} != {lon_svc}"
+        )
 
     # 2b — Identical reconstruction at exact GCP control points
     for i in range(N_LINES):
@@ -163,8 +172,12 @@ def test_gcp_cross_implementation_parity() -> None:
             pixel_gcp = j * (IMAGE_SHAPE[1] - 1) / (N_PIXELS - 1)
             lat_p0, lon_p0 = phase0_gcp.pixel_to_latlon(line_gcp, pixel_gcp)
             lat_svc, lon_svc = service_gcp.pixel_to_latlon(line_gcp, pixel_gcp)
-            assert lat_p0 == lat_svc, f"GCP ({i},{j}) lat mismatch: phase0 {lat_p0} != service {lat_svc}"
-            assert lon_p0 == lon_svc, f"GCP ({i},{j}) lon mismatch: phase0 {lon_p0} != service {lon_svc}"
+            assert lat_p0 == lat_svc, (
+                f"GCP ({i},{j}) lat mismatch: phase0 {lat_p0} != service {lat_svc}"
+            )
+            assert lon_p0 == lon_svc, (
+                f"GCP ({i},{j}) lon mismatch: phase0 {lon_p0} != service {lon_svc}"
+            )
 
     # 2c — Identical tile_to_bbox()
     bbox_p0 = phase0_gcp.tile_to_bbox(25, 25, 75, 75)

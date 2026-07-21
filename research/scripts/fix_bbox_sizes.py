@@ -54,6 +54,7 @@ ANNOTATIONS_ROOT = Path("phase0/data/annotations")
 # Statistical vessel size model (same as gfw_annotations.py)
 # ---------------------------------------------------------------------------
 
+
 def _sample_vessel_dimensions(rng: random.Random) -> tuple[float, float]:
     """Sample vessel dimensions WITHOUT type info (global distribution).
 
@@ -64,11 +65,11 @@ def _sample_vessel_dimensions(rng: random.Random) -> tuple[float, float]:
     """
     roll = rng.random()
     if roll < 0.60:
-        length_min, length_max = 10.0, 40.0       # small fishing
+        length_min, length_max = 10.0, 40.0  # small fishing
     elif roll < 0.90:
-        length_min, length_max = 40.0, 120.0       # medium
+        length_min, length_max = 40.0, 120.0  # medium
     else:
-        length_min, length_max = 120.0, 350.0      # large tanker/cargo
+        length_min, length_max = 120.0, 350.0  # large tanker/cargo
 
     log_min = math.log(length_min)
     log_max = math.log(length_max)
@@ -109,6 +110,7 @@ def sample_bbox_size(rng: random.Random) -> tuple[float, float]:
 # ---------------------------------------------------------------------------
 # Analysis
 # ---------------------------------------------------------------------------
+
 
 def analyze_distribution() -> dict:
     """Analyze current box size distribution across all scenes.
@@ -165,16 +167,19 @@ def analyze_distribution() -> dict:
 
     if widths:
         import numpy as np
-        stats.update({
-            "w_mean": float(np.mean(widths)),
-            "w_std": float(np.std(widths)),
-            "w_min": float(np.min(widths)),
-            "w_max": float(np.max(widths)),
-            "h_mean": float(np.mean(heights)),
-            "h_std": float(np.std(heights)),
-            "h_min": float(np.min(heights)),
-            "h_max": float(np.max(heights)),
-        })
+
+        stats.update(
+            {
+                "w_mean": float(np.mean(widths)),
+                "w_std": float(np.std(widths)),
+                "w_min": float(np.min(widths)),
+                "w_max": float(np.max(widths)),
+                "h_mean": float(np.mean(heights)),
+                "h_std": float(np.std(heights)),
+                "h_min": float(np.min(heights)),
+                "h_max": float(np.max(heights)),
+            }
+        )
 
     return stats
 
@@ -192,8 +197,12 @@ def report_distribution(stats: dict, label: str = "Current"):
         print(f"           min={stats['w_min']:.6f}  max={stats['w_max']:.6f}")
         print(f"  Height (norm): {stats['h_mean']:.6f} ± {stats['h_std']:.6f}")
         print(f"           min={stats['h_min']:.6f}  max={stats['h_max']:.6f}")
-        print(f"  Width  (px):   {stats['w_mean'] * TILE_SIZE:.1f} ± {stats['w_std'] * TILE_SIZE:.1f}")
-        print(f"  Height (px):   {stats['h_mean'] * TILE_SIZE:.1f} ± {stats['h_std'] * TILE_SIZE:.1f}")
+        print(
+            f"  Width  (px):   {stats['w_mean'] * TILE_SIZE:.1f} ± {stats['w_std'] * TILE_SIZE:.1f}"
+        )
+        print(
+            f"  Height (px):   {stats['h_mean'] * TILE_SIZE:.1f} ± {stats['h_std'] * TILE_SIZE:.1f}"
+        )
         print(f"  Unique widths:  {stats['unique_widths']}")
         print(f"  Unique heights: {stats['unique_heights']}")
     print("=" * 60)
@@ -203,6 +212,7 @@ def report_distribution(stats: dict, label: str = "Current"):
 # ---------------------------------------------------------------------------
 # Fix
 # ---------------------------------------------------------------------------
+
 
 def fix_scene_labels(scene_dir: Path, rng: random.Random, dry_run: bool = False) -> int:
     """Fix all YOLO label files in a scene directory.
@@ -267,7 +277,9 @@ def fix_all_scenes(dry_run: bool = False) -> int:
             total_modified += n
 
     if dry_run:
-        logger.info(f"[DRY-RUN] Would modify {total_modified} boxes across {len(fixed_scenes)} scenes")
+        logger.info(
+            f"[DRY-RUN] Would modify {total_modified} boxes across {len(fixed_scenes)} scenes"
+        )
     else:
         logger.info(f"Fixed {total_modified} boxes across {len(fixed_scenes)} scenes")
 
@@ -278,19 +290,19 @@ def fix_all_scenes(dry_run: bool = False) -> int:
 # Main
 # ---------------------------------------------------------------------------
 
+
 def main():
     parser = argparse.ArgumentParser(
         description="Fix fixed-size YOLO labels with variable-sized bboxes"
     )
     parser.add_argument(
-        "--dry-run", "-n",
+        "--dry-run",
+        "-n",
         action="store_true",
-        help="Show what would be changed without modifying files"
+        help="Show what would be changed without modifying files",
     )
     parser.add_argument(
-        "--analyze", "-a",
-        action="store_true",
-        help="Only analyze current distribution, don't fix"
+        "--analyze", "-a", action="store_true", help="Only analyze current distribution, don't fix"
     )
     args = parser.parse_args()
 

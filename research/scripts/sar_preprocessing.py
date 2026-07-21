@@ -235,7 +235,9 @@ def extract_gcps_from_geotiff(tiff_path: str) -> tuple[np.ndarray, tuple[int, in
         gcps_raw = src.gcps[0] if src.gcps else []
 
         if not gcps_raw:
-            raise ValueError(f"No GCPs found in {tiff_path}. Sentinel-1 GRD GeoTIFFs should carry a regular GCP grid.")
+            raise ValueError(
+                f"No GCPs found in {tiff_path}. Sentinel-1 GRD GeoTIFFs should carry a regular GCP grid."
+            )
 
         rows = sorted(set(gcp.row for gcp in gcps_raw))
         cols = sorted(set(gcp.col for gcp in gcps_raw))
@@ -244,7 +246,9 @@ def extract_gcps_from_geotiff(tiff_path: str) -> tuple[np.ndarray, tuple[int, in
         n_pixels = len(cols)
 
         if n_lines * n_pixels != len(gcps_raw):
-            raise ValueError(f"GCPs do not form a regular grid: {len(gcps_raw)} GCPs mapped to {n_lines}x{n_pixels}.")
+            raise ValueError(
+                f"GCPs do not form a regular grid: {len(gcps_raw)} GCPs mapped to {n_lines}x{n_pixels}."
+            )
 
         gcps_array = np.zeros((n_lines, n_pixels, 2), dtype=np.float64)
         row_to_idx = {row: i for i, row in enumerate(rows)}
@@ -277,7 +281,9 @@ class CalibrationLUT:
         logger.info(f"Parsing calibration LUT from {calibration_xml_path}")
 
         # Parse sigma Nought LUT
-        self.sigma_lines, self.sigma_pixels, self.sigma_values = self._parse_calibration_xml(calibration_xml_path)
+        self.sigma_lines, self.sigma_pixels, self.sigma_values = self._parse_calibration_xml(
+            calibration_xml_path
+        )
 
         # Parse noise LUT if provided
         self.noise_lines = None
@@ -287,7 +293,9 @@ class CalibrationLUT:
         if noise_xml_path:
             try:
                 logger.info(f"Parsing noise LUT from {noise_xml_path}")
-                self.noise_lines, self.noise_pixels, self.noise_values = self._parse_noise_xml(noise_xml_path)
+                self.noise_lines, self.noise_pixels, self.noise_values = self._parse_noise_xml(
+                    noise_xml_path
+                )
             except Exception as e:
                 logger.warning(f"Failed to parse noise LUT: {e}")
 
@@ -351,7 +359,11 @@ class CalibrationLUT:
             line = int(line_elem.text)
 
             pixel_elem = vec.find("pixel")
-            noise_elem = vec.find("noiseLut") if vec.find("noiseLut") is not None else vec.find("noiseRangeLut")
+            noise_elem = (
+                vec.find("noiseLut")
+                if vec.find("noiseLut") is not None
+                else vec.find("noiseRangeLut")
+            )
 
             if pixel_elem is not None and noise_elem is not None and noise_elem.text is not None:
                 pixels = np.array([int(p) for p in pixel_elem.text.split()])
@@ -367,7 +379,9 @@ class CalibrationLUT:
 
         return np.array(lines), pixel_indices, np.array(noise_values)
 
-    def get_sigma_window(self, row_start: int, row_end: int, col_start: int, col_end: int) -> np.ndarray:
+    def get_sigma_window(
+        self, row_start: int, row_end: int, col_start: int, col_end: int
+    ) -> np.ndarray:
         """
         Returns sigma LUT interpolated only for the requested window.
 
@@ -397,7 +411,9 @@ class CalibrationLUT:
 
         return lut_window
 
-    def get_noise_window(self, row_start: int, row_end: int, col_start: int, col_end: int) -> np.ndarray | None:
+    def get_noise_window(
+        self, row_start: int, row_end: int, col_start: int, col_end: int
+    ) -> np.ndarray | None:
         """
         Returns noise LUT interpolated only for the requested window.
 
@@ -505,7 +521,9 @@ def _apply_pipeline_to_window(
 
     elif pipeline_name == "B":
         # Pipeline B: Calibration only
-        dn_squared = np.maximum(data**2 - noise_lut_window, 0) if noise_lut_window is not None else data**2
+        dn_squared = (
+            np.maximum(data**2 - noise_lut_window, 0) if noise_lut_window is not None else data**2
+        )
 
         cal_lut_safe = np.where(sigma_lut_window == 0, 1e-10, sigma_lut_window)
         sigma0 = dn_squared / (cal_lut_safe**2)
@@ -518,7 +536,9 @@ def _apply_pipeline_to_window(
 
     elif pipeline_name == "C":
         # Pipeline C: Calibration + Lee filter
-        dn_squared = np.maximum(data**2 - noise_lut_window, 0) if noise_lut_window is not None else data**2
+        dn_squared = (
+            np.maximum(data**2 - noise_lut_window, 0) if noise_lut_window is not None else data**2
+        )
 
         cal_lut_safe = np.where(sigma_lut_window == 0, 1e-10, sigma_lut_window)
         sigma0 = dn_squared / (cal_lut_safe**2)
@@ -534,7 +554,9 @@ def _apply_pipeline_to_window(
 
     elif pipeline_name == "D":
         # Pipeline D: Full chain with histogram equalization
-        dn_squared = np.maximum(data**2 - noise_lut_window, 0) if noise_lut_window is not None else data**2
+        dn_squared = (
+            np.maximum(data**2 - noise_lut_window, 0) if noise_lut_window is not None else data**2
+        )
 
         cal_lut_safe = np.where(sigma_lut_window == 0, 1e-10, sigma_lut_window)
         sigma0 = dn_squared / (cal_lut_safe**2)
@@ -659,7 +681,9 @@ def process_safe_windowed(
         valid_count = 0
         skipped_count = 0
 
-        with tqdm(total=len(tile_grid), desc=f"Pipeline {pipeline_name} — {scene_id}", unit="tile") as pbar:
+        with tqdm(
+            total=len(tile_grid), desc=f"Pipeline {pipeline_name} — {scene_id}", unit="tile"
+        ) as pbar:
             for tile_idx, (y_start, x_start, y_end, x_end) in enumerate(tile_grid):
                 # Calculate window with padding for Lee filter
                 pad = LEE_PADDING
@@ -673,7 +697,9 @@ def process_safe_windowed(
                 window_w = x_end_padded - x_start_padded
 
                 # Read window from GeoTIFF (~0.5 MB for 512×512)
-                window = dataset.read(1, window=Window(x_start_padded, y_start_padded, window_w, window_h))
+                window = dataset.read(
+                    1, window=Window(x_start_padded, y_start_padded, window_w, window_h)
+                )
 
                 # Check NoData ratio
                 zero_ratio = np.sum(window == 0) / window.size
@@ -681,7 +707,13 @@ def process_safe_windowed(
                     skipped_count += 1
                     del window
                     pbar.update(1)
-                    pbar.set_postfix({"valid": valid_count, "skip": skipped_count, "RAM": f"{get_ram_mb():.0f}MB"})
+                    pbar.set_postfix(
+                        {
+                            "valid": valid_count,
+                            "skip": skipped_count,
+                            "RAM": f"{get_ram_mb():.0f}MB",
+                        }
+                    )
                     continue
 
                 # Get LUT windows for this specific region
@@ -693,7 +725,9 @@ def process_safe_windowed(
                 )
 
                 # Apply pipeline
-                tile_uint8 = _apply_pipeline_to_window(window, pipeline_name, sigma_lut_window, noise_lut_window)
+                tile_uint8 = _apply_pipeline_to_window(
+                    window, pipeline_name, sigma_lut_window, noise_lut_window
+                )
 
                 # Crop padding if we added it
                 if pad > 0:
@@ -719,7 +753,12 @@ def process_safe_windowed(
                     except Exception:
                         center_lat, center_lon = 0.0, 0.0
                     half = 0.025
-                    geo_bbox = [center_lat - half, center_lon - half, center_lat + half, center_lon + half]
+                    geo_bbox = [
+                        center_lat - half,
+                        center_lon - half,
+                        center_lat + half,
+                        center_lon + half,
+                    ]
                 # geo_bbox format: [lat_min, lon_min, lat_max, lon_max]
                 lat_min, lon_min, lat_max, lon_max = geo_bbox
 
@@ -749,7 +788,9 @@ def process_safe_windowed(
                 if tile_idx % 50 == 0:
                     gc.collect()
 
-                pbar.set_postfix({"valid": valid_count, "skip": skipped_count, "RAM": f"{get_ram_mb():.0f}MB"})
+                pbar.set_postfix(
+                    {"valid": valid_count, "skip": skipped_count, "RAM": f"{get_ram_mb():.0f}MB"}
+                )
                 pbar.update(1)
 
     processing_time = time.perf_counter() - start_time
@@ -849,7 +890,9 @@ def benchmark_memory_usage(safe_path: str, n_tiles: int = 10) -> dict[str, Any]:
                 noise_lut_window = calib_lut.get_noise_window(y, y_end, x, x_end)
 
                 # Apply pipeline D
-                tile_uint8 = _apply_pipeline_to_window(window, "D", sigma_lut_window, noise_lut_window)
+                tile_uint8 = _apply_pipeline_to_window(
+                    window, "D", sigma_lut_window, noise_lut_window
+                )
 
                 # Measure RAM after
                 ram_after = get_ram_mb()
@@ -930,15 +973,29 @@ def main() -> None:
     """Command-line entry point."""
     import argparse
 
-    parser = argparse.ArgumentParser(description="Sentinel-1 GRD SAR Preprocessing (Windowed Memory-Efficient)")
+    parser = argparse.ArgumentParser(
+        description="Sentinel-1 GRD SAR Preprocessing (Windowed Memory-Efficient)"
+    )
     parser.add_argument("--safe", help="Path to .SAFE directory")
     parser.add_argument(
-        "--pipeline", default="D", choices=["A", "B", "C", "D"], help="Preprocessing pipeline (default: D)"
+        "--pipeline",
+        default="D",
+        choices=["A", "B", "C", "D"],
+        help="Preprocessing pipeline (default: D)",
     )
-    parser.add_argument("--polarization", default="vv", choices=["vv", "vh"], help="Polarization channel (default: vv)")
-    parser.add_argument("--tile-size", type=int, default=512, help="Tile size in pixels (default: 512)")
+    parser.add_argument(
+        "--polarization",
+        default="vv",
+        choices=["vv", "vh"],
+        help="Polarization channel (default: vv)",
+    )
+    parser.add_argument(
+        "--tile-size", type=int, default=512, help="Tile size in pixels (default: 512)"
+    )
     parser.add_argument("--overlap", type=float, default=0.5, help="Tile overlap (default: 0.5)")
-    parser.add_argument("--output-dir", default=None, help="Output directory (default: phase0/data/tiles/)")
+    parser.add_argument(
+        "--output-dir", default=None, help="Output directory (default: phase0/data/tiles/)"
+    )
     parser.add_argument("--test", action="store_true", help="Run test with first scene")
     parser.add_argument("--benchmark-memory", action="store_true", help="Run memory benchmark")
 

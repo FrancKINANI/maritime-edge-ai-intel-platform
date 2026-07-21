@@ -4,7 +4,7 @@
 
 FROM maritime-intel-base:latest AS builder
 
-COPY services/ground-dashboard/requirements.txt .
+COPY services/ground_dashboard/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 FROM maritime-intel-base:latest AS release
@@ -12,7 +12,7 @@ FROM maritime-intel-base:latest AS release
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-COPY services/ground-dashboard/ /app/services/ground-dashboard/
+COPY services/ground_dashboard/ /app/services/ground_dashboard/
 COPY shared/ /app/shared/
 
 USER appuser
@@ -22,4 +22,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
 
 EXPOSE 8501
 
-CMD ["streamlit", "run", "services/ground-dashboard/app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+CMD ["streamlit", "run", "services/ground_dashboard/app.py", "--server.port=8501", "--server.address=0.0.0.0"]

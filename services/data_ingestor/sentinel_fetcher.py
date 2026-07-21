@@ -7,11 +7,19 @@ Helper interface containing download and API query functions to fetch files from
 import os
 from typing import Any
 
-from research.scripts.download_scenes import download_product, get_cdse_token, search_sentinel1_products
+from research.scripts.download_scenes import (
+    download_product,
+    get_cdse_token,
+    search_sentinel1_products,
+)
 
 
 def search_cdse_odata(
-    bbox: list[float], date_start: str, date_end: str, username: str | None = None, password: str | None = None
+    bbox: list[float],
+    date_start: str,
+    date_end: str,
+    username: str | None = None,
+    password: str | None = None,
 ) -> list[dict[str, Any]]:
     """Runs OData query on CDSE catalog by leveraging phase0 implementation.
 
@@ -40,4 +48,6 @@ def download_safe_product(
         raise ValueError("CDSE credentials must be provided via args or environment variables")
     token, expiry = get_cdse_token(username, password)
     # product_id here is the CDSE UUID; we need a product_name for naming – pass product_id as name when unknown
-    return download_product(token, product_id, product_id, download_path, expiry, username, password)
+    return download_product(
+        token, product_id, product_id, download_path, expiry, username, password
+    )

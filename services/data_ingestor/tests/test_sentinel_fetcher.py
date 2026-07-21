@@ -41,7 +41,10 @@ class TestSearchCdseOdata:
 
     def test_missing_credentials_raises(self):
         """No credentials at all should raise ValueError."""
-        with patch.dict(os.environ, {}, clear=True), pytest.raises(ValueError, match="CDSE credentials"):
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            pytest.raises(ValueError, match="CDSE credentials"),
+        ):
             search_cdse_odata(
                 bbox=[-10.0, 32.0, -8.0, 34.0],
                 date_start="2024-01-01",
@@ -91,7 +94,10 @@ class TestDownloadSafeProduct:
 
     def test_missing_credentials_raises(self):
         """No credentials should raise ValueError."""
-        with patch.dict(os.environ, {}, clear=True), pytest.raises(ValueError, match="CDSE credentials"):
+        with (
+            patch.dict(os.environ, {}, clear=True),
+            pytest.raises(ValueError, match="CDSE credentials"),
+        ):
             download_safe_product(
                 product_id="test-product",
                 download_path="/tmp/downloads",

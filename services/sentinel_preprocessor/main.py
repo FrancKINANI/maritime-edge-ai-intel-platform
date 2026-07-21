@@ -7,22 +7,24 @@ numpy sub-tiles using multiple pipelines.
 
 import importlib.util
 import logging
-import os
 import sys
 from pathlib import Path
 from typing import Any
 
+from fastapi import FastAPI, HTTPException, status
+
+from shared.config import SecretsValidationError, constants, validate_service_secrets
+
 logger = logging.getLogger(__name__)
 
 # Validate required environment variables at startup
-if not os.getenv("REDIS_URL"):
-    logger.warning("Missing required environment variable: REDIS_URL — service will start but may fail at runtime")
-
-from fastapi import FastAPI, HTTPException, status
-
-from shared.config import constants
-
-logger = logging.getLogger(__name__)
+# NOTE: We warn instead of sys.exit() to allow test imports without env vars.
+try:
+    validate_service_secrets("sentinel_preprocessor")
+    logger.info("Secrets validation passed")
+except SecretsValidationError as e:
+    logger.error("Secrets validation failed: %s", e)
+    logger.warning("Service will start but may fail at runtime — set REDIS_URL in .env")
 
 # Load the local preprocessing module (directory name contains a hyphen)
 _sp_path = Path(__file__).resolve().parent / "sar_preprocessing_module.py"
@@ -40,7 +42,9 @@ app = FastAPI(
 
 
 @app.post("/preprocess", status_code=status.HTTP_200_OK, response_model=dict[str, Any])
-async def preprocess_scene(safe_path: str, pipeline: str = None, output_dir: str = None) -> dict[str, Any]:
+async def preprocess_scene(
+    safe_path: str, pipeline: str = None, output_dir: str = None
+) -> dict[str, Any]:
     """Triggers Sentinel-1 scene preprocessing and returns manifest.
 
     The default pipeline comes from environment configuration. See README.md for
