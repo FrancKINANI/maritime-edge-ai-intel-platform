@@ -90,7 +90,7 @@ jobs:
           pip install pytest pytest-asyncio pytest-cov pytest-timeout
       - name: Install research dependencies
         if: contains(matrix.suite, 'research')
-        run: pip install scipy python-dotenv tqdm
+        run: pip install scipy python-dotenv tqdm psutil
       - name: Debug research environment
         if: contains(matrix.suite, 'research')
         run: |
