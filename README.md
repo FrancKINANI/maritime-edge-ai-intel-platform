@@ -343,7 +343,7 @@ make clean    # Clean generated tiles/scenes/results + coverage
 
 ## Testing
 
-**96 tests** across service tests, integration tests, research tests, and dashboard tests:
+**111 tests** across service tests, integration tests, research tests, and dashboard tests:
 
 ```bash
 # Run all tests
