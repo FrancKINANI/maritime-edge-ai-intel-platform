@@ -8,7 +8,6 @@ to detect vessels and output raw detection events.
 import base64
 import io
 import logging
-import os
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -19,14 +18,19 @@ import onnxruntime as ort
 from fastapi import FastAPI, HTTPException, status
 from pydantic import BaseModel
 
-from shared.config import constants
+from shared.config import SecretsValidationError, constants, validate_service_secrets
 from shared.schemas.events import BoundingBox, DetectionEvent
 
 logger = logging.getLogger(__name__)
 
 # Validate required environment variables at startup
-if not os.getenv("REDIS_URL"):
-    logger.warning("Missing required environment variable: REDIS_URL — service will start but may fail at runtime")
+# NOTE: We warn instead of sys.exit() to allow test imports without env vars.
+try:
+    validate_service_secrets("detector")
+    logger.info("Secrets validation passed")
+except SecretsValidationError as e:
+    logger.error("Secrets validation failed: %s", e)
+    logger.warning("Service will start but may fail at runtime — set REDIS_URL in .env")
 
 
 class DetectRequest(BaseModel):
@@ -83,7 +87,9 @@ def preprocess_tile(tile: np.ndarray, target_size: int = constants.MODEL_INPUT_S
     h, w, c = tile.shape
     if h != target_size or w != target_size:
         tile = np.array(
-            np.stack([np.resize(tile[:, :, ch], (target_size, target_size)) for ch in range(c)], axis=2),
+            np.stack(
+                [np.resize(tile[:, :, ch], (target_size, target_size)) for ch in range(c)], axis=2
+            ),
             dtype=np.float32,
         )
         tile = np.transpose(tile, (1, 2, 0))
@@ -144,8 +150,9 @@ async def detect_vessels(req: DetectRequest) -> DetectionEvent:
         except Exception as e:
             logger.error("Failed to load tile from path %s: %s", req.tile_path, e, exc_info=True)
             raise HTTPException(
-                status_code=400, detail="Unable to load tile from the provided path. Ensure it is a valid .npy file."
-            )
+                status_code=400,
+                detail="Unable to load tile from the provided path. Ensure it is a valid .npy file.",
+            ) from e
     elif req.tile_b64:
         try:
             raw = base64.b64decode(req.tile_b64)
@@ -155,7 +162,7 @@ async def detect_vessels(req: DetectRequest) -> DetectionEvent:
             raise HTTPException(
                 status_code=400,
                 detail="Unable to decode the provided base64 tile. Ensure it is a valid .npy file encoded in base64.",
-            )
+            ) from e
     else:
         raise HTTPException(status_code=400, detail="Either tile_path or tile_b64 must be provided")
 
@@ -166,7 +173,7 @@ async def detect_vessels(req: DetectRequest) -> DetectionEvent:
         outputs = DETECTOR_SESSION.run(None, {input_name: inp})
     except Exception as e:
         logger.error(f"ONNX runtime error during inference: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Model inference error")
+        raise HTTPException(status_code=500, detail="Model inference error") from e
     # YOLOv8 style output: (1, n, 85) or list
     preds = outputs[0]
     preds = np.squeeze(preds)
@@ -197,7 +204,11 @@ async def detect_vessels(req: DetectRequest) -> DetectionEvent:
         y2_pix = min(h, y2 * h)
         detections.append(
             BoundingBox(
-                x1=float(x1_pix), y1=float(y1_pix), x2=float(x2_pix), y2=float(y2_pix), confidence=float(scores[i])
+                x1=float(x1_pix),
+                y1=float(y1_pix),
+                x2=float(x2_pix),
+                y2=float(y2_pix),
+                confidence=float(scores[i]),
             )
         )
 
@@ -217,7 +228,7 @@ async def detect_vessels(req: DetectRequest) -> DetectionEvent:
     event = DetectionEvent(
         event_id=str(uuid.uuid4()),
         scene_id=req.scene_id or "unknown",
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
         tile_id=req.tile_id or str(uuid.uuid4()),
         tile_bbox_latlon=[0.0, 0.0, 0.0, 0.0],
         detections=detections,

@@ -252,7 +252,7 @@ def test_tle_fallback_pipeline():
     """Test that the TLE fallback flow correctly delegates to Celestrak.
 
     NOTE: Internal TLE_CACHE behavior is tested in the satellite-monitor's
-    own test files (services/satellite-monitor/tests/test_tle_fallback.py).
+    own test files (services/satellite_monitor/tests/test_tle_fallback.py).
     This integration test focuses on the delegation logic.
     """
     import importlib.util

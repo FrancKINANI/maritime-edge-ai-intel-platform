@@ -2,40 +2,6 @@
 # Maritime Edge AI Platform — .gitignore
 # =============================================================================
 
-
-# --- Phase 0 data (generated, large) ---
-/phase_post0/dataset_finetune/
-/phase_post0/models/
-/phase0/data/
-/phase0/docs/
-/docs/
-/data/
-
-# --- Images (generated tiles, never committed) ---
-*.png
-*.jpg
-*.jpeg
-*.tif
-*.tiff
-
-# --- Large SAR / geospatial files ---
-*.SAFE
-*.nc
-*.geotiff
-*.npy
-
-# --- Archives ---
-*.zip
-*.tar
-*.tar.gz
-*.rar
-*.7z
-
-# --- Generated CSV/JSON/XML exports ---
-*.csv
-*.xml
-!templates/*.csv
-
 # --- ONNX models (manual transfer) ---
 /shared/models/*
 !/shared/models/.gitkeep
@@ -64,7 +30,6 @@ build/
 *~
 .DS_Store
 Thumbs.db
-ehthumbs.db
 
 # --- Jupyter ---
 .ipynb_checkpoints/
@@ -74,8 +39,12 @@ ehthumbs.db
 .coverage
 .pytest_cache/
 htmlcov/
+coverage_html/
 .tox/
 .hypothesis/
+
+# --- Ruff ---
+.ruff_cache/
 
 # --- Temp ---
 tmp/
@@ -84,3 +53,20 @@ temp/
 *.bak
 *.log
 logs/
+
+# --- Docker ---
+.docker/
+
+# --- Generated large data ---
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+*.npy
+*.npz
+*.SAFE
+*.nc
+*.geotiff
+*.csv
+*.xml

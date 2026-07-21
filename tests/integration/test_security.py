@@ -37,7 +37,7 @@ def test_sentinel_preprocessor_path_traversal_prevention():
     sys.path.insert(0, str(_PREPROC_PATH.parent))
     # Import will fail if deps aren't installed — use try/except
     try:
-        from sar_preprocessing_module import SafetyViolation, validate_safe_path
+        from sar_preprocessing_module import SafetyViolationError, validate_safe_path
     except ImportError:
         # If validation isn't implemented, that's a finding too
         pytest.skip("validate_safe_path not found — security feature not implemented")
@@ -51,7 +51,7 @@ def test_sentinel_preprocessor_path_traversal_prevention():
         "/app/configs/../../proc/1/environ",
     ]
     for path in malicious_paths:
-        with pytest.raises(SafetyViolation):
+        with pytest.raises(SafetyViolationError):
             validate_safe_path(path)
 
     # Legitimate paths should pass
@@ -63,7 +63,7 @@ def test_sentinel_preprocessor_path_traversal_prevention():
     for path in safe_paths:
         try:
             validate_safe_path(path)
-        except SafetyViolation:
+        except SafetyViolationError:
             pytest.fail(f"Safe path rejected: {path}")
 
 

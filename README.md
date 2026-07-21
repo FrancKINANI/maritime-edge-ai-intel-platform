@@ -444,30 +444,33 @@ make clean              # Clean build artifacts + coverage
 │       └── requirements.txt        #   FastAPI, Pydantic, httpx, NumPy
 │
 ├── shared/                         # Common code for all services
-│   ├── __init__.py                 #   Package init
-│   ├── config/                     #   Shared constants
-│   │   ├── __init__.py
-│   │   └── constants.py            #   Zones, models, SAR params
-│   ├── schemas/                    #   Pydantic schemas
-│   │   ├── __init__.py
-│   │   └── events.py               #   DetectionEvent, BoundingBox, etc.
+│   ├── __init__.py
+│   ├── config/                     #   Shared constants & secrets validation
+│   ├── schemas/                    #   Pydantic schemas (DetectionEvent, etc.)
 │   ├── models/                     #   ONNX model files (gitignored)
 │   └── tests/                      #   Schema unit tests (21 tests)
 │
-├── phase0/                         # Scientific validation framework
+├── research/                       # Research & scientific validation
 │   ├── scripts/                    #   CDSE download, SAR preprocessing, GFW, benchmark
-│   ├── tests/                      #   Test suites
+│   ├── tests/                      #   Research test suites
 │   └── notebooks/                  #   Colab pipeline notebooks
 │
 ├── services/                       # Microservices
-│   ├── data-ingestor/              #   CDSE ingestion (:8001)
-│   ├── sentinel-preprocessor/      #   SAR preprocessing (:8000)
+│   ├── data_ingestor/              #   CDSE ingestion (:8001)
+│   ├── sentinel_preprocessor/      #   SAR preprocessing (:8000)
 │   ├── detector/                   #   YOLOv8 ONNX inference (:8003)
-│   ├── satellite-monitor/          #   TLE/SGP4 satellite tracking (:8004)
+│   ├── satellite_monitor/          #   TLE/SGP4 satellite tracking (:8004)
 │   ├── aggregator/                 #   Event enrichment + persistence (:8002)
-│   └── ground-dashboard/           #   Streamlit UI (:8501)
+│   └── ground_dashboard/           #   Streamlit UI (:8501)
 │
-└── tests/                          # Cross-service test suites
-    ├── integration/                #   End-to-end + security tests
-    └── ground_dashboard/           #   Dashboard utility tests
+├── tests/                          # Cross-service test suites
+│   └── integration/                #   End-to-end + security tests
+│
+├── docs/                           # Documentation
+│   ├── pdf/                        #   Research papers & reports
+│   ├── docx/                       #   Word documents
+│   ├── pics/                       #   Architecture diagrams
+│   └── QA.md                       #   GFW data QA analysis
+│
+└── docker-compose.yml              # Production compose (7 services)
 ```

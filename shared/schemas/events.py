@@ -47,32 +47,45 @@ class DetectionEvent(BaseModel):
         max_length=4,
         description="Geographic bounding box of the tile: [lat_min, lon_min, lat_max, lon_max]",
     )
-    detections: list[BoundingBox] = Field(..., description="List of detected vessels bounding boxes")
+    detections: list[BoundingBox] = Field(
+        ..., description="List of detected vessels bounding boxes"
+    )
     vessel_count: int = Field(..., ge=0, description="Total number of vessels detected")
     dark_vessel_count: int = Field(
         ..., ge=0, description="Number of vessels detected without matching active AIS signals"
     )
-    priority_level: str = Field(..., description="Assigned priority level: LOW, MEDIUM, HIGH, CRITICAL")
+    priority_level: str = Field(
+        ..., description="Assigned priority level: LOW, MEDIUM, HIGH, CRITICAL"
+    )
     zone: str = Field(..., description="Geographical maritime zone: Z1, Z2, Z3")
-    satellite_id: str | None = Field(None, description="NORAD ID or name of the observing satellite")
+    satellite_id: str | None = Field(
+        None, description="NORAD ID or name of the observing satellite"
+    )
     satellite_position: dict[str, Any] | None = Field(
         None, description="Coordinates and altitude of satellite at timestamp"
     )
     preprocessing_pipeline: str = Field(
         ..., description="Identifier of the preprocessing pipeline used (A, B, C, or D)"
     )
-    processing_time_ms: float = Field(..., ge=0.0, description="Processing duration in milliseconds")
+    processing_time_ms: float = Field(
+        ..., ge=0.0, description="Processing duration in milliseconds"
+    )
 
 
 class IngestRequest(BaseModel):
     """Payload to trigger acquisition and ingestion of satellite scenes."""
 
     bbox: list[float] = Field(
-        ..., min_length=4, max_length=4, description="Bounding box coordinates: [lon_min, lat_min, lon_max, lat_max]"
+        ...,
+        min_length=4,
+        max_length=4,
+        description="Bounding box coordinates: [lon_min, lat_min, lon_max, lat_max]",
     )
     date_start: str = Field(..., description="Query start time in ISO8601 format")
     date_end: str = Field(..., description="Query end time in ISO8601 format")
-    satellite_id: str | None = Field(None, description="Target satellite name or ID (e.g. Sentinel-1A)")
+    satellite_id: str | None = Field(
+        None, description="Target satellite name or ID (e.g. Sentinel-1A)"
+    )
     pipeline: str = Field("D", description="Preprocessing pipeline to execute (A, B, C, D)")
 
 
@@ -83,4 +96,6 @@ class TLEData(BaseModel):
     norad_id: int = Field(..., description="NORAD Catalog Number")
     tle1: str = Field(..., description="Line 1 of the TLE record")
     tle2: str = Field(..., description="Line 2 of the TLE record")
-    updated_at: datetime = Field(..., description="Timestamp of when the TLE was last fetched/refreshed")
+    updated_at: datetime = Field(
+        ..., description="Timestamp of when the TLE was last fetched/refreshed"
+    )

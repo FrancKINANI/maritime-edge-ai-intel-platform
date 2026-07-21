@@ -7,7 +7,6 @@ persisting findings in database storage, and querying aggregated metrics.
 
 import json
 import logging
-import os
 import sqlite3
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -16,16 +15,21 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException, status
 
-from shared.config import constants
+from shared.config import SecretsValidationError, constants, validate_service_secrets
 from shared.schemas.events import BoundingBox, DetectionEvent
 
 logger = logging.getLogger(__name__)
 
 # Validate required environment variables at startup
-_REQUIRED_ENV_VARS = ["REDIS_URL", "GFW_API_TOKEN"]
-for _var in _REQUIRED_ENV_VARS:
-    if not os.getenv(_var):
-        logger.warning("Missing required environment variable: %s — service will start but may fail at runtime", _var)
+# NOTE: We warn instead of sys.exit() to allow test imports without env vars.
+try:
+    validate_service_secrets("aggregator")
+    logger.info("Secrets validation passed")
+except SecretsValidationError as e:
+    logger.error("Secrets validation failed: %s", e)
+    logger.warning(
+        "Service will start but may fail at runtime — set GFW_API_TOKEN and REDIS_URL in .env"
+    )
 
 
 DB_PATH = Path(__file__).resolve().parent / "data" / "events.db"
@@ -142,7 +146,7 @@ async def ingest_detection_event(event: DetectionEvent) -> DetectionEvent:
         return event
     except Exception as e:
         logger.error(f"Database error in ingest_detection_event: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal database error")
+        raise HTTPException(status_code=500, detail="Internal database error") from e
 
 
 @app.get("/events", response_model=list[DetectionEvent])
