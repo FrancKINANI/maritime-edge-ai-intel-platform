@@ -134,7 +134,8 @@ def analyze_distribution() -> dict:
         for label_path in sorted(label_dir.glob("*.txt")):
             try:
                 text = label_path.read_text().strip()
-            except Exception:
+            except Exception as e:
+                logger.warning("Failed to read %s: %s", label_path, e)
                 continue
 
             for line in text.splitlines():
@@ -228,7 +229,8 @@ def fix_scene_labels(scene_dir: Path, rng: random.Random, dry_run: bool = False)
     for label_path in sorted(label_dir.glob("*.txt")):
         try:
             lines = label_path.read_text().strip().splitlines()
-        except Exception:
+        except Exception as e:
+            logger.warning("Failed to read %s: %s", label_path, e)
             continue
 
         new_lines = []

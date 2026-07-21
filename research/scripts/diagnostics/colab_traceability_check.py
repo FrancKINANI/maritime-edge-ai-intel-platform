@@ -29,6 +29,7 @@ Author: Phase 0 diagnostics
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -51,14 +52,15 @@ subprocess.check_call(
 )
 
 # Clone the repository (or mount Google Drive if already cloned)
+_GIT_PATH: str | None = shutil.which("git")
 if not Path("maritime-intelligence-platform").exists():
     subprocess.check_call(
-        ["git", "clone", "https://github.com/FrancKINANI/maritime-edge-ai-intel-platform.git"]
+        [_GIT_PATH, "clone", "https://github.com/FrancKINANI/maritime-edge-ai-intel-platform.git"]
     )
     os.chdir("maritime-intelligence-platform")
 else:
     os.chdir("maritime-intelligence-platform")
-    subprocess.check_call(["git", "pull"])  # Ensure latest version
+    subprocess.check_call([_GIT_PATH, "pull"])  # Ensure latest version
 
 # Option B: Google Drive mount (faster if already cloned)
 # from google.colab import drive
@@ -129,7 +131,8 @@ print(f"Period: {density_map.get('period', 'N/A')}")
 top_cells = density_map.get("cells", [])[:5]
 for i, cell in enumerate(top_cells):
     print(
-        f"  Zone {i + 1}: cell_index={cell['cell_index']}, bbox={cell['cell_bbox']}, AIS count={cell['count']}"
+        f"  Zone {i + 1}: cell_index={cell['cell_index']}, "
+        f"bbox={cell['cell_bbox']}, AIS count={cell['count']}"
     )
 
 if not density_map.get("cells"):

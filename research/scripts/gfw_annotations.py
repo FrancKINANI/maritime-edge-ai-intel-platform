@@ -49,7 +49,7 @@ GFW_4WINGS_LAST_REPORT = f"{GFW_BASE_URL}/4wings/last-report"
 GFW_REPORT = GFW_4WINGS_REPORT
 
 AIS_PRESENCE_DATASET = "public-global-presence:latest"
-# DEPRECATED per PH0-CORR-002: SAR_VESSEL_DETECTIONS_DATASET = "public-global-sar-vessel-detections:latest"
+# DEPRECATED per PH0-CORR-002: SAR_VESSEL_DETECTIONS_DATASET = "public-global-sar-vessel-detections:latest"  # noqa: E501
 # This dataset returns grid cell aggregates, not individual vessel positions
 AIS_OFF_DATASET = "public-global-gaps-events:latest"
 FISHING_EVENTS_DATASET = "public-global-fishing-events:latest"
@@ -382,9 +382,7 @@ class GFWClient:
 
         except Exception as e:
             logger.error(f"Failed to fetch AIS Vessel Presence: {e}")
-            logger.warning(
-                "The endpoint for AIS Vessel Presence may need verification against GFW documentation"
-            )
+            logger.warning("The AIS Vessel Presence endpoint needs verification against GFW docs")
             return []
 
     def get_dark_vessel_events(
@@ -438,7 +436,7 @@ class GFWClient:
             return events
         except Exception as exc:
             logger.warning(
-                "Failed to fetch dark vessel events (non-fatal): %s. Continuing with AIS presence data only.",
+                "Failed to fetch dark vessel events (non-fatal): %s. Using AIS presence only.",
                 exc,
             )
             return []
@@ -963,7 +961,7 @@ def convert_npy_tiles_to_png(
         # Validate array dimensions before conversion
         if arr.ndim != 2:
             raise ValueError(
-                f"Tile {tile_id} has {arr.ndim} dimensions (expected 2) — check the SAR pipeline output."
+                f"Tile {tile_id} has {arr.ndim} dims (expected 2) — check SAR pipeline output."
             )
 
         # Pad edge tiles that are smaller than tile_size to maintain

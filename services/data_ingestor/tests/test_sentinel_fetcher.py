@@ -65,7 +65,7 @@ class TestSearchCdseOdata:
                 date_start="2024-01-01",
                 date_end="2024-01-02",
                 username="test_user",
-                password="test_pass",
+                password="test_pass",  # noqa: S106
             )
             assert result == []
             mock_token.assert_called_once_with("test_user", "test_pass")
@@ -100,7 +100,7 @@ class TestDownloadSafeProduct:
         ):
             download_safe_product(
                 product_id="test-product",
-                download_path="/tmp/downloads",
+                download_path="/tmp/downloads",  # noqa: S108
             )
 
     def test_credentials_from_args(self):
@@ -109,13 +109,13 @@ class TestDownloadSafeProduct:
             mock_token.return_value = ("fake_token", "2025-01-01")
 
             with patch("data_ingestor_fetcher.download_product") as mock_dl:
-                mock_dl.return_value = "/tmp/downloads/test.SAFE"
+                mock_dl.return_value = "/tmp/downloads/test.SAFE"  # noqa: S108
 
                 result = download_safe_product(
                     product_id="test-uuid",
-                    download_path="/tmp/downloads",
+                    download_path="/tmp/downloads",  # noqa: S108
                     username="dl_user",
-                    password="dl_pass",
+                    password="dl_pass",  # noqa: S106
                 )
-                assert result == "/tmp/downloads/test.SAFE"
+                assert result == "/tmp/downloads/test.SAFE"  # noqa: S108
                 mock_token.assert_called_once_with("dl_user", "dl_pass")

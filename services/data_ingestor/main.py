@@ -23,9 +23,7 @@ try:
     logger.info("Secrets validation passed")
 except SecretsValidationError as e:
     logger.error("Secrets validation failed: %s", e)
-    logger.warning(
-        "Service will start but may fail at runtime — set CDSE_USERNAME, CDSE_PASSWORD, REDIS_URL in .env"
-    )
+    logger.warning("Service may fail at runtime — set CDSE_USERNAME, CDSE_PASSWORD, and REDIS_URL")
 
 app = FastAPI(
     title="Maritime Edge AI Intel Platform - Data Ingestor",

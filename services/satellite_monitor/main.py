@@ -27,7 +27,7 @@ try:
 except SecretsValidationError as e:
     logger.error("Secrets validation failed: %s", e)
     logger.warning(
-        "Service will start but may fail at runtime — set SENTINEL_HUB_CLIENT_ID/SECRET and REDIS_URL in .env"
+        "Service may fail at runtime — set SENTINEL_HUB_CLIENT_ID/SECRET and REDIS_URL in .env"
     )
 
 app = FastAPI(
@@ -122,7 +122,7 @@ async def fetch_tle_from_satnogs(norad_id: int) -> dict[str, Any]:
     if not data:
         logger.warning(
             "SatNOGS returned empty TLE data for NORAD %s — Celestrak fallback will be used. "
-            "Note: SatNOGS DB /api/tle/ endpoint structurally lacks data for Sentinel-1A (NORAD 39634) "
+            "Note: SatNOGS DB /api/tle/ endpoint lacks data for Sentinel-1A (NORAD 39634) "
             "and many operational satellites. Celestrak is the reliable source for this project.",
             norad_id,
         )

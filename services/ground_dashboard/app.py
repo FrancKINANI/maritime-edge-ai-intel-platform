@@ -39,7 +39,7 @@ def render_upload_mode() -> None:
     uploaded = st.file_uploader(
         "Choose file",
         type=["npy", "zip", "tiff", "tif"],
-        help="Preprocessed .npy tiles skip preprocessing. Raw .zip/.SAFE/.tiff products are preprocessed first.",
+        help="Preprocessed .npy tiles skip preprocessing. Raw .zip/.SAFE/.tiff processed first.",
     )
     scene_id = st.text_input("Scene ID (optional)")
     tile_id = st.text_input("Tile ID (optional)")
@@ -47,10 +47,11 @@ def render_upload_mode() -> None:
     # Pipeline selection with explanations
     st.markdown("**Preprocessing Pipeline Selection:**")
     pipeline_help = """
-    - **A: Raw** — Bare normalized image, no calibration or filtering (baseline, no SAR processing)
-    - **B: Sigma0** — Radiometric calibration applied (backscatter coefficient conversion), no noise reduction
-    - **C: Sigma0 + Lee** — Calibration AND adaptive speckle filtering (multiplicative noise characteristic of radar)
-    - **D: Sigma0 + Lee + Log dB** — Full chain with logarithmic compression, main candidate undergoing scientific validation (Phase 0 — result not yet definitive)
+    - **A: Raw** — Bare normalized image, no calibration or filtering (baseline)
+    - **B: Sigma0** — Radiometric calibration (backscatter coefficient), no noise reduction
+    - **C: Sigma0 + Lee** — Calibration + adaptive speckle filtering (radar multiplicative noise)
+    - **D: Sigma0 + Lee + Log dB** — Full chain with log compression, main candidate
+    undergoing scientific validation (Phase 0 — result not yet definitive)
     """
     st.markdown(pipeline_help)
     pipeline = st.selectbox("Select pipeline", options=["A", "B", "C", "D"], index=3)
@@ -74,9 +75,9 @@ def render_upload_mode() -> None:
                         r = client.post(f"{DETECTOR_URL}/detect", json=payload, timeout=60.0)
                         r.raise_for_status()
                         ev = r.json()
-                    st.success(
-                        f"Detection returned {ev.get('vessel_count')} vessels (priority {ev.get('priority_level')})"
-                    )
+                    vessel_count = ev.get("vessel_count", "?")
+                    priority = ev.get("priority_level", "?")
+                    st.success(f"Detection returned {vessel_count} vessels (priority {priority})")
                     st.json(ev)
                 except Exception as e:
                     st.error(f"Detector request failed: {e}")

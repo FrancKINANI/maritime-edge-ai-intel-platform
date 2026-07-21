@@ -236,7 +236,7 @@ def extract_gcps_from_geotiff(tiff_path: str) -> tuple[np.ndarray, tuple[int, in
 
         if not gcps_raw:
             raise ValueError(
-                f"No GCPs found in {tiff_path}. Sentinel-1 GRD GeoTIFFs should carry a regular GCP grid."
+                f"No GCPs found in {tiff_path}. Sentinel-1 GRD requires a regular GCP grid."
             )
 
         rows = sorted(set(gcp.row for gcp in gcps_raw))
@@ -247,7 +247,7 @@ def extract_gcps_from_geotiff(tiff_path: str) -> tuple[np.ndarray, tuple[int, in
 
         if n_lines * n_pixels != len(gcps_raw):
             raise ValueError(
-                f"GCPs do not form a regular grid: {len(gcps_raw)} GCPs mapped to {n_lines}x{n_pixels}."
+                f"GCPs not a regular grid: {len(gcps_raw)} GCPs to {n_lines}x{n_pixels}."
             )
 
         gcps_array = np.zeros((n_lines, n_pixels, 2), dtype=np.float64)
@@ -306,7 +306,7 @@ class CalibrationLUT:
 
     def _parse_calibration_xml(self, xml_path: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Parse calibration XML to extract sparse sigmaNought vectors."""
-        tree = ET.parse(xml_path)
+        tree = ET.parse(xml_path)  # noqa: S314
         root = tree.getroot()
 
         vectors = root.findall(".//calibrationVector")
@@ -334,7 +334,7 @@ class CalibrationLUT:
 
     def _parse_noise_xml(self, xml_path: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Parse noise XML to extract sparse noise vectors."""
-        tree = ET.parse(xml_path)
+        tree = ET.parse(xml_path)  # noqa: S314
         root = tree.getroot()
 
         # Try new format first

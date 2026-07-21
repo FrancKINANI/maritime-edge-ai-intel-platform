@@ -123,7 +123,11 @@ async def ingest_detection_event(event: DetectionEvent) -> DetectionEvent:
         conn = sqlite3.connect(str(DB_PATH))
         cur = conn.cursor()
         cur.execute(
-            "REPLACE INTO events (event_id, scene_id, timestamp, tile_id, tile_bbox_latlon, detections, vessel_count, dark_vessel_count, priority_level, zone, satellite_id, satellite_position, preprocessing_pipeline, processing_time_ms) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "REPLACE INTO events (event_id, scene_id, timestamp, tile_id, "
+            "tile_bbox_latlon, detections, vessel_count, dark_vessel_count, "
+            "priority_level, zone, satellite_id, satellite_position, "
+            "preprocessing_pipeline, processing_time_ms) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (
                 event.event_id,
                 event.scene_id,

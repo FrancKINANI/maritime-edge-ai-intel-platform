@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 
 # Constants
 CDSE_TOKEN_URL = (
-    "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token"
+    "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token"  # noqa: S105
 )
 CDSE_ODATA_URL = "https://catalogue.dataspace.copernicus.eu/odata/v1/Products"
 CDSE_DOWNLOAD_URL = "https://zipper.dataspace.copernicus.eu/odata/v1/Products"
@@ -420,11 +420,10 @@ def search_sentinel1_products(
             # Extract base identifier (timestamp and mission info)
             # Format: S1A_IW_GRDH_1SDV_YYYYMMDDTHHMMSS_YYYYMMDDTHHMMSS_...
             parts = name.split("_")
-            if len(parts) >= 8:
-                # Base identifier includes mission, mode, polarization, and timestamp
-                base_id = "_".join(parts[:7])  # S1A_IW_GRDH_1SDV_20240107T064657_20240107T064719
-            else:
-                base_id = name
+            # Base identifier includes mission, mode, polarization, and timestamp
+            base_id = (
+                "_".join(parts[:7]) if len(parts) >= 8 else name
+            )  # S1A_IW_GRDH_1SDV_20240107T064657_20240107T064719
 
             # Group products by base identifier
             if base_id not in product_groups:

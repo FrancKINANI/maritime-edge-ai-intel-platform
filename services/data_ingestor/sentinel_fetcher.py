@@ -47,7 +47,7 @@ def download_safe_product(
     if not username or not password:
         raise ValueError("CDSE credentials must be provided via args or environment variables")
     token, expiry = get_cdse_token(username, password)
-    # product_id here is the CDSE UUID; we need a product_name for naming – pass product_id as name when unknown
+    # product_id is the CDSE UUID; use product_id as name when product_name unknown
     return download_product(
         token, product_id, product_id, download_path, expiry, username, password
     )

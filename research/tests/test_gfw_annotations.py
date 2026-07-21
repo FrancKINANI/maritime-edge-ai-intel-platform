@@ -20,14 +20,14 @@ from research.scripts.gfw_annotations import GFWClient, _normalize_response_entr
 def mock_gfw_client():
     """Create a GFW client with mocked HTTP requests."""
     with patch("research.scripts.gfw_annotations._request_with_retry") as mock_req:
-        client = GFWClient("test_token_12345")
+        client = GFWClient("test_token_12345")  # noqa: S105
         yield client, mock_req
 
 
 def test_gfw_client_initialization():
     """Test that GFW client initializes with required headers."""
     client = GFWClient("test_token")
-    assert client.api_token == "test_token"
+    assert client.api_token == "test_token"  # noqa: S105
     assert "Authorization" in client.headers
     assert client.headers["Authorization"] == "Bearer test_token"
 

@@ -151,7 +151,7 @@ async def detect_vessels(req: DetectRequest) -> DetectionEvent:
             logger.error("Failed to load tile from path %s: %s", req.tile_path, e, exc_info=True)
             raise HTTPException(
                 status_code=400,
-                detail="Unable to load tile from the provided path. Ensure it is a valid .npy file.",
+                detail="Unable to load tile from path. Ensure it is a valid .npy file.",
             ) from e
     elif req.tile_b64:
         try:
@@ -161,7 +161,7 @@ async def detect_vessels(req: DetectRequest) -> DetectionEvent:
             logger.error("Failed to decode base64 .npy tile: %s", e, exc_info=True)
             raise HTTPException(
                 status_code=400,
-                detail="Unable to decode the provided base64 tile. Ensure it is a valid .npy file encoded in base64.",
+                detail="Unable to decode base64 tile. Ensure it is a valid .npy file.",
             ) from e
     else:
         raise HTTPException(status_code=400, detail="Either tile_path or tile_b64 must be provided")

@@ -34,8 +34,8 @@ print("SUCCESS: Service module loaded via importlib")
 ServiceGCPGeoreferencer = mod.GCPGeoreferencer
 
 # 2. Import phase0 implementation
-from research.scripts.sar_preprocessing import (
-    GCPGeoreferencer as Phase0GCPGeoreferencer,  # noqa: E402
+from research.scripts.sar_preprocessing import (  # noqa: E402
+    GCPGeoreferencer as Phase0GCPGeoreferencer,
 )
 
 # 3. Same synthetic GCP set as the test
@@ -58,8 +58,9 @@ for line, pixel in test_points:
     lat_svc, lon_svc = service_gcp.pixel_to_latlon(line, pixel)
     dlat = lat_p0 - lat_svc
     dlon = lon_p0 - lon_svc
+    is_match = abs(dlat) < 1e-12 and abs(dlon) < 1e-12
     print(
-        f"  ({line:2d},{pixel:2d}): lat diff = {dlat:.2e}, lon diff = {dlon:.2e}  MATCH={abs(dlat) < 1e-12 and abs(dlon) < 1e-12}"
+        f"  ({line:2d},{pixel:2d}): lat diff = {dlat:.2e}, lon diff = {dlon:.2e}  MATCH={is_match}"
     )
 
 print()
