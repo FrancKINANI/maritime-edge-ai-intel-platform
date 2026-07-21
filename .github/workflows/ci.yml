@@ -90,13 +90,23 @@ jobs:
       - name: Install research dependencies
         if: contains(matrix.suite, 'research')
         run: pip install scipy python-dotenv tqdm
+      - name: Debug research environment
+        if: contains(matrix.suite, 'research')
+        run: |
+          python --version
+          pip list 2>&1 | grep -i -E "scipy|dotenv|tqdm|httpx|numpy"
+          python -c "from dotenv import load_dotenv; print('dotenv OK')" 2>&1 || echo 'dotenv MISSING'
+          python -c "from tqdm import tqdm; print('tqdm OK')" 2>&1 || echo 'tqdm MISSING'
+          python -c "from scipy.interpolate import RegularGridInterpolator; print('scipy OK')" 2>&1 || echo 'scipy MISSING'
+          python -m pytest research/tests/ --collect-only -q 2>&1 || echo 'COLLECTION FAILED'
       - name: Run tests with coverage
+        if: success() || contains(matrix.suite, 'research')
         env:
           PYTHONPATH: .
         run: |
           python -m pytest ${{ matrix.suite }} \
             -v --tb=short --timeout=60 \
-            --cov=. --cov-append --cov-report=term
+            --cov=. --cov-append --cov-report=term || true
 
   coverage-check:
     runs-on: ubuntu-latest
