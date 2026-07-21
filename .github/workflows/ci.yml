@@ -28,7 +28,7 @@ jobs:
           bandit -r services/ -f sarif -o bandit-results.sarif || true
           bandit -r research/ --quiet || true
       - name: Upload Bandit results
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: bandit-results.sarif
           category: bandit
@@ -122,7 +122,7 @@ jobs:
           severity: HIGH,CRITICAL
           exit-code: 0
       - name: Upload Trivy results
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-results.sarif
           category: trivy
