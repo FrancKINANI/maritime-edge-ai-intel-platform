@@ -1,6 +1,6 @@
-# =============================================================================
 # Base requirements — shared across all platform microservices
-# =============================================================================
+# This file is compiled to requirements.txt via:
+#   uv pip compile --python-version 3.11 --upgrade requirements.in -o requirements.txt
 
 # API layer (every service exposes REST endpoints)
 fastapi>=0.110.0
