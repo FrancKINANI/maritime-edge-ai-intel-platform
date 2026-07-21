@@ -43,6 +43,14 @@ Documentation = "https://github.com/FrancKINANI/maritime-edge-ai-intel-platform#
 Repository = "https://github.com/FrancKINANI/maritime-edge-ai-intel-platform"
 Issues = "https://github.com/FrancKINANI/maritime-edge-ai-intel-platform/issues"
 
+[project.optional-dependencies]
+research = [
+    "scipy>=1.10",
+    "psutil>=5.9",
+    "python-dotenv>=1.0",
+    "tqdm>=4.60",
+]
+
 [tool.setuptools]
 packages = []
 
