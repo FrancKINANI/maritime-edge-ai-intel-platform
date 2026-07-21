@@ -176,7 +176,7 @@ if __name__ == "__main__":
     try:
         secrets = validate_secrets(["REDIS_URL"], ["OPTIONAL_VAR"])
         print("Secrets validation passed")
-        print(f"Validated secrets: {list(secrets.keys())}")
+        print(f"Validated {len(secrets)} secret entries")
     except SecretsValidationError as e:
         print(f"Secrets validation failed: {e}")
         exit(1)
