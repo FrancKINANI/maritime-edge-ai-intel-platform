@@ -94,11 +94,21 @@ jobs:
       - name: Debug research environment
         if: contains(matrix.suite, 'research')
         run: |
+          echo '=== Python version ==='
           python --version
-          pip list 2>&1 | grep -i -E "scipy|dotenv|tqdm|httpx|numpy"
-          python -c "from dotenv import load_dotenv; print('dotenv OK')" 2>&1 || echo 'dotenv MISSING'
-          python -c "from tqdm import tqdm; print('tqdm OK')" 2>&1 || echo 'tqdm MISSING'
-          python -c "from scipy.interpolate import RegularGridInterpolator; print('scipy OK')" 2>&1 || echo 'scipy MISSING'
+          echo '=== Installed packages ==='
+          pip list 2>&1 | head -40
+          echo '=== Import tests ==='
+          python -c "from dotenv import load_dotenv; print('dotenv OK')" 2>&1 || echo 'FAIL: dotenv'
+          python -c "from tqdm import tqdm; print('tqdm OK')" 2>&1 || echo 'FAIL: tqdm'
+          python -c "from scipy.interpolate import RegularGridInterpolator; print('scipy OK')" 2>&1 || echo 'FAIL: scipy'
+          echo '=== Import research modules ==='
+          cd /home/runner/work/maritime-edge-ai-intel-platform/maritime-edge-ai-intel-platform
+          export PYTHONPATH=.
+          python -c "import sys; sys.path.insert(0, 'research/scripts'); import download_scenes; print('download_scenes OK')" 2>&1 || echo 'FAIL: download_scenes'
+          python -c "import sys; sys.path.insert(0, 'research/scripts'); from research.scripts.gfw_annotations import GFWClient; print('gfw_annotations OK')" 2>&1 || echo 'FAIL: gfw_annotations'
+          python -c "from research.scripts.sar_preprocessing import GCPGeoreferencer; print('sar_preprocessing OK')" 2>&1 || echo 'FAIL: sar_preprocessing'
+          echo '=== Test collection ==='
           python -m pytest research/tests/ --collect-only -q 2>&1 || echo 'COLLECTION FAILED'
       - name: Run tests with coverage
         env:
