@@ -87,10 +87,11 @@ jobs:
                       -r services/satellite_monitor/requirements.txt \
                       -r docker/base/requirements.txt
           pip install pytest pytest-asyncio pytest-cov pytest-timeout
-          # Research tests need additional scientific dependencies
-          if echo "${{ matrix.suite }}" | grep -q "research"; then
-            pip install scipy rasterio
-          fi
+      - name: Install research dependencies
+        if: contains(matrix.suite, 'research')
+        run: |
+          sudo apt-get update && sudo apt-get install -y libgdal-dev
+          pip install scipy rasterio
       - name: Run tests with coverage
         env:
           PYTHONPATH: .
