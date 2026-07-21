@@ -17,6 +17,7 @@ from __future__ import annotations
 import importlib.util
 import os
 import sys
+import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
@@ -100,7 +101,7 @@ class TestDownloadSafeProduct:
         ):
             download_safe_product(
                 product_id="test-product",
-                download_path="/tmp/downloads",  # noqa: S108
+                download_path=tempfile.mkdtemp(),
             )
 
     def test_credentials_from_args(self):
@@ -109,13 +110,14 @@ class TestDownloadSafeProduct:
             mock_token.return_value = ("fake_token", "2025-01-01")
 
             with patch("data_ingestor_fetcher.download_product") as mock_dl:
-                mock_dl.return_value = "/tmp/downloads/test.SAFE"  # noqa: S108
+                tmpdir = tempfile.mkdtemp()
+                mock_dl.return_value = f"{tmpdir}/test.SAFE"
 
                 result = download_safe_product(
                     product_id="test-uuid",
-                    download_path="/tmp/downloads",  # noqa: S108
+                    download_path=tmpdir,
                     username="dl_user",
                     password="dl_pass",  # noqa: S106
                 )
-                assert result == "/tmp/downloads/test.SAFE"  # noqa: S108
+                assert result == f"{tmpdir}/test.SAFE"
                 mock_token.assert_called_once_with("dl_user", "dl_pass")

@@ -87,6 +87,10 @@ jobs:
                       -r services/satellite_monitor/requirements.txt \
                       -r docker/base/requirements.txt
           pip install pytest pytest-asyncio pytest-cov pytest-timeout
+          # Research tests need additional scientific dependencies
+          if echo "${{ matrix.suite }}" | grep -q "research"; then
+            pip install scipy rasterio
+          fi
       - name: Run tests with coverage
         env:
           PYTHONPATH: .
