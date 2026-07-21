@@ -2,6 +2,17 @@
 
 All notable changes to the Maritime Intelligence Platform will be documented in this file.
 
+## [2.0.1] — 2026-07-21
+
+### Fixed
+- 24 ruff CI errors across 10+ files (S112, E501, S314, S105, S106, S108, S608)
+- High-severity CVE: pillow bumped 12.2.0 → 12.3.0
+- Dependabot alerts: regen all requirements.txt via `uv pip compile --upgrade`
+- CI action versions fixed (checkout@v7→v4, setup-python@v7→v5)
+- Trivy scanner `skip-dirs` added for large data directories
+- `docker/base/requirements.in` restored with open-ended version ranges
+- `uv.lock` regenerated to match updated dependencies
+
 ## [2.0.0] — 2026-07-21
 
 ### Added
