@@ -59,6 +59,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [lint-and-sast]
     strategy:
+      fail-fast: false
       matrix:
         suite:
           - research/tests/
@@ -100,13 +101,12 @@ jobs:
           python -c "from scipy.interpolate import RegularGridInterpolator; print('scipy OK')" 2>&1 || echo 'scipy MISSING'
           python -m pytest research/tests/ --collect-only -q 2>&1 || echo 'COLLECTION FAILED'
       - name: Run tests with coverage
-        if: success() || contains(matrix.suite, 'research')
         env:
           PYTHONPATH: .
         run: |
           python -m pytest ${{ matrix.suite }} \
             -v --tb=short --timeout=60 \
-            --cov=. --cov-append --cov-report=term || true
+            --cov=. --cov-append --cov-report=term
 
   coverage-check:
     runs-on: ubuntu-latest
