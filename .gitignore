@@ -3,6 +3,9 @@
 # =============================================================================
 
 # --- ONNX models (manual transfer) ---
+/research/data/scenes/*
+/research/data/tiles/*
+/research/data/annotations/*
 /shared/models/*
 /research/results/*
 !/shared/models/.gitkeep

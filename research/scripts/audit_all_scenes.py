@@ -1,89 +1,41 @@
-import json, sys
+"""
+audit_all_scenes.py — False Positive visual audit across ALL scenes with tiles + annotations.
+
+Usage (from notebook):
+    python audit_all_scenes.py \\
+        --tiles-dir research/data/tiles \\
+        --annotations-dir research/data/annotations \\
+        --model shared/models/yolov8n_mrssd_int8.onnx \\
+        --output research/results/fp_audit
+
+This script:
+1. Finds all scenes with BOTH tiles AND annotations
+2. For each scene: loads GT labels, runs ONNX inference at conf=0.001, finds FPs
+3. Generates per-tile visualizations and a combined HTML gallery
+
+Prerequisite:
+    The project root must be in sys.path.
+"""
+
+import json
+import logging
+import sys
+import time
 from pathlib import Path
 
 import numpy as np
 from PIL import Image
 
-# === CONFIG ===
-ONNX_MODEL_PATH = PROJECT_ROOT / "shared" / "models" / "yolov8n_mrssd_int8.onnx"
-CONF_THRESHOLD = 0.001  # Very low to capture any prediction
-FP_AUDIT_DIR = PROJECT_ROOT / "research" / "results" / "fp_audit"
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
+)
+logger = logging.getLogger("audit_all_scenes")
+
+# Constants
+CONF_THRESHOLD = 0.001
 IOU_MATCH = 0.5
 MODEL_INPUT_SIZE = 640
-# ==============
-
-_BAR = "=" * 60
-print(_BAR)
-print("  CELL 13 — FALSE POSITIVE VISUAL AUDIT")
-print(_BAR)
-
-# --- Step 1: Load metadata ---
-metadata_path = TILES_DIR / scene_id / pipeline / "metadata.json"
-if not metadata_path.exists():
-    raise FileNotFoundError(f"Metadata not found: {metadata_path}")
-with open(metadata_path) as f:
-    metadata = json.load(f)
-print(f"Scene: {scene_id}")
-print(f"Tiles available: {metadata.get('valid_tiles', '?')}")
-
-# --- Step 2: Generate AIS annotations ---
-from research.scripts.gfw_annotations import GFWClient, annotate_scene
-
-ANNOTATIONS_DIR = PROJECT_ROOT / "research" / "data" / "annotations"
-ANNOTATIONS_DIR.mkdir(parents=True, exist_ok=True)
-
-print("\n--- Step 2: Generating AIS annotations via GFW ---")
-client = GFWClient(GFW_API_TOKEN)
-try:
-    report = annotate_scene(metadata_path, client, str(ANNOTATIONS_DIR), pipeline=pipeline)
-    print(f"  {report['total_annotations']} annotations on {report['annotated_tiles']} tiles")
-    print(f"  AIS seeds: {report['ais_presence_seeds']}")
-except Exception as e:
-    print(f"  ⚠ GFW annotation failed: {e}")
-    print("  Continuing with empty annotations — the model may still find false positives.")
-    print("  Check your GFW_API_TOKEN and internet connection.")
-    report = {
-        "total_annotations": 0,
-        "annotated_tiles": 0,
-        "ais_presence_seeds": 0,
-        "dark_vessel_candidates": 0,
-        "class_counts": {"AIS_confirmed": 0, "visual_only": 0, "dark_vessel_candidate": 0},
-    }
-
-# --- Step 3: Load ONNX model ---
-print("\n--- Step 3: Loading ONNX model ---")
-if not ONNX_MODEL_PATH.exists():
-    raise FileNotFoundError(f"Model not found: {ONNX_MODEL_PATH}")
-import onnxruntime as ort  # noqa: E402
-
-session = ort.InferenceSession(str(ONNX_MODEL_PATH))
-input_name = session.get_inputs()[0].name
-print(f"Model loaded: {ONNX_MODEL_PATH.name}")
-
-# --- Step 4: Load GT labels ---
-print("\n--- Step 4: Loading YOLO GT labels ---")
-gt_dir = ANNOTATIONS_DIR / scene_id / "labels"
-gt = {}
-if gt_dir.exists():
-    for f in sorted(gt_dir.glob("*.txt")):
-        tile_id = f.stem
-        boxes = []
-        with open(f) as fh:
-            for line in fh:
-                parts = line.strip().split()
-                if len(parts) == 5:
-                    cx, cy, w, h = map(float, parts[1:5])
-                    boxes.append({"bbox": [cx, cy, w, h]})
-        if boxes:
-            gt[tile_id] = boxes
-print(f"Loaded GT: {len(gt)} tiles, {sum(len(v) for v in gt.values())} boxes")
-
-# --- Step 5: Run inference ---
-print("\n--- Step 5: Running inference ---")
-tile_dir = TILES_DIR / scene_id / pipeline
-tile_paths = [tile_dir / f"{tid}.npy" for tid in gt.keys()]
-tile_paths = [p for p in tile_paths if p.exists()]
-print(f"Tiles to process: {len(tile_paths)}")
 
 
 def compute_iou(box1, box2):
@@ -107,29 +59,65 @@ def compute_iou(box1, box2):
     return inter / union if union > 0 else 0.0
 
 
-all_fps = []
-tiles_with_zero_preds = 0
-total_preds = 0
-FP_AUDIT_DIR.mkdir(parents=True, exist_ok=True)
+def load_gt_labels(annotations_dir: Path, scene_id: str) -> dict:
+    """Load YOLO-format GT labels for a scene.
 
-for tile_path in tile_paths:
-    tile_id = tile_path.stem
-    tile_uint8 = np.load(str(tile_path)).astype(np.uint8)
+    Returns: dict mapping tile_id -> list of {"bbox": [cx, cy, w, h]}
+    """
+    gt_dir = annotations_dir / scene_id / "labels"
+    gt = {}
+    if not gt_dir.exists():
+        return gt
+    for f in sorted(gt_dir.glob("*.txt")):
+        tile_id = f.stem
+        boxes = []
+        with open(f) as fh:
+            for line in fh:
+                parts = line.strip().split()
+                if len(parts) == 5:
+                    cx, cy, w, h = map(float, parts[1:5])
+                    boxes.append({"bbox": [cx, cy, w, h]})
+        if boxes:
+            gt[tile_id] = boxes
+    return gt
 
-    # Run inference
-    tile_rgb = np.stack([tile_uint8] * 3, axis=-1) if tile_uint8.ndim == 2 else tile_uint8
+
+def load_model(model_path: Path):
+    """Load ONNX model, return (session, input_name)."""
+    import onnxruntime as ort
+
+    logger.info(f"Loading model: {model_path}")
+    session = ort.InferenceSession(str(model_path))
+    input_name = session.get_inputs()[0].name
+    return session, input_name
+
+
+def run_inference(session, input_name, tile_uint8):
+    """Run ONNX inference on a single tile.
+
+    Returns: list of {"bbox": [cx, cy, w, h] (normalized), "confidence": float}
+    """
+    tile_rgb = (
+        np.stack([tile_uint8] * 3, axis=-1)
+        if tile_uint8.ndim == 2
+        else tile_uint8
+    )
     img = Image.fromarray(tile_rgb)
     img_res = img.resize((MODEL_INPUT_SIZE, MODEL_INPUT_SIZE), Image.Resampling.LANCZOS)
     inp = np.array(img_res, dtype=np.float32) / 255.0
     inp = inp.transpose(2, 0, 1)[np.newaxis, ...]
-    outputs = session.run(None, {input_name: inp})
 
-    # Parse detections
+    outputs = session.run(None, {input_name: inp})
     dets = outputs[0][0].T  # [8400, 5]
+
     preds = []
     for det in dets:
         cx, cy, w, h, conf = (
-            float(det[0]), float(det[1]), float(det[2]), float(det[3]), float(det[4])
+            float(det[0]),
+            float(det[1]),
+            float(det[2]),
+            float(det[3]),
+            float(det[4]),
         )
         if conf > CONF_THRESHOLD:
             preds.append({
@@ -142,113 +130,114 @@ for tile_path in tile_paths:
                 "confidence": conf,
             })
 
-    total_preds += len(preds)
-
     # NMS
     preds.sort(key=lambda d: d["confidence"], reverse=True)
     kept = []
     for p in preds:
         if not any(compute_iou(p["bbox"], k["bbox"]) > IOU_MATCH for k in kept):
             kept.append(p)
-    preds = kept
+    return kept
 
-    if not preds:
-        tiles_with_zero_preds += 1
-        continue
 
-    # Find false positives (predictions with no GT match)
-    tile_gt = gt.get(tile_id, [])
+def find_false_positives(predictions, ground_truth):
+    """Return predictions that have no GT match (IoU < threshold)."""
     fps = []
-    for pred in preds:
-        is_match = False
-        for g in tile_gt:
-            if compute_iou(pred["bbox"], g["bbox"]) >= IOU_MATCH:
-                is_match = True
-                break
+    for pred in predictions:
+        is_match = any(
+            compute_iou(pred["bbox"], g["bbox"]) >= IOU_MATCH for g in ground_truth
+        )
         if not is_match:
             fps.append(pred)
+    return fps
 
-    if not fps:
-        continue
 
-    # --- Generate visualization ---
-    import matplotlib  # noqa: E402
+def generate_visualization(tile_uint8, tile_id, scene_id, gt_boxes, fp_boxes, output_dir):
+    """Generate a visualization PNG for a tile with GT and FP boxes."""
+    import matplotlib
     matplotlib.use("Agg")
-    import matplotlib.pyplot as plt  # noqa: E402
-    import matplotlib.patches as patches  # noqa: E402
+    import matplotlib.pyplot as plt
+    import matplotlib.patches as patches
 
     fig, ax = plt.subplots(1, 1, figsize=(10, 10))
     ax.imshow(tile_uint8, cmap="gray", vmin=0, vmax=255)
     h_px, w_px = tile_uint8.shape[:2]
 
     # GT in GREEN
-    for g in tile_gt:
+    for g in gt_boxes:
         cx, cy, bw, bh = g["bbox"]
         x1 = (cx - bw / 2) * w_px
         y1 = (cy - bh / 2) * h_px
         rect = patches.Rectangle(
-            (x1, y1), bw * w_px, bh * h_px,
-            linewidth=2, edgecolor="lime", facecolor="none",
+            (x1, y1),
+            bw * w_px,
+            bh * h_px,
+            linewidth=2,
+            edgecolor="lime",
+            facecolor="none",
         )
         ax.add_patch(rect)
         ax.plot(cx * w_px, cy * h_px, marker="o", color="lime", markersize=6)
 
     # FP in RED
-    for fp in fps:
+    for fp in fp_boxes:
         cx, cy, bw, bh = fp["bbox"]
         x1 = (cx - bw / 2) * w_px
         y1 = (cy - bh / 2) * h_px
         rect = patches.Rectangle(
-            (x1, y1), bw * w_px, bh * h_px,
-            linewidth=2, edgecolor="red", facecolor="none",
+            (x1, y1),
+            bw * w_px,
+            bh * h_px,
+            linewidth=2,
+            edgecolor="red",
+            facecolor="none",
         )
         ax.add_patch(rect)
         ax.plot(cx * w_px, cy * h_px, marker="x", color="red", markersize=8)
         ax.text(
-            x1, y1 - 5, f"conf={fp['confidence']:.4f}",
-            color="red", fontsize=8, fontweight="bold",
+            x1,
+            y1 - 5,
+            f"conf={fp['confidence']:.4f}",
+            color="red",
+            fontsize=8,
+            fontweight="bold",
             bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.7),
         )
 
-    ax.set_title(f"Tile: {tile_id}\nGreen=GT (AIS)  Red=FP prediction", fontsize=12)
+    ax.set_title(
+        f"Scene: {scene_id} | Tile: {tile_id}\nGreen=GT (AIS)  Red=FP prediction",
+        fontsize=12,
+    )
     ax.axis("off")
 
-    save_path = FP_AUDIT_DIR / f"fp_{tile_id}.png"
+    save_path = output_dir / f"fp_{scene_id}_{tile_id}.png"
     fig.savefig(save_path, dpi=150, bbox_inches="tight", pad_inches=0.1)
     plt.close(fig)
-    all_fps.append((tile_id, save_path, len(fps)))
+    return save_path
 
-# --- Summary ---
-print(f"\n=== FALSE POSITIVE SUMMARY ===")
-print(f"Tiles with FPs: {len(all_fps)}")
-print(f"Total FP detections: {sum(f[2] for f in all_fps)}")
-print(f"Total predictions (all tiles): {total_preds}")
-if tiles_with_zero_preds > 0:
-    print(f"Tiles with ZERO predictions: {tiles_with_zero_preds} (try lower --conf)")
 
-# --- Step 6: Generate HTML gallery ---
-print("\n--- Step 6: Generating HTML gallery ---")
-
-# Build card HTML for each FP visualization
-card_html_lines = []
-for i, (tid, vpath, n_fp) in enumerate(all_fps):
-    rel = vpath.name
-    card_html_lines.append(
-        f"""<div class="card" data-idx="{i}" data-tile="{tid}">
+def generate_html(
+    all_fps, scene_ids, model_name, conf_threshold, output_dir
+):
+    """Generate the interactive HTML gallery for FP classification."""
+    card_lines = []
+    for i, (tid, vpath, n_fp, sid) in enumerate(all_fps):
+        rel = vpath.name
+        card_lines.append(
+            f"""<div class="card" data-idx="{i}" data-tile="{tid}">
     <img src="{rel}" alt="FP {tid}" loading="lazy">
-    <div class="tile-id">[{i+1}/{len(all_fps)}] {tid} ({n_fp} FP(s))</div>
+    <div class="tile-id">[{i+1}/{len(all_fps)}] {sid} — {tid} ({n_fp} FP(s))</div>
     <div class="buttons">
         <button class="btn btn-a" onclick="classify({i},'A')">🟢 A — Clearly a vessel</button>
         <button class="btn btn-b" onclick="classify({i},'B')">🔴 B — Not a vessel (noise)</button>
         <button class="btn btn-c" onclick="classify({i},'C')">🟡 C — Ambiguous</button>
     </div>
 </div>"""
-    )
+        )
 
-cards_joined = "\n".join(card_html_lines)
-total_fps = len(all_fps)
+    cards_joined = "\n".join(card_lines)
+    total_fps = len(all_fps)
 
-HTML = f"""<!DOCTYPE html>
+    HTML = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -299,7 +288,7 @@ HTML = f"""<!DOCTYPE html>
 </head>
 <body>
 <h1>🔍 False Positive Visual Audit</h1>
-<p class="subtitle">Scene: {scene_id} &middot; Model: {ONNX_MODEL_PATH.name} &middot; conf&gt;{CONF_THRESHOLD}</p>
+<p class="subtitle">Scenes: {', '.join(scene_ids[:3])}{'…' if len(scene_ids) > 3 else ''} &middot; Model: {model_name} &middot; conf&gt;{conf_threshold}</p>
 <p class="progress">Progress: <span id="progress-count">0</span> / <span id="total-count">{total_fps}</span> classified</p>
 <div id="gallery">
 {cards_joined}
@@ -369,8 +358,7 @@ function exportResults() {{
         if (results[idx]) counts[results[idx]]++;
     }});
     const data = {{
-        scene: '{scene_id}',
-        model: '{ONNX_MODEL_PATH.name}',
+        model: '{model_name}',
         total: TOTAL,
         classified: Object.keys(results).length,
         counts: counts,
@@ -386,13 +374,121 @@ function exportResults() {{
 </script>
 </body>
 </html>"""
+    html_path = output_dir / "fp_audit.html"
+    with open(html_path, "w", encoding="utf-8") as f:
+        f.write(HTML)
+    logger.info(f"HTML gallery: {html_path}")
+    return html_path
 
-html_path = FP_AUDIT_DIR / "fp_audit.html"
-with open(html_path, "w") as f:
-    f.write(HTML)
 
-print(f"\n=== DONE ===")
-print(f"HTML gallery: {html_path}")
-print(f"Visualizations: {FP_AUDIT_DIR}")
-print(f"Total FPs to classify: {len(all_fps)}")
-print(f"Open in browser: file://{html_path.resolve()}")
+def audit_all_scenes(
+    tiles_dir: Path,
+    annotations_dir: Path,
+    model_path: Path,
+    output_dir: Path,
+    conf_threshold: float = CONF_THRESHOLD,
+):
+    """Run FP audit across all scenes with both tiles and annotations."""
+    tiles_dir = Path(tiles_dir)
+    annotations_dir = Path(annotations_dir)
+    model_path = Path(model_path)
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    if not model_path.exists():
+        raise FileNotFoundError(f"Model not found: {model_path}")
+
+    # Find scenes with annotations
+    annotated_scenes = []
+    for scene_dir in sorted(tiles_dir.iterdir()):
+        if not scene_dir.is_dir():
+            continue
+        sid = scene_dir.name
+        gt = load_gt_labels(annotations_dir, sid)
+        if gt:
+            annotated_scenes.append((sid, gt))
+
+    if not annotated_scenes:
+        logger.warning("No scenes with both tiles and annotations found!")
+        # Generate empty HTML
+        generate_html([], [], model_path.name, conf_threshold, output_dir)
+        return
+
+    logger.info(f"Found {len(annotated_scenes)} scene(s) with annotations: {[s[0] for s in annotated_scenes]}")
+
+    # Load model once
+    session, input_name = load_model(model_path)
+
+    all_fps = []
+    total_tiles_processed = 0
+    total_predictions = 0
+    tiles_with_zero_preds = 0
+
+    for scene_id, gt in annotated_scenes:
+        logger.info(f"\n--- Scene: {scene_id} ({len(gt)} tiles, {sum(len(v) for v in gt.values())} boxes) ---")
+        tile_dir = tiles_dir / scene_id / "D"
+
+        for tile_id, gboxes in gt.items():
+            tile_path = tile_dir / f"{tile_id}.npy"
+            if not tile_path.exists():
+                continue
+
+            tile_uint8 = np.load(str(tile_path)).astype(np.uint8)
+            preds = run_inference(session, input_name, tile_uint8)
+
+            total_predictions += len(preds)
+
+            if not preds:
+                tiles_with_zero_preds += 1
+                continue
+
+            fps = find_false_positives(preds, gboxes)
+            if not fps:
+                continue
+
+            viz_path = generate_visualization(
+                tile_uint8, tile_id, scene_id, gboxes, fps, output_dir
+            )
+            all_fps.append((f"{scene_id}_{tile_id}", viz_path, len(fps), scene_id))
+
+            total_tiles_processed += 1
+            if total_tiles_processed % 50 == 0:
+                logger.info(f"  {scene_id}: {total_tiles_processed} tiles processed, {len(all_fps)} FPs found")
+
+    logger.info(f"\n{'='*50}")
+    logger.info(f"FP AUDIT SUMMARY")
+    logger.info(f"  Scenes audited: {len(annotated_scenes)}")
+    logger.info(f"  Total predictions: {total_predictions}")
+    logger.info(f"  Tiles with zero predictions: {tiles_with_zero_preds}")
+    logger.info(f"  Tiles with FPs: {len(all_fps)}")
+    logger.info(f"  Total FP detections: {sum(f[2] for f in all_fps)}")
+    logger.info(f"{'='*50}")
+
+    # Generate HTML
+    scene_ids = list(set(s[0] for s in annotated_scenes))
+    generate_html(all_fps, scene_ids, model_path.name, conf_threshold, output_dir)
+    logger.info(f"Open in browser: file://{output_dir}/fp_audit.html")
+
+
+def main():
+    import argparse
+
+    parser = argparse.ArgumentParser(description="FP audit across all scenes")
+    parser.add_argument("--tiles-dir", default="research/data/tiles", help="Tiles directory")
+    parser.add_argument("--annotations-dir", default="research/data/annotations", help="Annotations directory")
+    parser.add_argument("--model", default="shared/models/yolov8n_mrssd_int8.onnx", help="ONNX model path")
+    parser.add_argument("--output", default="research/results/fp_audit", help="Output directory")
+    parser.add_argument("--conf", type=float, default=CONF_THRESHOLD, help="Confidence threshold")
+    args = parser.parse_args()
+
+    audit_all_scenes(
+        Path(args.tiles_dir),
+        Path(args.annotations_dir),
+        Path(args.model),
+        Path(args.output),
+        conf_threshold=args.conf,
+    )
+
+
+if __name__ == "__main__":
+    main()
