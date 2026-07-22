@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw
 
-# Paths (one level up from scripts/ to phase0/)
+# Paths (one level up from scripts/ to research/)
 DATA_DIR = Path(__file__).parent.parent / "data"
 TILES_ROOT = DATA_DIR / "tiles"
 ANNOTATIONS_ROOT = DATA_DIR / "annotations"
@@ -379,7 +379,7 @@ def main():
         for tile in sample_tiles[:24]:
             tid = tile["tile_id"]
             # Construct npy path directly from scene/tile structure
-            # (avoids issues with stored npy_path containing "phase0/" prefix)
+            # (avoids issues with stored npy_path containing "research/" prefix)
             npy_path = str((TILES_ROOT / scene_id / "D" / f"{tid}.npy").resolve())
             img_name = f"{tid}.png"
             img_path = samples_dir / img_name

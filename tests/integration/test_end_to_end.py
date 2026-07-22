@@ -23,7 +23,7 @@ import pytest
 
 
 def test_ingestor_sentinel_fetcher_integration():
-    """Test the ingestor's sentinel fetcher with mocked phase0 functions."""
+    """Test the ingestor's sentinel fetcher with mocked research functions."""
     import importlib.util
     import sys
 
@@ -37,7 +37,7 @@ def test_ingestor_sentinel_fetcher_integration():
     assert _spec.loader is not None
     _spec.loader.exec_module(_module)
 
-    # sentinel_fetcher delegates to phase0.scripts.download_scenes
+    # sentinel_fetcher delegates to research.scripts.download_scenes
     # search_cdse_odata needs env vars unless we pass username/password explicitly
     mock_results = [
         {

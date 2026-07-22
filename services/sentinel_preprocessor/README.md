@@ -26,7 +26,7 @@
 | Function | Description |
 |----------|-------------|
 | `calibrate_sigma0(data, lut)` | Radiometric calibration: DN² / LUT² |
-| `apply_lee_filter(data, kernel_size=5)` | Adaptive speckle filter (uses phase0 windowed version when available) |
+| `apply_lee_filter(data, kernel_size=5)` | Adaptive speckle filter (uses research windowed version when available) |
 | `convert_to_db(data)` | Logarithmic conversion: 10·log₁₀(x) |
 | `normalize_to_uint8(data, db_min, db_max)` | Clip + scale to [0, 255] |
 | `tile_image(data, tile_size=512, overlap=0.5)` | Sliding window tiling |
@@ -59,7 +59,7 @@ curl -X POST "http://localhost:8000/preprocess?safe_path=/data/scenes/SCENE.SAFE
 
 ## Output Location
 
-- Default: `phase0/data/tiles/<scene>/<pipeline>/`
+- Default: `research/data/tiles/<scene>/<pipeline>/`
 - Tiles in `.npy` format (512×512 pixels)
 
 ## Docker

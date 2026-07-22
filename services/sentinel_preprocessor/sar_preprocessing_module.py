@@ -12,16 +12,16 @@ from typing import Any
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 
-# Reuse the robust windowed pipeline implementation from phase0 when available.
+# Reuse the robust windowed pipeline implementation from research when available.
 try:
     from research.scripts.sar_preprocessing import (
         _lee_filter_windowed,
         process_safe_windowed,
     )
 
-    _HAS_PHASE0 = True
+    _HAS_research = True
 except Exception:
-    _HAS_PHASE0 = False
+    _HAS_research = False
 
 # --------------------------------------------------------------------------
 # GCP Georeferencing (validated for Sentinel-1 GRD products)
@@ -39,7 +39,7 @@ class GCPGeoreferencer:
 
     VALIDATED PROPERTY:
         Interpolation error at GCP control points is EXACTLY ZERO
-        (machine precision verified in phase0/tests/test_gcp_interpolation.py).
+        (machine precision verified in research/tests/test_gcp_interpolation.py).
 
     NOT VALIDATED:
         Behavior when a requested pixel falls beyond the last recorded GCP.
@@ -236,7 +236,7 @@ def calibrate_sigma0(data: np.ndarray, calibration_lut: np.ndarray) -> np.ndarra
     """Simple radiometric calibration: DN^2 / calibration_lut^2
 
     The full, memory-efficient CalibrationLUT-based interpolation is available
-    in `phase0.scripts.sar_preprocessing.CalibrationLUT`. This function performs
+    in `research.scripts.sar_preprocessing.CalibrationLUT`. This function performs
     pointwise calibration for already-aligned arrays.
     """
     cal_safe = np.where(calibration_lut == 0, 1e-10, calibration_lut)
@@ -252,9 +252,9 @@ def apply_lee_filter(data: np.ndarray, kernel_size: int = 5) -> np.ndarray:
     The Lee filter is an adaptive filter that preserves edges while reducing speckle,
     which is critical for vessel detection where ship wakes must remain visible.
 
-    This implementation uses the phase0 windowed version when available for memory
+    This implementation uses the research windowed version when available for memory
     efficiency on large scenes (25K×16K pixels). Falls back to a simple local-mean
-    filter if phase0 is not present.
+    filter if research is not present.
 
     Args:
         data: Input SAR array (float32)
@@ -263,7 +263,7 @@ def apply_lee_filter(data: np.ndarray, kernel_size: int = 5) -> np.ndarray:
     Returns:
         Filtered SAR array (float32)
     """
-    if _HAS_PHASE0:
+    if _HAS_research:
         return _lee_filter_windowed(data.astype(np.float32), kernel_size=kernel_size)
     # Fallback: simple mean filter
     from scipy.ndimage import uniform_filter
@@ -298,30 +298,30 @@ def tile_image(
 
 
 def pipeline_a(safe_path: str, output_dir: str | None = None) -> dict[str, Any]:
-    """Pipeline A: baseline using phase0 implementation when available.
+    """Pipeline A: baseline using research implementation when available.
     Returns manifest dictionary with tile metadata.
     """
-    if _HAS_PHASE0:
+    if _HAS_research:
         return process_safe_windowed(safe_path, "A", output_dir or "data/tiles")
-    raise NotImplementedError("phase0 implementation not available in workspace")
+    raise NotImplementedError("research implementation not available in workspace")
 
 
 def pipeline_b(safe_path: str, output_dir: str | None = None) -> dict[str, Any]:
-    if _HAS_PHASE0:
+    if _HAS_research:
         return process_safe_windowed(safe_path, "B", output_dir or "data/tiles")
-    raise NotImplementedError("phase0 implementation not available in workspace")
+    raise NotImplementedError("research implementation not available in workspace")
 
 
 def pipeline_c(safe_path: str, output_dir: str | None = None) -> dict[str, Any]:
-    if _HAS_PHASE0:
+    if _HAS_research:
         return process_safe_windowed(safe_path, "C", output_dir or "data/tiles")
-    raise NotImplementedError("phase0 implementation not available in workspace")
+    raise NotImplementedError("research implementation not available in workspace")
 
 
 def pipeline_d(safe_path: str, output_dir: str | None = None) -> dict[str, Any]:
-    if _HAS_PHASE0:
+    if _HAS_research:
         return process_safe_windowed(safe_path, "D", output_dir or "data/tiles")
-    raise NotImplementedError("phase0 implementation not available in workspace")
+    raise NotImplementedError("research implementation not available in workspace")
 
 
 # --------------------------------------------------------------------------

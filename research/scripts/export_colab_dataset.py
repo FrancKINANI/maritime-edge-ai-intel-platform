@@ -4,18 +4,18 @@ Export Colab Dataset — Package AIS annotations for Google Colab fine-tuning
 ============================================================================
 Usage::
 
-    # Export dataset (creates ZIP in phase0/data/colab_export/)
-    uv run python phase0/scripts/export_colab_dataset.py
+    # Export dataset (creates ZIP in research/data/colab_export/)
+    uv run python research/scripts/export_colab_dataset.py
 
     # Specify custom input/output paths
-    uv run python phase0/scripts/export_colab_dataset.py \\
-        --input phase0/data/cvat_annotated_only \\
-        --output phase0/data/colab_export \\
+    uv run python research/scripts/export_colab_dataset.py \\
+        --input research/data/cvat_annotated_only \\
+        --output research/data/colab_export \\
         --split 80 10 10
 
 Output::
 
-    phase0/data/colab_export/
+    research/data/colab_export/
     ├── maritime_dataset.zip          ← Upload this to Colab (~320 MB)
     ├── colab_finetune_yolo.ipynb     ← The Colab notebook
     └── dataset_summary.json          ← Metadata about the dataset
@@ -195,14 +195,14 @@ def main():
     parser.add_argument(
         "--input",
         type=Path,
-        default=Path("phase0/data/cvat_annotated_only"),
+        default=Path("research/data/cvat_annotated_only"),
         help="Input directory with scene subdirectories (default: cvat_annotated_only)",
     )
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("phase0/data/colab_export"),
-        help="Output directory for ZIP + notebook (default: phase0/data/colab_export)",
+        default=Path("research/data/colab_export"),
+        help="Output directory for ZIP + notebook (default: research/data/colab_export)",
     )
     parser.add_argument(
         "--split",

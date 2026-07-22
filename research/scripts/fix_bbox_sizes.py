@@ -47,7 +47,7 @@ logger = logging.getLogger("fix_bbox_sizes")
 TILE_SIZE = 512
 RNG_SEED = 42
 
-ANNOTATIONS_ROOT = Path("phase0/data/annotations")
+ANNOTATIONS_ROOT = Path("research/data/annotations")
 
 
 # ---------------------------------------------------------------------------

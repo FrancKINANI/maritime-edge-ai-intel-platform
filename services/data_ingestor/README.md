@@ -11,11 +11,11 @@
 | `/products` | GET | Lists available Sentinel-1 products via CDSE OData API (⚠️ 501 — in development) |
 | `/health` | GET | Service health |
 
-> ⚠️ The `/ingest`, `/status`, and `/products` endpoints return `501 Not Implemented`. The CDSE ingestion logic is currently implemented in the Phase 0 scripts (`phase0/scripts/download_scenes.py`) and will be migrated to this service in a future release.
+> ⚠️ The `/ingest`, `/status`, and `/products` endpoints return `501 Not Implemented`. The CDSE ingestion logic is currently implemented in the Phase 0 scripts (`research/scripts/download_scenes.py`) and will be migrated to this service in a future release.
 
 ## Core Functions (shared with Phase 0)
 
-Business logic is shared from `phase0/scripts/download_scenes.py`:
+Business logic is shared from `research/scripts/download_scenes.py`:
 
 - `get_cdse_token(username, password)` — Keycloak authentication against CDSE
 - `search_sentinel1_products(token, bbox, start, end, max_results)` — OData query with bbox/date/product-type filters

@@ -47,7 +47,7 @@ services/           # Microservices (FastAPI)
 ├── satellite-monitor/
 └── sentinel-preprocessor/
 shared/             # Shared schemas, config, utilities
-phase0/             # Phase 0: benchmark, dataset construction, analysis
+research/             # Phase 0: benchmark, dataset construction, analysis
 phase_post0/        # Fine-tuning pipeline, Colab notebooks
 ```
 

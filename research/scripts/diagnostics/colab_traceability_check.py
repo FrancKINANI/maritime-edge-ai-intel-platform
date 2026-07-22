@@ -107,7 +107,7 @@ from research.scripts.download_scenes import (
 )
 from research.scripts.sar_preprocessing import process_safe_windowed
 
-SCENES_DIR = Path("phase0/data/scenes")
+SCENES_DIR = Path("research/data/scenes")
 SCENES_DIR.mkdir(parents=True, exist_ok=True)
 
 print("Modules imported.")
@@ -155,7 +155,7 @@ print("CDSE authentication successful.")
 
 # ⚠ Download only 1 scene for the verification test.
 # ⚠ If you re-run this cell, delete the existing .SAFE directory first:
-#      rm -rf phase0/data/scenes/<scene-name>.SAFE
+#      rm -rf research/data/scenes/<scene-name>.SAFE
 #    Otherwise select_and_download_scenes_from_density() will skip the
 #    download AND NOT write target_trace.json, causing Cell 7 to fail.
 downloaded = select_and_download_scenes_from_density(
@@ -218,7 +218,7 @@ else:
 
 # process_safe_windowed already imported in Cell 3
 
-TILES_DIR = Path("phase0/data/tiles")
+TILES_DIR = Path("research/data/tiles")
 
 print("Running process_safe_windowed on the downloaded scene...")
 print("This will take several minutes (processing tile-by-tile).")

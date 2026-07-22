@@ -5,5 +5,5 @@
 set -e
 cd "$(dirname "$0")/.."
 echo "Regenerating maritime_dataset.zip..."
-uv run python phase0/scripts/export_colab_dataset.py
-echo "Done. ZIP ready at phase0/data/colab_export/maritime_dataset.zip"
+uv run python research/scripts/export_colab_dataset.py
+echo "Done. ZIP ready at research/data/colab_export/maritime_dataset.zip"

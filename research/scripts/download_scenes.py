@@ -9,7 +9,7 @@ Inputs:
     Query parameters: bounding box, date range
 
 Outputs:
-    Downloaded and extracted .SAFE folders in phase0/data/scenes/
+    Downloaded and extracted .SAFE folders in research/data/scenes/
     manifest.json with scene metadata
 
 This module implements OData API interactions with CDSE, Keycloak authentication,
@@ -240,7 +240,7 @@ def check_ais_coverage_before_download(
             # The residual bug was that the len(data[field]) > 0 check could produce
             # a false positive on a nested empty response (entries[0][dataset_key] structure).
             # By normalizing first, we correctly handle the nested structure.
-            from phase0.scripts.gfw_annotations import _normalize_response_entries
+            from research.scripts.gfw_annotations import _normalize_response_entries
 
             normalized = _normalize_response_entries(data)
             if normalized and len(normalized) > 0:
@@ -812,7 +812,7 @@ def build_ais_density_map(
     Returns:
         Dict with 'cells' (sorted by count descending), 'total_positions', etc.
     """
-    from phase0.scripts.gfw_annotations import _extract_lat_lon, _normalize_response_entries
+    from research.scripts.gfw_annotations import _extract_lat_lon, _normalize_response_entries
 
     lon_min, lat_min, lon_max, lat_max = bbox
     end = datetime.now(UTC).date()
@@ -924,7 +924,7 @@ def build_ais_density_map(
 #
 # Layout (one trace per scene, never a shared parent-level file):
 #
-#   phase0/data/scenes/
+#   research/data/scenes/
 #     <SCENE_ID>.SAFE/
 #       manifest.safe
 #       target_trace.json          ← always INSIDE the .SAFE folder
@@ -1125,7 +1125,7 @@ def select_and_download_scenes_from_density(
         token: CDSE authentication token
         density_map: Result of build_ais_density_map()
         n_scenes: Maximum number of scenes to download
-        output_dir: Output directory (default: phase0/data/scenes/)
+        output_dir: Output directory (default: research/data/scenes/)
         username: CDSE username (for token refresh during long downloads)
         password: CDSE password
 

@@ -5,7 +5,7 @@ This module contains configuration values for geographic zones,
 SAR preprocessing algorithms, detector specifications, and satellite metadata.
 
 NOTEBOOK <-> SCRIPTS SYNCHRONIZATION:
-    The Colab notebook (colab_phase0_pipeline_final.ipynb) should, in the next
+    The Colab notebook (colab_research_pipeline_final.ipynb) should, in the next
     session, IMPORT these constants from this file rather than redefining them
     locally. This file is the single source of truth for all shared constants.
 """
@@ -49,7 +49,7 @@ TLE_REFRESH_HOURS: int = 24
 SENTINEL1_PRODUCT_TYPE: str = "IW_GRDH_1S"
 SENTINEL1_POLARIZATION: str = "VV VH"
 
-# GFW API constants (shared between phase0/scripts/ and notebook)
+# GFW API constants (shared between research/scripts/ and notebook)
 GFW_MARGIN_DEG: float = 0.01  # Margin around bbox for GFW queries
 N_EMPTY_TILES_PER_SCENE: int = 80  # Number of empty control tiles per scene
 MAX_TILES_PER_SCENE_HARD_CAP: int = 600  # Hard cap on tiles per scene

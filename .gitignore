@@ -4,6 +4,7 @@
 
 # --- ONNX models (manual transfer) ---
 /shared/models/*
+/research/results/*
 !/shared/models/.gitkeep
 
 # --- Python ---

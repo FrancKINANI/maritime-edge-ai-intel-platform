@@ -27,7 +27,7 @@ Architecture:
     - Explicit memory management: del + gc.collect()
 
 Note on GCP duplication:
-    GCP logic intentionally duplicated (no phase0<->services dependency).
+    GCP logic intentionally duplicated (no research<->services dependency).
     The GCPGeoreferencer and GCPOutOfBoundsError classes below are a standalone
     copy from services/sentinel_preprocessor/sar_preprocessing.py.
     ASSUMED RISK: any bug fix here must be manually replicated
@@ -35,7 +35,7 @@ Note on GCP duplication:
 """
 
 # Note on GCP duplication:
-# GCP logic intentionally duplicated (no phase0<->services dependency).
+# GCP logic intentionally duplicated (no research<->services dependency).
 # The GCPGeoreferencer and GCPOutOfBoundsError classes below are a standalone
 # copy from services/sentinel_preprocessor/sar_preprocessing.py.
 # ASSUMED RISK: any bug fix here must be manually replicated
@@ -114,7 +114,7 @@ class GCPGeoreferencer:
 
     VALIDATED PROPERTY:
         Interpolation error at GCP control points is EXACTLY ZERO
-        (machine precision verified in phase0/tests/test_gcp_interpolation.py).
+        (machine precision verified in research/tests/test_gcp_interpolation.py).
 
     NOT VALIDATED:
         Behavior when a requested pixel falls beyond the last recorded GCP.
@@ -1003,7 +1003,7 @@ def main() -> None:
     )
     parser.add_argument("--overlap", type=float, default=0.5, help="Tile overlap (default: 0.5)")
     parser.add_argument(
-        "--output-dir", default=None, help="Output directory (default: phase0/data/tiles/)"
+        "--output-dir", default=None, help="Output directory (default: research/data/tiles/)"
     )
     parser.add_argument("--test", action="store_true", help="Run test with first scene")
     parser.add_argument("--benchmark-memory", action="store_true", help="Run memory benchmark")

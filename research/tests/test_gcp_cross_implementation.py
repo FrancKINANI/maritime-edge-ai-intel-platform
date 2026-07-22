@@ -1,7 +1,7 @@
 """GCP cross-implementation non-regression test.
 
 Verifies that the standalone GCPGeoreferencer implementation in
-phase0/scripts/sar_preprocessing.py produces IDENTICAL results
+research/scripts/sar_preprocessing.py produces IDENTICAL results
 to the original implementation in services/sentinel_preprocessor/sar_preprocessing.py
 on the same input data.
 
@@ -9,7 +9,7 @@ This test meets the prompt.md (Part A.1) requirement:
     "NON-REGRESSION TEST REQUIRED for this standalone copy: reuse
     exactly the same already-validated test from the service side (zero
     reconstruction error at GCP control points) and apply it to this
-    new phase0/ implementation -- both implementations must produce
+    new research/ implementation -- both implementations must produce
     IDENTICAL results on the same input data, not just 'pass their own
     tests' independently."
 """
@@ -20,12 +20,12 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-# Import phase0 implementation
+# Import research implementation
 from research.scripts.sar_preprocessing import (
-    GCPGeoreferencer as Phase0GCPGeoreferencer,
+    GCPGeoreferencer as researchGCPGeoreferencer,
 )
 from research.scripts.sar_preprocessing import (
-    GCPOutOfBoundsError as Phase0GCPOutOfBoundsError,
+    GCPOutOfBoundsError as researchGCPOutOfBoundsError,
 )
 
 # Load service implementation via importlib to bypass the hyphen
@@ -84,44 +84,44 @@ OUT_OF_BOUNDS: list[tuple[int, int]] = [
 
 
 # ---------------------------------------------------------------------------
-# Test 1 — phase0 self-consistency (always runs)
+# Test 1 — research self-consistency (always runs)
 # ---------------------------------------------------------------------------
 
 
-def test_gcp_phase0_self_consistency() -> None:
-    """Phase0 implementation self-consistency checks.
+def test_gcp_research_self_consistency() -> None:
+    """research implementation self-consistency checks.
 
     These assertions always run and validate that the standalone
     GCPGeoreferencer produces correct results independently.
     """
-    phase0_gcp = Phase0GCPGeoreferencer(_gcps, IMAGE_SHAPE)
+    research_gcp = researchGCPGeoreferencer(_gcps, IMAGE_SHAPE)
 
     # 1a — Interpolated points are within the expected geographic range
     for line, pixel in CONTROL_POINTS:
-        lat_p0, lon_p0 = phase0_gcp.pixel_to_latlon(line, pixel)
-        assert 29.0 <= lat_p0 <= 31.0, f"phase0 lat {lat_p0} outside range"
-        assert -11.0 <= lon_p0 <= -9.0, f"phase0 lon {lon_p0} outside range"
+        lat_p0, lon_p0 = research_gcp.pixel_to_latlon(line, pixel)
+        assert 29.0 <= lat_p0 <= 31.0, f"research lat {lat_p0} outside range"
+        assert -11.0 <= lon_p0 <= -9.0, f"research lon {lon_p0} outside range"
 
     # 1b — Strictly zero reconstruction error at GCP control points
     for i in range(N_LINES):
         for j in range(N_PIXELS):
             line_gcp = i * (IMAGE_SHAPE[0] - 1) / (N_LINES - 1)
             pixel_gcp = j * (IMAGE_SHAPE[1] - 1) / (N_PIXELS - 1)
-            lat_p0, lon_p0 = phase0_gcp.pixel_to_latlon(line_gcp, pixel_gcp)
+            lat_p0, lon_p0 = research_gcp.pixel_to_latlon(line_gcp, pixel_gcp)
             expected_lat = _gcps[i, j, 0]
             expected_lon = _gcps[i, j, 1]
             assert abs(lat_p0 - expected_lat) < 1e-10, (
-                f"phase0 error at GCP ({i},{j}): {lat_p0} != {expected_lat}"
+                f"research error at GCP ({i},{j}): {lat_p0} != {expected_lat}"
             )
             assert abs(lon_p0 - expected_lon) < 1e-10
 
     # 1c — GCPOutOfBoundsError raised for out-of-bounds pixels
     for line, pixel in OUT_OF_BOUNDS:
-        with pytest.raises(Phase0GCPOutOfBoundsError):
-            phase0_gcp.pixel_to_latlon(line, pixel)
+        with pytest.raises(researchGCPOutOfBoundsError):
+            research_gcp.pixel_to_latlon(line, pixel)
 
     # 1d — tile_to_bbox() returns a valid bbox
-    bbox_p0 = phase0_gcp.tile_to_bbox(25, 25, 75, 75)
+    bbox_p0 = research_gcp.tile_to_bbox(25, 25, 75, 75)
     assert len(bbox_p0) == 4, f"bbox must have 4 elements, got {len(bbox_p0)}"
     assert bbox_p0[0] <= bbox_p0[2], f"lat_min {bbox_p0[0]} > lat_max {bbox_p0[2]}"
     assert bbox_p0[1] <= bbox_p0[3], f"lon_min {bbox_p0[1]} > lon_max {bbox_p0[3]}"
@@ -151,12 +151,12 @@ def test_gcp_cross_implementation_parity() -> None:
             "Use importlib.util.spec_from_file_location() to load it."
         )
 
-    phase0_gcp = Phase0GCPGeoreferencer(_gcps, IMAGE_SHAPE)
+    research_gcp = researchGCPGeoreferencer(_gcps, IMAGE_SHAPE)
     service_gcp = ServiceGCPGeoreferencer(_gcps, IMAGE_SHAPE)
 
     # 2a — Identical interpolation at arbitrary control points
     for line, pixel in CONTROL_POINTS:
-        lat_p0, lon_p0 = phase0_gcp.pixel_to_latlon(line, pixel)
+        lat_p0, lon_p0 = research_gcp.pixel_to_latlon(line, pixel)
         lat_svc, lon_svc = service_gcp.pixel_to_latlon(line, pixel)
         assert np.isclose(lat_p0, lat_svc, atol=1e-10), (
             f"lat mismatch at ({line},{pixel}): {lat_p0} != {lat_svc}"
@@ -170,18 +170,18 @@ def test_gcp_cross_implementation_parity() -> None:
         for j in range(N_PIXELS):
             line_gcp = i * (IMAGE_SHAPE[0] - 1) / (N_LINES - 1)
             pixel_gcp = j * (IMAGE_SHAPE[1] - 1) / (N_PIXELS - 1)
-            lat_p0, lon_p0 = phase0_gcp.pixel_to_latlon(line_gcp, pixel_gcp)
+            lat_p0, lon_p0 = research_gcp.pixel_to_latlon(line_gcp, pixel_gcp)
             lat_svc, lon_svc = service_gcp.pixel_to_latlon(line_gcp, pixel_gcp)
             assert lat_p0 == lat_svc, (
-                f"GCP ({i},{j}) lat mismatch: phase0 {lat_p0} != service {lat_svc}"
+                f"GCP ({i},{j}) lat mismatch: research {lat_p0} != service {lat_svc}"
             )
             assert lon_p0 == lon_svc, (
-                f"GCP ({i},{j}) lon mismatch: phase0 {lon_p0} != service {lon_svc}"
+                f"GCP ({i},{j}) lon mismatch: research {lon_p0} != service {lon_svc}"
             )
 
     # 2c — Identical tile_to_bbox()
-    bbox_p0 = phase0_gcp.tile_to_bbox(25, 25, 75, 75)
+    bbox_p0 = research_gcp.tile_to_bbox(25, 25, 75, 75)
     bbox_svc = service_gcp.tile_to_bbox(25, 25, 75, 75)
     assert all(abs(a - b) < 1e-10 for a, b in zip(bbox_p0, bbox_svc, strict=False)), (
-        f"bbox mismatch: phase0 {bbox_p0}, service {bbox_svc}"
+        f"bbox mismatch: research {bbox_p0}, service {bbox_svc}"
     )

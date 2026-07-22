@@ -3,7 +3,7 @@
 Build Fine-Tuning Dataset — Package AIS annotations into YOLO format
 =====================================================================
 
-Scans scene directories under ``phase0/data/annotations/``, maps each
+Scans scene directories under ``research/data/annotations/``, maps each
 YOLO label file to its corresponding PNG image, applies quality filters,
 splits by **scene** (configurable), and exports a clean YOLO dataset
 ready for Ultralytics fine-tuning.
@@ -703,8 +703,8 @@ def main() -> None:
     parser.add_argument(
         "--annotations",
         "-a",
-        default="phase0/data/annotations",
-        help="Root annotations directory (default: phase0/data/annotations/)",
+        default="research/data/annotations",
+        help="Root annotations directory (default: research/data/annotations/)",
     )
     parser.add_argument(
         "--output",

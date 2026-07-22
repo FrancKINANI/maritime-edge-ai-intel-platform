@@ -5,14 +5,14 @@ Annotation Server — Web-based interactive AIS annotation tool
 Usage::
 
     # Start the server (default port 8765)
-    uv run python phase0/scripts/annotation_server.py
+    uv run python research/scripts/annotation_server.py
 
     # Specify a different port
-    uv run python phase0/scripts/annotation_server.py --port 8080
+    uv run python research/scripts/annotation_server.py --port 8080
 
     # Point to the annotated-only dataset
-    uv run python phase0/scripts/annotation_server.py \\
-        --data phase0/data/cvat_annotated_only
+    uv run python research/scripts/annotation_server.py \\
+        --data research/data/cvat_annotated_only
 
 Then open http://localhost:8765 in your browser.
 
@@ -321,8 +321,8 @@ def main():
     parser.add_argument(
         "--data",
         type=Path,
-        default=Path("phase0/data/cvat_annotated_only"),
-        help="Path to annotated-only dataset (default: phase0/data/cvat_annotated_only)",
+        default=Path("research/data/cvat_annotated_only"),
+        help="Path to annotated-only dataset (default: research/data/cvat_annotated_only)",
     )
     parser.add_argument(
         "--port",

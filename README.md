@@ -319,13 +319,13 @@ python3.11 -m venv .venv
 source .venv/bin/activate
 # or with uv:
 uv venv && source .venv/bin/activate
-pip install -r phase0/requirements.txt
+pip install -r research/requirements.txt
 ```
 
 ### Linting & SAST
 
 ```bash
-make lint   # ruff check services/ phase0/ shared/
+make lint   # ruff check services/ research/ shared/
 make sast   # bandit security scan
 ```
 

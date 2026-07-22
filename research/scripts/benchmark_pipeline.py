@@ -1,7 +1,7 @@
-# phase0/scripts/benchmark_pipeline.py
+# research/scripts/benchmark_pipeline.py
 """Pipeline Benchmarking and Domain Shift Evaluation.
 
-Ported from notebook colab_phase0_pipeline_final.ipynb (cells 20-22).
+Ported from notebook colab_research_pipeline_final.ipynb (cells 20-22).
 Compare model inference against ground truth across pipelines, calculating metrics
 such as Precision, Recall, mAP@0.5, and KS-distance to evaluate domain transfer.
 
@@ -545,7 +545,7 @@ def main() -> None:
     parser.add_argument(
         "--output-dir",
         default=None,
-        help="Output directory for results (default: phase0/data/results/)",
+        help="Output directory for results (default: research/data/results/)",
     )
 
     args = parser.parse_args()

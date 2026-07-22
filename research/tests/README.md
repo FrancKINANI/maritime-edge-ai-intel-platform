@@ -14,5 +14,5 @@ Unit tests for the Phase 0 scientific validation scripts.
 ## Run
 
 ```bash
-uv run python -m pytest phase0/tests/ -v
+uv run python -m pytest research/tests/ -v
 ```

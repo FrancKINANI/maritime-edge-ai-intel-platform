@@ -59,7 +59,7 @@ async def preprocess_scene(
 
     if output_dir is None:
         # Save under shared/data/tiles by default
-        base = Path(__file__).resolve().parents[2] / "phase0" / "data" / "tiles"
+        base = Path(__file__).resolve().parents[2] / "research" / "data" / "tiles"
         output_dir = str(base)
 
     try:

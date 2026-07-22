@@ -21,7 +21,7 @@ def search_cdse_odata(
     username: str | None = None,
     password: str | None = None,
 ) -> list[dict[str, Any]]:
-    """Runs OData query on CDSE catalog by leveraging phase0 implementation.
+    """Runs OData query on CDSE catalog by leveraging research implementation.
 
     Requires CDSE credentials provided either as arguments or via environment variables.
     """
@@ -37,7 +37,7 @@ def search_cdse_odata(
 def download_safe_product(
     product_id: str, download_path: str, username: str | None = None, password: str | None = None
 ) -> str:
-    """Downloads a Sentinel-1 product using CDSE zipper via phase0 helper.
+    """Downloads a Sentinel-1 product using CDSE zipper via research helper.
 
     Returns the path to the extracted .SAFE directory.
     """

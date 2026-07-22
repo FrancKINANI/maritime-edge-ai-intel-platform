@@ -8,27 +8,27 @@ on Sentinel-1 Pipeline D tiles (512x512).
 Usage::
 
     # Validate scene 1 (10 tiles — quick test)
-    uv run python phase0/scripts/cvat_fallback_validator.py \\
-        --scene phase0/data/cvat_annotated_only/S1D_20260711
+    uv run python research/scripts/cvat_fallback_validator.py \\
+        --scene research/data/cvat_annotated_only/S1D_20260711
 
     # Validate scene 2 (1534 tiles — full validation)
-    uv run python phase0/scripts/cvat_fallback_validator.py \\
-        --scene phase0/data/cvat_annotated_only/S1D_20260716
+    uv run python research/scripts/cvat_fallback_validator.py \\
+        --scene research/data/cvat_annotated_only/S1D_20260716
 
     # Resume interrupted validation
-    uv run python phase0/scripts/cvat_fallback_validator.py \\
-        --scene phase0/data/cvat_annotated_only/S1D_20260716 \\
+    uv run python research/scripts/cvat_fallback_validator.py \\
+        --scene research/data/cvat_annotated_only/S1D_20260716 \\
         --resume
 
     # Export validated labels
-    uv run python phase0/scripts/cvat_fallback_validator.py \\
-        --scene phase0/data/cvat_annotated_only/S1D_20260716 \\
+    uv run python research/scripts/cvat_fallback_validator.py \\
+        --scene research/data/cvat_annotated_only/S1D_20260716 \\
         --export-only
 
     # Generate static HTML overview (no GUI needed)
-    uv run python phase0/scripts/cvat_fallback_validator.py \\
-        --scene phase0/data/cvat_annotated_only/S1D_20260716 \\
-        --generate-report phase0/data/results/cvat_overview.html
+    uv run python research/scripts/cvat_fallback_validator.py \\
+        --scene research/data/cvat_annotated_only/S1D_20260716 \\
+        --generate-report research/data/results/cvat_overview.html
 
 Interactive controls::
 
@@ -824,7 +824,7 @@ def main():
         "--scene",
         type=Path,
         required=True,
-        help="Path to scene directory (e.g. phase0/data/cvat_annotated_only/S1D_20260716)",
+        help="Path to scene directory (e.g. research/data/cvat_annotated_only/S1D_20260716)",
     )
     parser.add_argument(
         "--resume",

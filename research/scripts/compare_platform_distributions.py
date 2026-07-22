@@ -47,7 +47,7 @@ def collect_pipeline_d_tiles(tiles_root: Path) -> dict[str, list[Path]]:
     """Scan tiles_root/<scene>/D/*.npy grouped by satellite platform.
 
     Args:
-        tiles_root: Path to the tiles directory (e.g., phase0/data/tiles/).
+        tiles_root: Path to the tiles directory (e.g., research/data/tiles/).
 
     Returns:
         Dict mapping platform ("S1C" or "S1D") to list of .npy file paths.
@@ -433,13 +433,13 @@ def main() -> None:
     )
     parser.add_argument(
         "--tiles-root",
-        default="phase0/data/tiles",
-        help="Path to the tiles directory (default: phase0/data/tiles)",
+        default="research/data/tiles",
+        help="Path to the tiles directory (default: research/data/tiles)",
     )
     parser.add_argument(
         "--annotations-root",
-        default="phase0/data/annotations",
-        help="Path to annotations root (default: phase0/data/annotations)",
+        default="research/data/annotations",
+        help="Path to annotations root (default: research/data/annotations)",
     )
     parser.add_argument(
         "--sample-limit",

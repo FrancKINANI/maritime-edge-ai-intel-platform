@@ -22,11 +22,11 @@ log = logging.getLogger(__name__)
 PROJECT_ROOT = Path(
     "/home/franck/Documents/02_Projets/IA/Projets_IA/cubesat-maritime-project/maritime-intelligence-platform"
 )
-PHASE0 = PROJECT_ROOT / "phase0"
+research = PROJECT_ROOT / "research"
 MODEL_PATH = PROJECT_ROOT / "shared" / "models" / "yolov8n_int8.onnx"
-TILES_ROOT = PHASE0 / "data" / "tiles"
-ANNOTATIONS_ROOT = PHASE0 / "data" / "annotations"
-OUTPUT_DIR = PHASE0 / "data" / "analysis"
+TILES_ROOT = research / "data" / "tiles"
+ANNOTATIONS_ROOT = research / "data" / "annotations"
+OUTPUT_DIR = research / "data" / "analysis"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 SCENES = [
