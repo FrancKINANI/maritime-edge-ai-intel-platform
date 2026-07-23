@@ -68,6 +68,11 @@ DENSITY_LOOKBACK_DAYS = 30  # recent period for AIS query
 N_TARGET_ZONES = 5  # number of high-density zones to target
 MAX_TEST_SCENES = 5  # strict test batch size
 
+# Minimum scene age (days): avoids downloading scenes too recent for GFW AIS processing
+# GFW typically needs 48-72h to ingest AIS data. Scenes < MIN_SCENE_AGE_DAYS old
+# are unlikely to have AIS annotations and would waste bandwidth.
+MIN_SCENE_AGE_DAYS = 3
+
 # Targeting traceability (Part B of the protocol)
 # Fields recorded in target_trace.json for each downloaded scene:
 #   - target_density_cell_index (int, position in dmap['cells'])
@@ -1142,7 +1147,9 @@ def select_and_download_scenes_from_density(
         logger.error("Density map has no cells -- cannot select scenes.")
         return []
 
-    end = datetime.now(UTC).date()
+    # Search from MIN_SCENE_AGE_DAYS ago backwards (avoid today's/yesterday's scenes
+    # that GFW may not have processed AIS data for yet)
+    end = datetime.now(UTC).date() - timedelta(days=MIN_SCENE_AGE_DAYS)
     start = end - timedelta(days=90)
     downloaded: list[str] = []
     existing_ids = get_existing_scene_ids(output_dir)
@@ -1227,6 +1234,26 @@ def select_and_download_scenes_from_density(
             if base_id:
                 existing_ids.add(base_id)
             continue
+
+        # --- AIS coverage check before downloading ---
+        gfw_token = os.getenv("GFW_API_TOKEN")
+        if gfw_token:
+            # Query GFW for AIS data around the product's acquisition date
+            product_date = product.get("date", "")
+            if product_date:
+                try:
+                    dt = datetime.fromisoformat(product_date.replace("Z", "+00:00"))
+                    ais_date = dt.strftime("%Y-%m-%d")
+                    has_ais = check_ais_coverage_before_download(
+                        bbox, ais_date, ais_date, gfw_token
+                    )
+                    if not has_ais:
+                        logger.info(
+                            f"  Skipping {product_name} — no GFW AIS coverage for {ais_date}"
+                        )
+                        continue
+                except Exception as e:
+                    logger.warning(f"  AIS coverage check failed: {e} — proceeding anyway")
 
         # --- Case B: fresh download ---
         try:
