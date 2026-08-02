@@ -13,6 +13,7 @@ jobs:
   lint-and-sast:
     runs-on: ubuntu-latest
     permissions:
+      contents: read         # needed for actions/checkout (job-level permissions override workflow-level)
       security-events: write  # needed to upload SARIF results to GitHub Code Scanning
     steps:
       - uses: actions/checkout@v7
