@@ -3,6 +3,7 @@
 [![CI](https://github.com/FrancKINANI/maritime-edge-ai-intel-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/FrancKINANI/maritime-edge-ai-intel-platform/actions/workflows/ci.yml)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 [![Docker](https://img.shields.io/badge/Docker-20.10%2B-2496ED.svg)](https://docker.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A high-performance microservice platform for **real-time maritime vessel detection** from Copernicus Sentinel-1 SAR satellite imagery. Transitions simulation-trained Edge AI models (Phase I) to a fully operational, containerized architecture consuming real-world radar scenes.
 
@@ -247,7 +248,7 @@ docker compose -f docker-compose.demo.yml up --build
 
 ### Base Image
 
-All services use a shared base image (`maritime-intel-base:latest`) defined in `docker/base/Dockerfile`:
+All services use a shared base image (`maritime-intel-base:2.1.0`) defined in `docker/base/Dockerfile`:
 
 | Package | Version | Purpose |
 |---------|---------|---------|
@@ -260,7 +261,7 @@ All services use a shared base image (`maritime-intel-base:latest`) defined in `
 
 ### Duplication Elimination
 
-All 6 service Dockerfiles have been refactored to `FROM maritime-intel-base:latest`, eliminating duplicated system package installations and Python dependencies. The base image is built once and cached for all services.
+All 6 service Dockerfiles have been refactored to `FROM maritime-intel-base:2.1.0`, eliminating duplicated system package installations and Python dependencies. The base image is built once and cached for all services.
 
 ### Docker Compose
 
@@ -288,7 +289,7 @@ docker compose down
 
 ```bash
 # Build base image first
-docker build -f docker/base/Dockerfile -t maritime-intel-base:latest .
+docker build -f docker/base/Dockerfile -t maritime-intel-base:2.1.0 .
 
 # Then build all services
 docker compose build
@@ -444,7 +445,7 @@ make clean              # Clean build artifacts + coverage
 ├── .env.example                    # Environment template
 │
 ├── docker/
-│   └── base/                       # Base image (maritime-intel-base:latest)
+│   └── base/                       # Base image (maritime-intel-base:2.1.0)
 │       ├── Dockerfile              #   Multi-stage with shared Python deps
 │       └── requirements.txt        #   FastAPI, Pydantic, httpx, NumPy
 │

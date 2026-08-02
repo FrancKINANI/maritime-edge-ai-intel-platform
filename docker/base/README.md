@@ -1,11 +1,11 @@
-# Docker Base Image — `maritime-intel-base:latest`
+# Docker Base Image — `maritime-intel-base:2.1.0`
 
 Common base image for all maritime-intelligence-platform microservices.
 
 ## Build
 
 ```bash
-docker build -f docker/base/Dockerfile -t maritime-intel-base:latest .
+docker build -f docker/base/Dockerfile -t maritime-intel-base:2.1.0 .
 ```
 
 ## Contents
@@ -21,4 +21,4 @@ docker build -f docker/base/Dockerfile -t maritime-intel-base:latest .
 
 ## Purpose
 
-All 6 service Dockerfiles start with `FROM maritime-intel-base:latest`, eliminating duplicate installations of FastAPI, Uvicorn, Pydantic, and other shared dependencies.
+All 6 service Dockerfiles start with `FROM maritime-intel-base:2.1.0`, eliminating duplicate installations of FastAPI, Uvicorn, Pydantic, and other shared dependencies.

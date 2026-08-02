@@ -2,7 +2,7 @@
 # Data Ingestor — FastAPI service
 # =============================================================================
 
-FROM maritime-intel-base:latest AS release
+FROM maritime-intel-base:2.1.0 AS release
 
 COPY services/data_ingestor/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt

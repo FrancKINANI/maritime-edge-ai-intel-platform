@@ -5,7 +5,7 @@ services:
       context: .
       dockerfile: docker/base/Dockerfile
       target: release
-    image: maritime-intel-base:latest
+    image: maritime-intel-base:2.1.0
     container_name: maritime-base-builder
     # This service exists only to build the base image as a dependency.
     # All downstream services depend on it so docker-compose builds base first.

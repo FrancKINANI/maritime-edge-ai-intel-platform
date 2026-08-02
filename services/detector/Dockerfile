@@ -3,12 +3,12 @@
 # Build stage compiles deps, runtime stage is minimal
 # =============================================================================
 
-FROM maritime-intel-base:latest AS builder
+FROM maritime-intel-base:2.1.0 AS builder
 
 COPY services/detector/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-FROM maritime-intel-base:latest AS release
+FROM maritime-intel-base:2.1.0 AS release
 
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin

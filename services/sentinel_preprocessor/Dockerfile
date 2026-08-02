@@ -3,7 +3,7 @@
 # Uses multi-stage to keep final image small
 # =============================================================================
 
-FROM maritime-intel-base:latest AS builder
+FROM maritime-intel-base:2.1.0 AS builder
 
 # GDAL is needed at build time for rasterio compilation
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -14,7 +14,7 @@ COPY services/sentinel_preprocessor/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Runtime stage — GDAL runtime only (no dev headers)
-FROM maritime-intel-base:latest AS release
+FROM maritime-intel-base:2.1.0 AS release
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gdal-bin \
