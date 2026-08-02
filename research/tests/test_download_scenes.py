@@ -9,7 +9,7 @@ _TOOLS_DIR = (
 )
 sys.path.insert(0, str(_TOOLS_DIR))
 
-import download_scenes
+import download_scenes  # noqa: E402  (module moved; path injected above)
 
 SCENE_A = "S1A_IW_GRDH_1SDV_20240107T064657_20240107T064719_051997_06488E_B2F9"
 SCENE_B = "S1D_IW_GRDH_1SDV_20260711T061903_20260711T061928_003622_00673D_224C"
