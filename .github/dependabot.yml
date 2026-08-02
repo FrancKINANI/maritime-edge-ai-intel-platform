@@ -34,3 +34,12 @@ updates:
     labels:
       - "dependencies"
       - "ci"
+    # NOTE: `versioning-strategy` only supports `auto` for github-actions
+    # (any other value fails configuration validation). To prevent major
+    # bumps that previously broke CI (checkout@v4 -> v7), ignore semver-major
+    # updates for the actions that must stay on a tested major version.
+    ignore:
+      - dependency-name: "actions/checkout"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "actions/setup-python"
+        update-types: ["version-update:semver-major"]
