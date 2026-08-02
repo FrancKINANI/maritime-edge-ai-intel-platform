@@ -244,6 +244,22 @@ docker compose -f docker-compose.demo.yml up --build
 
 ---
 
+### JSON Output Summary — The 3 Operational Modes
+
+Whatever mode the operator uses, the dashboard renders each result as a
+**JSON payload** (plus a human-readable success/error banner). Below are the
+exact fields returned by each mode's backing endpoint.
+
+| Mode | Backing endpoint | JSON output fields |
+| :--- | :--- | :--- |
+| **1 — Upload** (`.npy` tile) | `POST /detect` (detector) | `event_id`, `scene_id`, `timestamp`, `tile_id`, `tile_bbox_latlon`, `detections[]` (`x1,y1,x2,y2,confidence`), `vessel_count`, `dark_vessel_count`, `priority_level` (`LOW/MEDIUM/HIGH/CRITICAL`), `zone` (`Z1/Z2/Z3`), `satellite_id`, `satellite_position`, `preprocessing_pipeline` (`A-E`), `processing_time_ms` |
+| **1 — Upload** (raw `.zip/.SAFE/.tiff`) | `POST /preprocess` → `POST /detect` | Preprocessor result (`tiles[]`, `valid_tiles`, `processing_time_s`…) then one `DetectionEvent` per tile (first 5 shown) |
+| **2 — Satellite Query** | `GET /position` (satellite-monitor) | `satellite_id`, `name`, `timestamp`, `lat`, `lon`, `alt_m`, `tle_source` (`satnogs`/`celestrak`/`cache`), `tle_cached_at`, `tle_fresh` |
+| **3 — Continuous Monitoring** | `GET /stats` (aggregator) | `{"by_zone": {Z1: n, …}, "by_priority": {MEDIUM: n, …}}` |
+| **3 — Continuous Monitoring** | `GET /events` (aggregator) | Array of `DetectionEvent` (filters: `since`, `zone`, `priority`) rendered as a table (`event_id`, `zone`, `priority`, `vessels`, `dark`, `time`) |
+
+---
+
 ## Docker
 
 ### Base Image
