@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "maritime-intelligence-platform"
-version = "2.0.0"
+version = "2.1.0"
 description = "Maritime Edge AI Intelligence Platform - Real-time vessel detection from Sentinel-1 SAR imagery"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -89,14 +89,10 @@ ignore = [
 "tests/**" = ["S101", "S311"]
 "shared/**" = ["S310"]
 # Research scripts: long lines tolerated for HTML/CSS templates, SVG, URLs
-"research/scripts/analyze_domain_shift.py" = ["E501"]
-"research/scripts/cvat_fallback_validator.py" = ["E501"]
 "research/scripts/visualize_samples.py" = ["E501"]
 "research/scripts/benchmark_pipeline.py" = ["E501"]
 "research/scripts/build_finetune_dataset.py" = ["E501"]
 "research/scripts/export_colab_dataset.py" = ["E501"]
-"research/scripts/compare_platform_distributions.py" = ["E501"]
-"research/scripts/annotation_server.py" = ["E501", "S104"]
 "services/data_ingestor/tools/download_scenes.py" = ["E501"]
 "services/data_ingestor/tools/gfw_annotations.py" = ["E501"]
 "services/sentinel_preprocessor/tools/sar_preprocessing.py" = ["E501"]

@@ -18,7 +18,6 @@ import json
 import logging
 import sys
 import time
-from datetime import datetime
 from pathlib import Path
 
 # Add project root for CLI usage (4 levels up from services/sentinel_preprocessor/tools/)

@@ -109,7 +109,7 @@ def process_scene(
 
     start = time.perf_counter()
     out_tiles = []
-    for idx, t in enumerate(tiles):
+    for _idx, t in enumerate(tiles):
         npy_path = Path(t["npy_path"])
         if not npy_path.exists():
             # Fall back to reconstructing the path inside src_dir

@@ -47,6 +47,7 @@ logger = logging.getLogger("fix_bbox_sizes")
 TILE_SIZE = 512
 RNG_SEED = 42
 DEFAULT_ANNOTATIONS_ROOT = Path("research/data/annotations")
+ANNOTATIONS_ROOT = DEFAULT_ANNOTATIONS_ROOT
 
 
 # ---------------------------------------------------------------------------
@@ -332,7 +333,7 @@ def main():
     if args.dry_run:
         logger.info("[DRY-RUN] Running fix without writing...")
 
-    fix_all_scenes(dry_run=args.dry_run)
+    fix_all_scenes(annotations_root=DEFAULT_ANNOTATIONS_ROOT, dry_run=args.dry_run)
 
     # Step 3: Verify fix
     if not args.dry_run:

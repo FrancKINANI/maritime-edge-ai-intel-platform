@@ -29,7 +29,7 @@ A high-performance microservice platform for **real-time maritime vessel detecti
 ### Key Features
 
 - **Real SAR data**: Ingests real Sentinel-1 IW GRDH scenes (not simulated)
-- **4 preprocessing pipelines**: A (raw), B (Sigma0), C (Sigma0+Lee), D (full chain)
+- **5 preprocessing pipelines**: A (raw), B (Sigma0), C (Sigma0+Lee), D (full chain), E (MVSSD-enhanced)
 - **INT8 quantized detection**: YOLOv8 ONNX with NMS post-processing
 - **GCP georeferencing**: Pixel-to-(lat,lon) via RegularGridInterpolator (zero error at control points)
 - **AIS ground truth**: GFW API v3 integration for vessel presence and dark vessel detection
@@ -155,7 +155,7 @@ docker compose -f docker-compose.demo.yml up --build
 |----------|--------|-------------|
 | `/ingest` | POST | Trigger ingestion (501 - in development) |
 | `/status/{job_id}` | GET | Ingestion job status (501 - in development) |
-| `/products` | GET | List available Sentinel-1 products (501 - in development) |
+| `/products` | GET | Search Sentinel-1 products on the CDSE catalogue (bbox + date range) |
 | `/health` | GET | Service health |
 
 **Image**: `maritime-intelligence-platform-data-ingestor`
@@ -168,11 +168,11 @@ docker compose -f docker-compose.demo.yml up --build
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/preprocess` | POST | Run SAR pipeline (A/B/C/D) on a `.SAFE` product |
+| `/preprocess` | POST | Run SAR pipeline (A/B/C/D/E) on a `.SAFE` product |
 | `/pipelines` | GET | List available pipelines with descriptions |
 | `/health` | GET | Service health |
 
-**Pipelines:** A (Raw), B (Sigma0), C (Sigma0+Lee), D (Full chain - default)
+**Pipelines:** A (Raw), B (Sigma0), C (Sigma0+Lee), D (Full chain - default), E (MVSSD: CLAHE + Gaussian Blur + Median Blur)
 
 **Image**: `maritime-intelligence-platform-sentinel-preprocessor`
 
@@ -315,11 +315,8 @@ Optional region overrides: `ALGERIA_MED_BBOX`, `MAURITANIA_ATL_BBOX`, etc.
 ### Local Python Setup
 
 ```bash
-python3.11 -m venv .venv
-source .venv/bin/activate
-# or with uv:
 uv venv && source .venv/bin/activate
-pip install -r research/requirements.txt
+uv sync --extra research   # base deps + research extras (scipy, psutil, tqdm, python-dotenv)
 ```
 
 ### Linting & SAST
@@ -343,29 +340,30 @@ make clean    # Clean generated tiles/scenes/results + coverage
 
 ## Testing
 
-**111 tests** across service tests, integration tests, research tests, and dashboard tests:
+**122 tests** (115 passed, 7 skipped — skipped need network credentials) across service, integration, research, and dashboard tests:
 
 ```bash
 # Run all tests
 make test-all
 
 # Run specific suites
-make test-services      # 43 service tests
-make test-integration   # 9 integration tests (4 skipped for missing deps)
-make test-dashboard     # 6 ground dashboard tests
+make test-services      # Service tests (all microservices)
+make test-integration   # Integration tests (E2E + security)
+make test-dashboard     # Ground dashboard tests
 ```
 
 ### Test Organization
 
 ```
-shared/tests/                    # 21 tests — Pydantic schemas (BoundingBox, DetectionEvent, etc.)
-services/data-ingestor/tests/   # 13 tests — FastAPI endpoints + sentinel fetcher
-services/aggregator/tests/      # 8 tests — Zone classification
-services/detector/tests/        # 7 tests — NMS, xywh2xyxy
-services/satellite-monitor/tests/  # 2 tests — TLE fallback
-services/sentinel-preprocessor/tests/ # 13 tests — SAR preprocessing, GCP georeferencing
-tests/integration/              # 13 tests — End-to-end pipeline, security (4 skipped)
-tests/ground_dashboard/          # 6 tests — Dashboard utility functions
+shared/tests/                         # 21 tests — Pydantic schemas (BoundingBox, DetectionEvent, etc.)
+services/data_ingestor/tests/        # 16 tests — FastAPI endpoints + CDSE search + sentinel fetcher
+services/aggregator/tests/           # 8 tests — Zone classification
+services/detector/tests/             # 7 tests — NMS, xywh2xyxy
+services/satellite_monitor/tests/    # 17 tests — TLE fallback + SGP4 position
+services/sentinel_preprocessor/tests/# 13 tests — SAR preprocessing, GCP georeferencing
+services/ground_dashboard/tests/     # 6 tests — Dashboard utility functions
+research/tests/                      # 21 tests — GFW annotations, GCP cross-impl, download scenes
+tests/integration/                   # 13 tests — End-to-end pipeline, security (4 skipped)
 ```
 
 ### Test Suites Details
@@ -373,13 +371,14 @@ tests/ground_dashboard/          # 6 tests — Dashboard utility functions
 | Suite | Tests | Description |
 |-------|-------|-------------|
 | `shared/tests/` | 21 | BoundingBox, DetectionEvent, IngestRequest, TLEData schemas |
-| `services/data-ingestor/tests/` | 13 | `/health`, `/ingest`, credential resolution |
+| `services/data_ingestor/tests/` | 16 | `/health`, `/products`, credential resolution, CDSE search |
 | `services/aggregator/tests/` | 8 | Zone classification (Z1/Z2/Z3, edges, invalid) |
-| `services/detector/tests/` | 7 | NMS, xywh2xyxy converison |
-| `services/satellite-monitor/tests/` | 2 | SatNOGS + Celestrak fallback |
-| `services/sentinel-preprocessor/tests/` | 13 | Calibration, Lee filter, dB, GCP georeferencer |
-| `tests/integration/` | 9+4 skipped | Data flow, schema, TLE delegation, security |
-| `tests/ground_dashboard/` | 6 | URL formatting, BBox validation, mode parsing |
+| `services/detector/tests/` | 7 | NMS, xywh2xyxy conversion |
+| `services/satellite_monitor/tests/` | 17 | SatNOGS + Celestrak fallback + SGP4 position |
+| `services/sentinel_preprocessor/tests/` | 13 | Calibration, Lee filter, dB, GCP georeferencer |
+| `services/ground_dashboard/tests/` | 6 | URL formatting, BBox validation, mode parsing |
+| `research/tests/` | 21 | GFW annotations, GCP cross-impl, download scenes |
+| `tests/integration/` | 13 (4 skipped) | Data flow, schema, TLE delegation, security |
 
 ### Coverage
 
@@ -431,10 +430,16 @@ make clean              # Clean build artifacts + coverage
 ```
 .
 ├── README.md
+├── CHANGELOG.md                     # Version history
+├── CONTRIBUTING.md                  # Contribution guidelines
+├── DEPLOYMENT.md                    # Production deployment guide
+├── LICENSE                          # MIT license
+├── SECURITY.md                      # Security policy & reporting
 ├── docker-compose.yml              # Production compose (7 services)
 ├── docker-compose.demo.yml         # Demo compose with base image build
 ├── .github/workflows/ci.yml        # CI: lint + SAST + test matrix + coverage
 ├── Makefile                        # Build, test, lint, sast targets
+├── pyproject.toml                  # Project metadata, Ruff, pytest config
 ├── pytest.ini                      # Pytest configuration
 ├── .env.example                    # Environment template
 │
@@ -451,20 +456,27 @@ make clean              # Clean build artifacts + coverage
 │   └── tests/                      #   Schema unit tests (21 tests)
 │
 ├── research/                       # Research & scientific validation
-│   ├── scripts/                    #   CDSE download, SAR preprocessing, GFW, benchmark
+│   ├── scripts/                    #   Reproduction pipeline (dataset build, traceability,
+│   │                               #   Colab export, benchmark, sample visualization)
 │   ├── tests/                      #   Research test suites
 │   └── notebooks/                  #   Colab pipeline notebooks
 │
 ├── services/                       # Microservices
 │   ├── data_ingestor/              #   CDSE ingestion (:8001)
+│   │   └── tools/                  #     download_scenes.py, gfw_annotations.py
 │   ├── sentinel_preprocessor/      #   SAR preprocessing (:8000)
+│   │   └── tools/                  #     sar_preprocessing.py, process_all_scenes.py,
+│   │                               #     apply_mvssd_ops.py
 │   ├── detector/                   #   YOLOv8 ONNX inference (:8003)
 │   ├── satellite_monitor/          #   TLE/SGP4 satellite tracking (:8004)
 │   ├── aggregator/                 #   Event enrichment + persistence (:8002)
 │   └── ground_dashboard/           #   Streamlit UI (:8501)
 │
+├── tools/                          # Cross-cutting utilities
+│   └── maintenance/                #   fix_bbox_sizes.py
+│
 ├── tests/                          # Cross-service test suites
 │   └── integration/                #   End-to-end + security tests
 │
-└── docker-compose.yml              # Production compose (7 services)
+└── docs/                           # Internal documentation (kept local, gitignored)
 ```
