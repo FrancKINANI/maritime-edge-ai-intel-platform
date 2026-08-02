@@ -9,7 +9,7 @@ Inputs:
     Query parameters: bounding box, date range
 
 Outputs:
-    Downloaded and extracted .SAFE folders in research/data/scenes/
+    Downloaded and extracted .SAFE folders in <data_dir>/scenes/
     manifest.json with scene metadata
 
 This module implements OData API interactions with CDSE, Keycloak authentication,
@@ -245,7 +245,7 @@ def check_ais_coverage_before_download(
             # The residual bug was that the len(data[field]) > 0 check could produce
             # a false positive on a nested empty response (entries[0][dataset_key] structure).
             # By normalizing first, we correctly handle the nested structure.
-            from research.scripts.gfw_annotations import _normalize_response_entries
+            from .gfw_annotations import _normalize_response_entries
 
             normalized = _normalize_response_entries(data)
             if normalized and len(normalized) > 0:
@@ -817,7 +817,7 @@ def build_ais_density_map(
     Returns:
         Dict with 'cells' (sorted by count descending), 'total_positions', etc.
     """
-    from research.scripts.gfw_annotations import _extract_lat_lon, _normalize_response_entries
+    from .gfw_annotations import _extract_lat_lon, _normalize_response_entries
 
     lon_min, lat_min, lon_max, lat_max = bbox
     end = datetime.now(UTC).date()
@@ -929,7 +929,7 @@ def build_ais_density_map(
 #
 # Layout (one trace per scene, never a shared parent-level file):
 #
-#   research/data/scenes/
+#   <data_dir>/scenes/
 #     <SCENE_ID>.SAFE/
 #       manifest.safe
 #       target_trace.json          ← always INSIDE the .SAFE folder
@@ -959,9 +959,7 @@ def resolve_safe_dir(scenes_dir: Path, product_name: str) -> Path | None:
     scene_id = _normalize_scene_id(product_name)
     candidates = [
         scenes_dir / f"{scene_id}.SAFE",
-        scenes_dir / f"{product_name}.SAFE"
-        if not product_name.endswith(".SAFE")
-        else scenes_dir / product_name,
+        scenes_dir / f"{product_name}.SAFE" if not product_name.endswith(".SAFE") else scenes_dir / product_name,
         scenes_dir / product_name,
     ]
     for candidate in candidates:
@@ -1130,7 +1128,7 @@ def select_and_download_scenes_from_density(
         token: CDSE authentication token
         density_map: Result of build_ais_density_map()
         n_scenes: Maximum number of scenes to download
-        output_dir: Output directory (default: research/data/scenes/)
+        output_dir: Output directory (default: <data_dir>/scenes/)
         username: CDSE username (for token refresh during long downloads)
         password: CDSE password
 

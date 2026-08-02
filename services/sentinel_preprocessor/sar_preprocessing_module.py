@@ -12,9 +12,10 @@ from typing import Any
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 
-# Reuse the robust windowed pipeline implementation from research when available.
+# Reuse the robust windowed pipeline implementation from the service tools
+# directory (moved here during the production reorg) when available.
 try:
-    from research.scripts.sar_preprocessing import (
+    from services.sentinel_preprocessor.tools.sar_preprocessing import (
         _lee_filter_windowed,
         process_safe_windowed,
     )
@@ -236,7 +237,8 @@ def calibrate_sigma0(data: np.ndarray, calibration_lut: np.ndarray) -> np.ndarra
     """Simple radiometric calibration: DN^2 / calibration_lut^2
 
     The full, memory-efficient CalibrationLUT-based interpolation is available
-    in `research.scripts.sar_preprocessing.CalibrationLUT`. This function performs
+    in `services.sentinel_preprocessor.tools.sar_preprocessing.CalibrationLUT`.
+    This function performs
     pointwise calibration for already-aligned arrays.
     """
     cal_safe = np.where(calibration_lut == 0, 1e-10, calibration_lut)
@@ -321,6 +323,17 @@ def pipeline_c(safe_path: str, output_dir: str | None = None) -> dict[str, Any]:
 def pipeline_d(safe_path: str, output_dir: str | None = None) -> dict[str, Any]:
     if _HAS_research:
         return process_safe_windowed(safe_path, "D", output_dir or "data/tiles")
+    raise NotImplementedError("research implementation not available in workspace")
+
+
+def pipeline_e(safe_path: str, output_dir: str | None = None) -> dict[str, Any]:
+    """Pipeline E: Pipeline D + MVSSD enhancement ops (CLAHE, blur, median).
+
+    Reuses the windowed research implementation. Same output layout and
+    metadata.json format as the other pipelines.
+    """
+    if _HAS_research:
+        return process_safe_windowed(safe_path, "E", output_dir or "data/tiles")
     raise NotImplementedError("research implementation not available in workspace")
 
 

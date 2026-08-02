@@ -122,12 +122,13 @@ def test_mode_parsing():
 
 def test_pipeline_selection_options():
     """Test that pipeline selection matches expected values."""
-    pipelines = ["A", "B", "C", "D"]
+    pipelines = ["A", "B", "C", "D", "E"]
     pipeline_descriptions = {
         "A": "Raw — no calibration",
         "B": "Sigma0 — calibration only",
         "C": "Sigma0 + Lee — calibration + speckle filter",
         "D": "Sigma0 + Lee + Log dB — full chain",
+        "E": "D + MVSSD ops (CLAHE + blur)",
     }
 
     for pipeline in pipelines:

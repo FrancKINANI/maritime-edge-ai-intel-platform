@@ -40,6 +40,7 @@ PREPROCESSING_PIPELINES: dict[str, str] = {
     "B": "sigma0",
     "C": "sigma0_lee",
     "D": "sigma0_lee_log",
+    "E": "sigma0_lee_log_mvssd",
 }
 
 # Orbital tracking constants
@@ -63,5 +64,5 @@ MAX_TEST_SCENES: int = 5  # Strict test batch size
 
 # Benchmark constants
 NODATA_THRESHOLD: float = 0.30  # Max NoData ratio to keep a tile
-PIPELINES: list[str] = ["A", "B", "C", "D"]
+PIPELINES: list[str] = ["A", "B", "C", "D", "E"]
 POLARIZATION: str = "vv"

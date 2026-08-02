@@ -2,7 +2,12 @@ import json
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+# download_scenes moved from research/scripts/ to services/data_ingestor/tools/
+# during the production reorg.
+_TOOLS_DIR = (
+    Path(__file__).resolve().parents[2] / "services" / "data_ingestor" / "tools"
+)
+sys.path.insert(0, str(_TOOLS_DIR))
 
 import download_scenes
 

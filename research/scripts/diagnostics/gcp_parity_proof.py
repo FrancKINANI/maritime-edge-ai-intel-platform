@@ -33,8 +33,7 @@ print("SUCCESS: Service module loaded via importlib")
 
 ServiceGCPGeoreferencer = mod.GCPGeoreferencer
 
-# 2. Import research implementation
-from research.scripts.sar_preprocessing import (  # noqa: E402
+from services.sentinel_preprocessor.tools.sar_preprocessing import (  # noqa: E402
     GCPGeoreferencer as researchGCPGeoreferencer,
 )
 

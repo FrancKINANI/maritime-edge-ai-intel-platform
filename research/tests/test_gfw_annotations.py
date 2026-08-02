@@ -13,13 +13,16 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from research.scripts.gfw_annotations import GFWClient, _normalize_response_entries
+from services.data_ingestor.tools.gfw_annotations import (
+    GFWClient,
+    _normalize_response_entries,
+)
 
 
 @pytest.fixture
 def mock_gfw_client():
     """Create a GFW client with mocked HTTP requests."""
-    with patch("research.scripts.gfw_annotations._request_with_retry") as mock_req:
+    with patch("services.data_ingestor.tools.gfw_annotations._request_with_retry") as mock_req:
         client = GFWClient("test_token_12345")  # noqa: S105
         yield client, mock_req
 
@@ -199,8 +202,8 @@ def test_search_vessels(mock_gfw_client):
 def test_gfw_client_retry_logic():
     """Test that client implements retry logic for transient errors."""
     with (
-        patch("research.scripts.gfw_annotations.time.sleep") as mock_sleep,
-        patch("research.scripts.gfw_annotations.httpx.Client") as mock_client,
+        patch("services.data_ingestor.tools.gfw_annotations.time.sleep") as mock_sleep,
+        patch("services.data_ingestor.tools.gfw_annotations.httpx.Client") as mock_client,
     ):
         mock_client_instance = MagicMock()
         mock_client.return_value.__enter__.return_value = mock_client_instance

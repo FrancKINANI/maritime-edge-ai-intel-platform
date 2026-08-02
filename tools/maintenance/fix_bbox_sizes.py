@@ -22,13 +22,13 @@ Fix (Option B):
 
 Usage:
     # Fix all scenes in-place
-    uv run python phase_post0/fix_bbox_sizes.py
+    uv run python tools/maintenance/fix_bbox_sizes.py
 
     # Dry-run: show distribution without modifying files
-    uv run python phase_post0/fix_bbox_sizes.py --dry-run
+    uv run python tools/maintenance/fix_bbox_sizes.py --dry-run
 
     # Only analyze current distribution
-    uv run python phase_post0/fix_bbox_sizes.py --analyze
+    uv run python tools/maintenance/fix_bbox_sizes.py --analyze
 """
 
 import argparse
@@ -46,8 +46,7 @@ logger = logging.getLogger("fix_bbox_sizes")
 
 TILE_SIZE = 512
 RNG_SEED = 42
-
-ANNOTATIONS_ROOT = Path("research/data/annotations")
+DEFAULT_ANNOTATIONS_ROOT = Path("research/data/annotations")
 
 
 # ---------------------------------------------------------------------------
@@ -260,8 +259,12 @@ def fix_scene_labels(scene_dir: Path, rng: random.Random, dry_run: bool = False)
     return modified
 
 
-def fix_all_scenes(dry_run: bool = False) -> int:
+def fix_all_scenes(annotations_root: Path, dry_run: bool = False) -> int:
     """Fix bbox sizes in all scenes.
+
+    Args:
+        annotations_root: Path to annotations directory
+        dry_run: If True, show what would be changed without modifying files
 
     Returns total boxes modified.
     """
@@ -269,7 +272,7 @@ def fix_all_scenes(dry_run: bool = False) -> int:
     total_modified = 0
     fixed_scenes = []
 
-    for scene_dir in sorted(ANNOTATIONS_ROOT.iterdir()):
+    for scene_dir in sorted(annotations_root.iterdir()):
         if not scene_dir.is_dir() or scene_dir.name.startswith("."):
             continue
 

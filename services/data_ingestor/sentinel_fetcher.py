@@ -7,7 +7,8 @@ Helper interface containing download and API query functions to fetch files from
 import os
 from typing import Any
 
-from research.scripts.download_scenes import (
+# The downloader/annotator scripts live in this service's tools/ directory.
+from services.data_ingestor.tools.download_scenes import (
     download_product,
     get_cdse_token,
     search_sentinel1_products,

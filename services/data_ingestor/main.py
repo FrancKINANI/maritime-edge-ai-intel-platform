@@ -10,6 +10,7 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException, status
 
+from services.data_ingestor import sentinel_fetcher
 from shared.config import SecretsValidationError, validate_service_secrets
 from shared.schemas.events import IngestRequest
 
@@ -70,6 +71,10 @@ async def list_available_products(
 ) -> list[dict[str, Any]]:
     """Lists Sentinel-1 products matching search criteria from Copernicus Data Space.
 
+    Queries the CDSE OData catalog (metadata only — no downloads). Returns the
+    matching Sentinel-1 IW GRDH products with their id, name, acquisition date,
+    size and footprint.
+
     Args:
         bbox (str): Comma-separated bbox coordinates (lon_min,lat_min,lon_max,lat_max).
         date_start (str): Start date string (ISO8601).
@@ -78,10 +83,24 @@ async def list_available_products(
     Returns:
         List[Dict[str, Any]]: Metadata list of products.
     """
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Product listing queries are not yet implemented.",
-    )
+    try:
+        coords = [float(x.strip()) for x in bbox.split(",")]
+    except (ValueError, AttributeError) as e:
+        raise HTTPException(
+            status_code=422, detail=f"bbox must be 4 comma-separated numbers: {e}"
+        ) from e
+    if len(coords) != 4:
+        raise HTTPException(status_code=422, detail="bbox must contain exactly 4 values")
+
+    try:
+        return sentinel_fetcher.search_cdse_odata(coords, date_start, date_end)
+    except ValueError as e:
+        raise HTTPException(status_code=503, detail=f"CDSE unavailable: {e}") from e
+    except Exception as e:
+        logger.error("CDSE product search failed: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=502, detail=f"CDSE product search failed: {e}"
+        ) from e
 
 
 @app.get("/health", response_model=dict[str, str])

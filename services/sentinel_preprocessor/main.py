@@ -54,8 +54,8 @@ async def preprocess_scene(
     if pipeline is None or pipeline == "":
         pipeline = "D"
     pipeline = str(pipeline).upper()
-    if pipeline not in ["A", "B", "C", "D"]:
-        raise HTTPException(status_code=400, detail="pipeline must be one of A/B/C/D")
+    if pipeline not in ["A", "B", "C", "D", "E"]:
+        raise HTTPException(status_code=400, detail="pipeline must be one of A/B/C/D/E")
 
     if output_dir is None:
         # Save under shared/data/tiles by default
@@ -69,8 +69,10 @@ async def preprocess_scene(
             result = sar_preprocessing.pipeline_b(safe_path, output_dir)
         elif pipeline == "C":
             result = sar_preprocessing.pipeline_c(safe_path, output_dir)
-        else:
+        elif pipeline == "D":
             result = sar_preprocessing.pipeline_d(safe_path, output_dir)
+        else:
+            result = sar_preprocessing.pipeline_e(safe_path, output_dir)
     except NotImplementedError as e:
         raise HTTPException(status_code=501, detail=str(e)) from e
     except Exception as e:

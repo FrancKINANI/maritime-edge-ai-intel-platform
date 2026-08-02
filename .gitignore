@@ -10,6 +10,11 @@
 /research/results/*
 !/shared/models/.gitkeep
 
+# --- Documentation ---
+# Ignore all documentation except README.md
+!README.md
+/docs/*
+
 # --- Python ---
 **/__pycache__/
 **/*.pyc

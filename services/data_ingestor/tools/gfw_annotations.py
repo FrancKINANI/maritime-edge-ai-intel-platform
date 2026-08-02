@@ -1,4 +1,4 @@
-"""Global Fishing Watch annotation pipeline for research.
+"""Global Fishing Watch annotation pipeline for data ingestion.
 
 This module builds scene-level annotations by querying the Global Fishing
 Watch API for SAR detections, AIS vessel presence, and AIS-off / dark vessel

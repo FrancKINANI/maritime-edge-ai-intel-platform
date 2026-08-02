@@ -10,6 +10,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY services/aggregator/ /app/services/aggregator/
 COPY shared/ /app/shared/
 
+# Ensure the sqlite data directory is writable by the non-privileged user
+RUN mkdir -p /app/services/aggregator/data && chown -R appuser:appgroup /app/services/aggregator/data
+
 USER appuser
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

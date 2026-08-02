@@ -26,18 +26,18 @@ Architecture:
     - Windowed processing: Read → process → write → free
     - Explicit memory management: del + gc.collect()
 
-Note on GCP duplication:
-    GCP logic intentionally duplicated (no research<->services dependency).
+Note on GCP implementation:
+    GCP logic is shared with sar_preprocessing_module.py in the same service.
     The GCPGeoreferencer and GCPOutOfBoundsError classes below are a standalone
-    copy from services/sentinel_preprocessor/sar_preprocessing.py.
+    copy from the main preprocessing module.
     ASSUMED RISK: any bug fix here must be manually replicated
     in the other file (and vice versa).
 """
 
-# Note on GCP duplication:
-# GCP logic intentionally duplicated (no research<->services dependency).
+# Note on GCP implementation:
+# GCP logic is shared with sar_preprocessing_module.py in the same service.
 # The GCPGeoreferencer and GCPOutOfBoundsError classes below are a standalone
-# copy from services/sentinel_preprocessor/sar_preprocessing.py.
+# copy from the main preprocessing module.
 # ASSUMED RISK: any bug fix here must be manually replicated
 # in the other file (and vice versa).
 
@@ -58,7 +58,7 @@ except ImportError:
     rasterio = None  # type: ignore
     Window = None  # type: ignore
 from scipy.interpolate import RegularGridInterpolator
-from scipy.ndimage import uniform_filter
+from scipy.ndimage import gaussian_filter, median_filter, uniform_filter
 from tqdm import tqdm
 
 # Configure logging
@@ -114,7 +114,7 @@ class GCPGeoreferencer:
 
     VALIDATED PROPERTY:
         Interpolation error at GCP control points is EXACTLY ZERO
-        (machine precision verified in research/tests/test_gcp_interpolation.py).
+        (machine precision verified in services/sentinel_preprocessor/tests/).
 
     NOT VALIDATED:
         Behavior when a requested pixel falls beyond the last recorded GCP.
@@ -561,7 +561,7 @@ def _apply_pipeline_to_window(
         clipped = np.clip(db, -30.0, 0.0)
         result = ((clipped + 30.0) / 30.0 * 255.0).astype(np.uint8)
 
-    elif pipeline_name == "D":
+    elif pipeline_name in ("D", "E"):
         # Pipeline D: Full chain with histogram equalization
         dn_squared = (
             np.maximum(data**2 - noise_lut_window, 0) if noise_lut_window is not None else data**2
@@ -590,10 +590,98 @@ def _apply_pipeline_to_window(
         equalized = np.interp(stretched.flatten(), bins[:-1], cdf_normalized)
         result = equalized.reshape(stretched.shape).astype(np.uint8)
 
+        if pipeline_name == "E":
+            # Pipeline E: Pipeline D + MVSSD enhancement ops.
+            # Mirrors the albumentations config used during MVSSD fine-tuning
+            # (CLAHE, Gaussian Blur, Median Blur), applied deterministically.
+            result = _apply_mvssd_enhancement(result)
+
     else:
         raise ValueError(f"Unknown pipeline: {pipeline_name}")
 
     return result
+
+
+def _apply_mvssd_enhancement(tile_uint8: np.ndarray) -> np.ndarray:
+    """Apply MVSSD-style enhancement ops to a uint8 tile (CLAHE, blur, median).
+
+    Deterministic re-implementation of the albumentations pipeline used during
+    MVSSD fine-tuning:
+        Blur(p=0.01, blur_limit=(3, 7)),
+        MedianBlur(p=0.01, blur_limit=(3, 7)),
+        CLAHE(p=0.01, clip_limit=(1.0, 4.0), tile_grid_size=(8, 8))
+
+    Uses numpy/scipy only (no cv2 dependency) so it runs identically in the
+    microservice containers. Order matches apply_mvssd_ops.py
+    (CLAHE -> Gaussian blur -> median blur).
+    """
+    out = tile_uint8
+    out = _clahe_numpy(out, clip_limit=4.0, tile_grid_size=8)
+    # cv2 GaussianBlur(k=5, sigma=0) -> sigma ~= 1.1
+    out = gaussian_filter(out, sigma=1.1).astype(np.uint8)
+    out = median_filter(out, size=5)
+    return np.ascontiguousarray(out, dtype=np.uint8)
+
+
+def _clahe_numpy(
+    image: np.ndarray, clip_limit: float = 4.0, tile_grid_size: int = 8
+) -> np.ndarray:
+    """Contrast Limited Adaptive Histogram Equalization (pure numpy).
+
+    Equivalent to cv2.createCLAHE(clipLimit=..., tileGridSize=(n, n)).apply().
+    Histograms are clipped per tile, then remapped with bilinear interpolation
+    between neighbouring tiles (standard CLAHE behaviour).
+    """
+    img = np.asarray(image, dtype=np.uint8)
+    h, w = img.shape
+    n = max(1, int(tile_grid_size))
+    tile_h = max(1, h // n)
+    tile_w = max(1, w // n)
+    pad_h = n * tile_h - h
+    pad_w = n * tile_w - w
+    if pad_h > 0 or pad_w > 0:
+        img = np.pad(img, ((0, pad_h), (0, pad_w)), mode="edge")
+        h, w = img.shape
+
+    # Per-tile clipped histograms -> CDFs
+    tiles = img.reshape(n, tile_h, n, tile_w).transpose(0, 2, 1, 3)  # (n, n, th, tw)
+    clip = max(1, int(clip_limit * tile_h * tile_w / 256.0))
+    cdfs = np.zeros((n, n, 256), dtype=np.float32)
+    for i in range(n):
+        for j in range(n):
+            hist = np.bincount(tiles[i, j].ravel(), minlength=256).astype(np.float32)
+            excess = float(np.sum(np.maximum(hist - clip, 0)))
+            hist = np.minimum(hist, clip)
+            hist += excess / 256.0
+            cdf = np.cumsum(hist)
+            denom = cdf[-1] - cdf[0]
+            if denom > 0:
+                cdf = (cdf - cdf[0]) / denom * 255.0
+            cdfs[i, j] = cdf
+
+    # Tile-space coordinates with safe clamping to [0, n-2] for interpolation
+    ys = np.arange(h) / tile_h - 0.5
+    xs = np.arange(w) / tile_w - 0.5
+    iy0 = np.clip(np.floor(ys).astype(int), 0, n - 2)
+    ix0 = np.clip(np.floor(xs).astype(int), 0, n - 2)
+    fy = np.clip(ys - iy0, 0.0, 1.0)
+    fx = np.clip(xs - ix0, 0.0, 1.0)
+
+    vals = img.astype(np.int32)
+    c00 = cdfs[iy0[:, None], ix0[None, :], vals]
+    c01 = cdfs[iy0[:, None], ix0[None, :] + 1, vals]
+    c10 = cdfs[iy0[:, None] + 1, ix0[None, :], vals]
+    c11 = cdfs[iy0[:, None] + 1, ix0[None, :] + 1, vals]
+    w00 = (1 - fy)[:, None] * (1 - fx)[None, :]
+    w01 = (1 - fy)[:, None] * fx[None, :]
+    w10 = fy[:, None] * (1 - fx)[None, :]
+    w11 = fy[:, None] * fx[None, :]
+
+    out = w00 * c00 + w01 * c01 + w10 * c10 + w11 * c11
+    out = np.clip(out, 0, 255).astype(np.uint8)
+    if pad_h > 0 or pad_w > 0:
+        out = out[: h - pad_h, : w - pad_w]
+    return out
 
 
 def _lee_filter_windowed(data: np.ndarray, kernel_size: int = 5) -> np.ndarray:
@@ -989,8 +1077,8 @@ def main() -> None:
     parser.add_argument(
         "--pipeline",
         default="D",
-        choices=["A", "B", "C", "D"],
-        help="Preprocessing pipeline (default: D)",
+        choices=["A", "B", "C", "D", "E"],
+        help="Preprocessing pipeline (default: D). E = D + MVSSD enhancement ops",
     )
     parser.add_argument(
         "--polarization",

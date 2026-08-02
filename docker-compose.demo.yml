@@ -106,7 +106,7 @@ services:
       dockerfile: services/data_ingestor/Dockerfile
     container_name: maritime-ingestor-demo
     ports:
-      - "8001:8000"
+      - "8001:8001"
     environment:
       - DEMO_MODE=true
     volumes:
@@ -118,7 +118,7 @@ services:
       maritime-base:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/health\")'"]
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8001/health\")'"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -136,6 +136,7 @@ services:
       - DETECTOR_URL=http://detector:8000
       - SATMON_URL=http://satellite-monitor:8000
       - DEMO_MODE=true
+      - HOME=/tmp
     volumes:
       - ./shared:/app/shared
     networks:

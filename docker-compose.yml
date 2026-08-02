@@ -142,6 +142,7 @@ services:
       - DETECTOR_URL=http://detector:8000
       - SATMON_URL=http://satellite-monitor:8000
       - PREPROCESSOR_URL=http://sentinel-preprocessor:8000
+      - HOME=/tmp
     volumes:
       - ./shared:/app/shared
     networks:

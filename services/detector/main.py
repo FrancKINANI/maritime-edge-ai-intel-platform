@@ -78,26 +78,36 @@ app = FastAPI(
 
 
 def preprocess_tile(tile: np.ndarray, target_size: int = constants.MODEL_INPUT_SIZE) -> np.ndarray:
-    # Accept single-channel or multi-channel; convert to 3-channel float32 and resize
+    """Convert a tile to a NCHW float32 batch for the ONNX model.
+
+    The model expects (1, 3, H, W) in [0, 1]. Tiles are converted to
+    3-channel HWC, resized to target_size, normalized, then transposed to CHW.
+    """
     if tile.dtype != np.float32:
         tile = tile.astype(np.float32)
     if tile.ndim == 2:
         tile = np.stack([tile, tile, tile], axis=2)
-    # resize with simple numpy (nearest) if needed
     h, w, c = tile.shape
     if h != target_size or w != target_size:
-        tile = np.array(
-            np.stack(
-                [np.resize(tile[:, :, ch], (target_size, target_size)) for ch in range(c)], axis=2
-            ),
-            dtype=np.float32,
-        )
-        tile = np.transpose(tile, (1, 2, 0))
+        # True nearest-neighbor resize per channel (np.repeat, then crop).
+        # NOTE: np.resize would tile the flattened array (mosaic artifact);
+        # this scales each channel with an integer upscale factor + center crop.
+        resized = np.zeros((target_size, target_size, c), dtype=np.float32)
+        for ch in range(c):
+            ch_tile = tile[:, :, ch]
+            scale_y = max(1, int(np.ceil(target_size / h)))
+            scale_x = max(1, int(np.ceil(target_size / w)))
+            up = np.repeat(np.repeat(ch_tile, scale_y, axis=0), scale_x, axis=1)
+            # Center crop to target size
+            y0 = max(0, (up.shape[0] - target_size) // 2)
+            x0 = max(0, (up.shape[1] - target_size) // 2)
+            resized[:, :, ch] = up[y0 : y0 + target_size, x0 : x0 + target_size]
+        tile = resized
     # normalize 0..1
     tile = (tile - tile.min()) / (tile.max() - tile.min() + 1e-6)
-    # HWC -> CHW
-    tile = np.transpose(tile, (2, 0, 1))
-    tile = np.expand_dims(tile, axis=0)
+    # HWC -> NCHW batch
+    tile = np.transpose(tile, (2, 0, 1))  # (C, H, W)
+    tile = np.expand_dims(tile, axis=0)  # (1, C, H, W)
     return tile
 
 
@@ -174,34 +184,49 @@ async def detect_vessels(req: DetectRequest) -> DetectionEvent:
     except Exception as e:
         logger.error(f"ONNX runtime error during inference: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Model inference error") from e
-    # YOLOv8 style output: (1, n, 85) or list
+    # MRSSD YOLOv8 output: (1, 5, 8400) = [cx, cy, w, h, obj_conf] (single class)
     preds = outputs[0]
-    preds = np.squeeze(preds)
-    boxes = []
-    scores = []
-    conf_thresh = 0.25
-    for row in preds:
-        conf = float(row[4])
-        if conf < conf_thresh:
-            continue
-        # xywh + class scores
-        xywh = row[0:4]
-        class_conf = float(np.max(row[5:])) if row.shape[0] > 5 else 0.0
-        score = conf * class_conf if class_conf > 0 else conf
-        xyxy = xywh2xyxy(xywh)
-        boxes.append(xyxy)
-        scores.append(score)
+    preds = np.squeeze(preds)  # (5, 8400)
+    if preds.ndim == 2 and preds.shape[0] == 5:
+        boxes = []
+        scores = []
+        conf_thresh = 0.25
+        for i in range(preds.shape[1]):
+            cx, cy, bw, bh, conf = preds[:, i]
+            conf = float(conf)
+            if conf < conf_thresh:
+                continue
+            xyxy = xywh2xyxy((float(cx), float(cy), float(bw), float(bh)))
+            boxes.append(xyxy)
+            scores.append(conf)
+    else:
+        # Fallback: generic (N, 4+1+classes) row format
+        boxes = []
+        scores = []
+        conf_thresh = 0.25
+        for row in preds:
+            conf = float(row[4])
+            if conf < conf_thresh:
+                continue
+            xywh = row[0:4]
+            class_conf = float(np.max(row[5:])) if row.shape[0] > 5 else 0.0
+            score = conf * class_conf if class_conf > 0 else conf
+            xyxy = xywh2xyxy(xywh)
+            boxes.append(xyxy)
+            scores.append(score)
     keep = nms(boxes, scores)
     detections: list[BoundingBox] = []
+    h, w = tile.shape[0], tile.shape[1]
+    # Model coordinates are in input-image pixels (MODEL_INPUT_SIZE x MODEL_INPUT_SIZE).
+    # Rescale them back to the original tile size.
+    scale_x = w / constants.MODEL_INPUT_SIZE
+    scale_y = h / constants.MODEL_INPUT_SIZE
     for i in keep:
         x1, y1, x2, y2 = boxes[i]
-        # scale back to original tile size
-        h, w = tile.shape[0], tile.shape[1]
-        # preds assumed normalized to 0..1 or to input size; try to rescale
-        x1_pix = max(0.0, x1 * w)
-        y1_pix = max(0.0, y1 * h)
-        x2_pix = min(w, x2 * w)
-        y2_pix = min(h, y2 * h)
+        x1_pix = max(0.0, x1 * scale_x)
+        y1_pix = max(0.0, y1 * scale_y)
+        x2_pix = min(w, x2 * scale_x)
+        y2_pix = min(h, y2 * scale_y)
         detections.append(
             BoundingBox(
                 x1=float(x1_pix),

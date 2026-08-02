@@ -2,12 +2,12 @@
 process_all_scenes.py — Batch preprocessing for all downloaded Sentinel-1 scenes.
 
 Usage (from notebook or CLI):
-    python process_all_scenes.py --scenes-dir research/data/scenes --tiles-dir research/data/tiles
+    python process_all_scenes.py --scenes-dir <data_dir>/scenes --tiles-dir <data_dir>/tiles
 
 This script:
 1. Finds all downloaded scenes in scenes_dir
-2. For each scene that doesn't already have tiles in tiles_dir:
-   - Runs process_safe_windowed(pipeline="D")
+2. For each scene that doesn't already have tiles for the requested pipeline:
+   - Runs process_safe_windowed(pipeline=<A|B|C|D>)
    - Injects traceability metadata into metadata.json
 
 Prerequisite:
@@ -20,6 +20,11 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
+
+# Add project root for CLI usage (4 levels up from services/sentinel_preprocessor/tools/)
+_project_root = str(Path(__file__).resolve().parent.parent.parent.parent)
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -36,16 +41,20 @@ def find_scenes(scenes_dir: Path) -> list[Path]:
     return valid
 
 
-def tile_dir_for_scene(scene_path: Path, tiles_dir: Path) -> Path:
-    """Return the expected tile output directory for a scene."""
-    # Use the scene stem (no .SAFE)
+def tile_dir_for_scene(scene_path: Path, tiles_dir: Path, pipeline: str = "D") -> Path:
+    """Return the expected tile output directory for a scene.
+
+    Tiles are stored under ``tiles_dir/<scene>/<pipeline>/`` so that each
+    preprocessing pipeline has its own isolated output tree.
+    """
+    # Use the scene stem (no .SAFE) + pipeline subdirectory
     stem = scene_path.stem
-    return tiles_dir / stem / "D"
+    return tiles_dir / stem / pipeline
 
 
-def scene_already_processed(scene_path: Path, tiles_dir: Path) -> bool:
+def scene_already_processed(scene_path: Path, tiles_dir: Path, pipeline: str = "D") -> bool:
     """Check if a scene has already been processed into tiles."""
-    td = tile_dir_for_scene(scene_path, tiles_dir)
+    td = tile_dir_for_scene(scene_path, tiles_dir, pipeline)
     if not td.exists():
         return False
     # Check for metadata.json and at least some .npy files
@@ -56,10 +65,10 @@ def scene_already_processed(scene_path: Path, tiles_dir: Path) -> bool:
     return len(npy_files) > 0
 
 
-def inject_traceability(scene_path: Path, tiles_dir: Path) -> None:
+def inject_traceability(scene_path: Path, tiles_dir: Path, pipeline: str = "D") -> None:
     """Propagate target_trace.json fields into the tile metadata.json."""
     trace_path = scene_path / "target_trace.json"
-    td = tile_dir_for_scene(scene_path, tiles_dir)
+    td = tile_dir_for_scene(scene_path, tiles_dir, pipeline)
     meta_path = td / "metadata.json"
 
     if not trace_path.exists():
@@ -95,7 +104,7 @@ def process_scene(scene_path: Path, tiles_dir: Path, pipeline: str = "D") -> dic
 
     Returns a dict with status, tile_count, and processing_time.
     """
-    from research.scripts.sar_preprocessing import process_safe_windowed
+    from .sar_preprocessing import process_safe_windowed
 
     start = time.time()
     scene_name = scene_path.name
@@ -122,12 +131,13 @@ def process_scene(scene_path: Path, tiles_dir: Path, pipeline: str = "D") -> dic
         tile_count = result
 
     # Inject traceability metadata
-    inject_traceability(scene_path, tiles_dir)
+    inject_traceability(scene_path, tiles_dir, pipeline)
 
     logger.info(f"  Done: {scene_name} — {tile_count} tiles in {elapsed:.1f}s")
     return {
         "scene": scene_name,
         "status": "ok",
+        "pipeline": pipeline,
         "tile_count": tile_count,
         "processing_time_s": round(elapsed, 1),
     }
@@ -158,7 +168,7 @@ def process_all_scenes(
     results = []
 
     for scene_path in scenes:
-        if not force and scene_already_processed(scene_path, tiles_dir):
+        if not force and scene_already_processed(scene_path, tiles_dir, pipeline):
             logger.info(f"  Skipping {scene_path.name} (already processed)")
             results.append({
                 "scene": scene_path.name,
@@ -190,18 +200,39 @@ def process_all_scenes(
 def main():
     import argparse
     parser = argparse.ArgumentParser(description="Batch SAR preprocessing for all scenes")
-    parser.add_argument("--scenes-dir", default="research/data/scenes", help="Scenes directory")
-    parser.add_argument("--tiles-dir", default="research/data/tiles", help="Tiles output directory")
-    parser.add_argument("--pipeline", default="D", help="SAR pipeline name")
+    parser.add_argument("--scenes-dir", default="research/data/scenes", help="Scenes directory (default: research/data/scenes)")
+    parser.add_argument("--tiles-dir", default="research/data/tiles", help="Tiles output directory (default: research/data/tiles)")
+    parser.add_argument("--pipeline", default="D", help="SAR pipeline name (A/B/C/D/E)")
     parser.add_argument("--force", action="store_true", help="Re-process already processed scenes")
+    parser.add_argument("--scene", default=None, help="Process only this scene name (optional)")
     parser.add_argument("--summary", action="store_true", help="Print JSON summary")
     args = parser.parse_args()
 
-    results = process_all_scenes(
-        Path(args.scenes_dir),
-        Path(args.tiles_dir),
-        args.pipeline,
-        force=args.force,
+    # Filter to a single scene when requested
+    scenes = find_scenes(Path(args.scenes_dir))
+    if args.scene:
+        scenes = [s for s in scenes if s.stem == args.scene]
+        if not scenes:
+            raise SystemExit(f"Scene {args.scene} not found in {args.scenes_dir}")
+        logger.info(f"Restricted to {len(scenes)} scene: {args.scene}")
+
+    results = []
+    for scene_path in scenes:
+        if not args.force and scene_already_processed(scene_path, Path(args.tiles_dir), args.pipeline):
+            logger.info(f"  Skipping {scene_path.name} (already processed)")
+            results.append({"scene": scene_path.name, "status": "skipped", "tile_count": 0})
+            continue
+        results.append(process_scene(scene_path, Path(args.tiles_dir), args.pipeline))
+
+    ok = sum(1 for r in results if r["status"] == "ok")
+    failed = sum(1 for r in results if r["status"] == "failed")
+    total_tiles = sum(r.get("tile_count", 0) for r in results)
+    logger.info(
+        f"\n{'='*50}\n"
+        f"PROCESSING SUMMARY\n"
+        f"  Total scenes: {len(results)}  |  OK: {ok}  Failed: {failed}\n"
+        f"  Total tiles generated: {total_tiles}\n"
+        f"{'='*50}"
     )
 
     if args.summary:

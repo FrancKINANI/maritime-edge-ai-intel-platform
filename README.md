@@ -466,11 +466,5 @@ make clean              # Clean build artifacts + coverage
 ├── tests/                          # Cross-service test suites
 │   └── integration/                #   End-to-end + security tests
 │
-├── docs/                           # Documentation
-│   ├── pdf/                        #   Research papers & reports
-│   ├── docx/                       #   Word documents
-│   ├── pics/                       #   Architecture diagrams
-│   └── QA.md                       #   GFW data QA analysis
-│
 └── docker-compose.yml              # Production compose (7 services)
 ```

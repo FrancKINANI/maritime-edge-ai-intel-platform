@@ -52,9 +52,11 @@ def render_upload_mode() -> None:
     - **C: Sigma0 + Lee** — Calibration + adaptive speckle filtering (radar multiplicative noise)
     - **D: Sigma0 + Lee + Log dB** — Full chain with log compression, main candidate
     undergoing scientific validation (Phase 0 — result not yet definitive)
+    - **E: D + MVSSD ops** — Pipeline D enhanced with CLAHE + Gaussian/Median blur,
+    matching the augmentation applied to the MVSSD fine-tuning dataset
     """
     st.markdown(pipeline_help)
-    pipeline = st.selectbox("Select pipeline", options=["A", "B", "C", "D"], index=3)
+    pipeline = st.selectbox("Select pipeline", options=["A", "B", "C", "D", "E"], index=4)
 
     if uploaded is not None:
         data = uploaded.read()

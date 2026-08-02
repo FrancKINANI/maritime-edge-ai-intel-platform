@@ -7,7 +7,7 @@ Tests coverage:
   - /health endpoint
   - /ingest endpoint (501 Not Implemented)
   - /status/{job_id} endpoint (501 Not Implemented)
-  - /products endpoint (501 Not Implemented)
+  - /products endpoint (CDSE catalog search, mocked)
   - Request validation
 
 NOTE: Uses importlib to load the module because the directory name
@@ -19,6 +19,7 @@ from __future__ import annotations
 import importlib.util
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -95,18 +96,74 @@ class TestStatusEndpoint:
 
 
 class TestProductsEndpoint:
-    """Tests for the /products endpoint."""
+    """Tests for the /products endpoint (CDSE catalog search, mocked)."""
 
-    def test_products_returns_501(self, client):
+    def test_products_returns_catalog_results(self, client):
+        mock_result = [
+            {
+                "id": "abc-123",
+                "name": "S1C_IW_GRDH_1SDV_20240101T060000_20240101T060025_000001_000000_0000",
+                "date": "2024-01-01T06:00:00.000Z",
+                "size": 1744830464,
+                "footprint": "POLYGON((...))",
+            }
+        ]
+        with patch(
+            "services.data_ingestor.sentinel_fetcher.search_cdse_odata",
+            return_value=mock_result,
+        ):
+            response = client.get(
+                "/products",
+                params={
+                    "bbox": "-10.0,32.0,-8.0,34.0",
+                    "date_start": "2024-01-01",
+                    "date_end": "2024-01-02",
+                },
+            )
+        assert response.status_code == 200
+        assert response.json() == mock_result
+
+    def test_products_cdse_unavailable(self, client):
+        with patch(
+            "services.data_ingestor.sentinel_fetcher.search_cdse_odata",
+            side_effect=ValueError("CDSE credentials not configured"),
+        ):
+            response = client.get(
+                "/products",
+                params={
+                    "bbox": "-10.0,32.0,-8.0,34.0",
+                    "date_start": "2024-01-01",
+                    "date_end": "2024-01-02",
+                },
+            )
+        assert response.status_code == 503
+        assert "CDSE" in response.json()["detail"]
+
+    def test_products_cdse_search_failure(self, client):
+        with patch(
+            "services.data_ingestor.sentinel_fetcher.search_cdse_odata",
+            side_effect=RuntimeError("catalog timeout"),
+        ):
+            response = client.get(
+                "/products",
+                params={
+                    "bbox": "-10.0,32.0,-8.0,34.0",
+                    "date_start": "2024-01-01",
+                    "date_end": "2024-01-02",
+                },
+            )
+        assert response.status_code == 502
+
+    def test_products_invalid_bbox(self, client):
         response = client.get(
             "/products",
             params={
-                "bbox": "-10.0,32.0,-8.0,34.0",
+                "bbox": "not-a-bbox",
                 "date_start": "2024-01-01",
                 "date_end": "2024-01-02",
             },
         )
-        assert response.status_code == 501
+        assert response.status_code == 422
 
     def test_products_missing_params(self, client):
         response = client.get("/products")

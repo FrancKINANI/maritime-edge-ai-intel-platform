@@ -33,7 +33,7 @@ def test_gcp_interpolation_zero_error_at_control_points():
         ]
     )
 
-    # Configure interpolator exactly as in research/scripts/sar_preprocessing.py
+    # Configure interpolator exactly as in services/sentinel_preprocessor/tools/sar_preprocessing.py
     interpolator = RegularGridInterpolator(
         (lines, pixels), values, method="linear", bounds_error=False, fill_value=None
     )
