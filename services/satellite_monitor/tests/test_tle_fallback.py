@@ -1,7 +1,7 @@
 """Unit tests for SatNOGS primary + Celestrak fallback TLE fetch.
 
 Engineering non-regression: empty SatNOGS response must trigger Celestrak,
-which is the acté solution for Sentinel-1A (NORAD 39634) data absence.
+which is the accepted solution when Sentinel-1A (NORAD 39634) data is absent.
 """
 
 from __future__ import annotations

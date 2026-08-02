@@ -76,11 +76,11 @@ def create_annotated_png(
 def generate_html(scenes_data: list[dict]) -> str:
     """Generate a self-contained HTML page."""
     html = """<!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Échantillons SAR — Pipeline D</title>
+<title>SAR Samples — Pipeline D</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -236,26 +236,26 @@ def generate_html(scenes_data: list[dict]) -> str:
 <body>
 
 <div class="header">
-  <h1>🛰️ Échantillons SAR — Pipeline D</h1>
-  <p>Tuiles Sentinel-1 GRD IW · Prétraitées (σ⁰ + Lee 5×5 + Histogram Equalization) · 512×512 px</p>
+  <h1>🛰️ SAR Samples — Pipeline D</h1>
+  <p>Sentinel-1 GRD IW tiles · Preprocessed (σ⁰ + Lee 5×5 + Histogram Equalization) · 512×512 px</p>
 </div>
 
 <div class="stats-row">
   <div class="stat-card">
     <div class="stat-value">2</div>
-    <div class="stat-label">Scènes S1D</div>
+    <div class="stat-label">S1D Scenes</div>
   </div>
   <div class="stat-card">
     <div class="stat-value">12,860</div>
-    <div class="stat-label">Tuiles .npy</div>
+    <div class="stat-label">.npy Tiles</div>
   </div>
   <div class="stat-card">
     <div class="stat-value">12,860</div>
-    <div class="stat-label">Images PNG</div>
+    <div class="stat-label">PNG Images</div>
   </div>
   <div class="stat-card">
     <div class="stat-value">3,321</div>
-    <div class="stat-label">Annotations AIS</div>
+    <div class="stat-label">AIS Annotations</div>
   </div>
 </div>
 """
@@ -264,9 +264,9 @@ def generate_html(scenes_data: list[dict]) -> str:
 <div class="scene-section">
   <div class="scene-title">📡 {sd["scene_id"][:50]}…</div>
   <div class="scene-meta">
-    <span class="badge"><strong>Tuiles:</strong> {sd["n_tiles"]:,}</span>
+    <span class="badge"><strong>Tiles:</strong> {sd["n_tiles"]:,}</span>
     <span class="badge"><strong>Annotations:</strong> {sd["n_annotations"]:,}</span>
-    <span class="badge"><strong>Tuiles annotées:</strong> {sd["n_annotated_tiles"]}</span>
+    <span class="badge"><strong>Annotated tiles:</strong> {sd["n_annotated_tiles"]}</span>
     <span class="badge"><strong>AIS seeds:</strong> {sd["ais_seeds"]}</span>
     <span class="badge"><strong>BBox:</strong> {sd["bbox"]}</span>
   </div>
@@ -275,7 +275,7 @@ def generate_html(scenes_data: list[dict]) -> str:
         for tile in sd["samples"]:
             img_src = tile["img_rel"]
             has_ann = tile["n_annotations"] > 0
-            ann_label = f"{tile['n_annotations']} annotation(s)" if has_ann else "Aucune"
+            ann_label = f"{tile['n_annotations']} annotation(s)" if has_ann else "None"
             ann_class = "annotation-badge" if has_ann else "no-annotation"
             lon_min, lat_min, lon_max, lat_max = tile["geo_bbox"]
             html += f"""
@@ -295,7 +295,7 @@ def generate_html(scenes_data: list[dict]) -> str:
     html += """
 <div class="lightbox" id="lightbox" onclick="this.classList.remove('active')">
   <span class="close">&times;</span>
-  <img id="lightbox-img" src="" alt="Zoom">
+  <img id="lightbox-img" src="" alt="Zoom view">
 </div>
 
 <script>
@@ -417,8 +417,8 @@ def main():
     with open(html_path, "w") as f:
         f.write(html)
 
-    print(f"\n✅ Page générée: {html_path}")
-    print(f"📂 Ouvrir avec: file://{html_path.absolute()}")
+    print(f"\n✅ Page generated: {html_path}")
+    print(f"📂 Open with: file://{html_path.absolute()}")
 
 
 if __name__ == "__main__":
