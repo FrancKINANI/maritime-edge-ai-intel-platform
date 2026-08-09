@@ -36,7 +36,7 @@ folium==0.20.0
     #   streamlit-folium
 gitdb==4.0.12
     # via gitpython
-gitpython==3.1.54
+gitpython==3.1.58
     # via streamlit
 h11==0.16.0
     # via
