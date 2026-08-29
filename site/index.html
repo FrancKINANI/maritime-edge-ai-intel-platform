@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Maritime Edge AI Intelligence Platform by KSF Space Foundation — Real-time vessel detection from Sentinel-1 SAR satellite imagery using edge AI, YOLOv8 INT8 ONNX inference, and microservices architecture.">
+    <meta name="keywords" content="maritime AI, vessel detection, Sentinel-1 SAR, edge AI, KSF Space Foundation, YOLOv8, ONNX, dark vessel detection, maritime domain awareness, satellite surveillance">
+    <meta name="author" content="KSF Space Foundation — FrancKINANI">
+    <meta property="og:title" content="Maritime Edge AI Intelligence Platform — KSF Space Foundation">
+    <meta property="og:description" content="Real-time maritime vessel detection from Sentinel-1 SAR satellite imagery using orbital edge AI and YOLOv8 INT8 ONNX inference.">
+    <meta property="og:type" content="website">
+    <title>Maritime Edge AI Intelligence Platform — KSF Space Foundation</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- ===== NAVIGATION ===== -->
+    <nav class="navbar" id="navbar">
+        <div class="nav-container">
+            <a href="#hero" class="nav-logo">
+                <img src="images/ksf.space-logo-high.png" alt="KSF Space Foundation Logo" class="nav-logo-img">
+                <span class="logo-text">KSF Space <span class="logo-highlight">Maritime AI</span></span>
+            </a>
+            <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">☰</button>
+            <ul class="nav-links" id="navLinks">
+                <li><a href="#challenge">Challenge</a></li>
+                <li><a href="#sar">SAR Data</a></li>
+                <li><a href="#edge-ai">Edge AI</a></li>
+                <li><a href="#architecture">Architecture</a></li>
+                <li><a href="#detection">Detection</a></li>
+                <li><a href="#dashboard">Dashboard</a></li>
+                <li><a href="#conclusion">Conclusion</a></li>
+                <li><a href="#download" class="nav-cta">📄 Report</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- ===== HERO SECTION ===== -->
+    <header class="hero" id="hero">
+        <div class="hero-overlay"></div>
+        <div class="hero-content">
+            <div class="hero-badge">KSF Space Foundation — Internship Project</div>
+            <h1>Maritime Edge AI<br>Intelligence Platform</h1>
+            <p class="hero-subtitle">Real-time vessel detection from Sentinel-1 SAR satellite imagery using orbital edge AI and YOLOv8 INT8 ONNX inference</p>
+            <div class="hero-stats">
+                <div class="stat">
+                    <span class="stat-number">6</span>
+                    <span class="stat-label">Microservices</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number">122</span>
+                    <span class="stat-label">Tests</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number">5</span>
+                    <span class="stat-label">Pipelines</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-number">75%</span>
+                    <span class="stat-label">Model Compression</span>
+                </div>
+            </div>
+            <div class="hero-actions">
+                <a href="#architecture" class="btn btn-primary">Explore Architecture</a>
+                <a href="#download" class="btn btn-secondary">📄 Download Report</a>
+            </div>
+        </div>
+        <!-- Hero image placeholder -->
+        <div class="hero-image-placeholder">
+            <img src="images/ksf-space-maritime-edge-ai-intel-platform-architecture.svg" alt="Maritime Edge AI Intelligence Platform architecture diagram showing 6 microservices" loading="eager">
+        </div>
+    </header>
+
+    <!-- ===== SECTION 1: THE CHALLENGE ===== -->
+    <section class="section section-dark" id="challenge">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">01 — Problem Statement</span>
+                <h2>Redefining Maritime Domain Awareness</h2>
+                <p class="section-subtitle">Maritime domain awareness is the effective understanding of anything associated with the global maritime environment that could impact security, safety, economy, or the environment.</p>
+            </div>
+
+            <div class="content-grid">
+                <div class="content-text">
+                    <h3>Why Legacy Real-Time Vessel Monitoring Fails</h3>
+                    <p>Traditional <strong>real-time vessel monitoring</strong> relies heavily on the Automatic Identification System (AIS). AIS requires vessels to broadcast their GPS coordinates, identity, and heading. However, AIS is a cooperative technology — it relies on the compliance of the vessel's crew.</p>
+
+                    <div class="callout callout-warning">
+                        <span class="callout-icon">⚠️</span>
+                        <div>
+                            <strong>The Dark Vessel Problem</strong>
+                            <p>A "dark vessel" has disabled its AIS transponder, spoofed its location, or altered its transmission data. These vessels are frequently involved in illegal fishing, smuggling, and sanctions evasion.</p>
+                        </div>
+                    </div>
+
+                    <h3>The Bandwidth Bottleneck</h3>
+                    <p>Legacy satellites capture massive, uncompressed images and queue them for transmission to Earth. Because satellite downlink bandwidth is extremely narrow and ground station passes are limited to a few minutes per orbit, the delay between capturing an image and analyzing it can stretch from <strong>hours to days</strong>. This latency renders tactical intervention impossible.</p>
+                </div>
+
+                <div class="content-visual">
+                    <!-- Dark vessel detection image placeholder -->
+                    <div class="image-placeholder" id="img-dark-vessel">
+                        <img src="images/ksf-space-maritime-edge-ai-intel-platform-dark-vessel-detection.png"
+                             alt="Dark vessel detection — vessel detected by SAR but absent from AIS broadcasts"
+                             onerror="this.parentElement.classList.add('missing'); this.style.display='none';">
+                        <div class="placeholder-label">Dark Vessel Detection</div>
+                        <div class="placeholder-fallback">
+                            <span class="placeholder-icon">🚢</span>
+                            <span>ksf-space-maritime-edge-ai-intel-platform-dark-vessel-detection.png</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== SECTION 2: SAR DATA ===== -->
+    <section class="section section-light" id="sar">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">02 — Data Foundation</span>
+                <h2>Sentinel-1 SAR Satellite Imagery</h2>
+                <p class="section-subtitle">Optical satellites are blinded by clouds and ineffective at night. SAR provides the sensory foundation for true operational reliability.</p>
+            </div>
+
+            <div class="content-grid content-grid-reverse">
+                <div class="content-visual">
+                    <!-- SAR raw scene image placeholder -->
+                    <div class="image-placeholder" id="img-sar-raw">
+                        <img src="images/ksf-space-maritime-edge-ai-intel-platform-sar-raw-scene.png"
+                             alt="Raw Sentinel-1 SAR scene showing ocean surface with vessel reflections"
+                             onerror="this.parentElement.classList.add('missing'); this.style.display='none';">
+                        <div class="placeholder-label">Raw Sentinel-1 SAR Scene</div>
+                        <div class="placeholder-fallback">
+                            <span class="placeholder-icon">📡</span>
+                            <span>ksf-space-maritime-edge-ai-intel-platform-sar-raw-scene.png</span>
+                        </div>
+                    </div>
+
+                    <!-- Pipeline comparison image placeholder -->
+                    <div class="image-placeholder" id="img-pipeline" style="margin-top: 1.5rem;">
+                        <img src="images/ksf-space-maritime-edge-ai-intel-platform-pipeline-comparison.svg"
+                             alt="Comparison of 5 preprocessing pipelines A through E for Sentinel-1 SAR data"
+                             onerror="this.parentElement.classList.add('missing'); this.style.display='none';">
+                        <div class="placeholder-label">5 Preprocessing Pipelines (A–E)</div>
+                        <div class="placeholder-fallback">
+                            <span class="placeholder-icon">🔬</span>
+                            <span>ksf-space-maritime-edge-ai-intel-platform-pipeline-comparison.svg</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="content-text">
+                    <h3>Breaking Through Clouds: The Physics of SAR</h3>
+                    <p><strong>Sentinel-1 SAR satellite imagery</strong> is an active sensor. Instead of passively capturing reflected sunlight, the satellite emits its own microwave pulses and measures the backscatter.</p>
+                    <p>Microwaves pass directly through clouds, fog, and darkness. When pulses hit the ocean surface, water scatters the energy away, rendering the ocean as a dark, noisy background. When pulses hit the angular, metallic hull of a ship, the <strong>"corner reflector" effect</strong> causes the vessel to appear as a brilliant, high-intensity pixel cluster.</p>
+
+                    <h3>Polarization Strategies for Optimal Contrast</h3>
+                    <p>Cross-polarization (VH) dramatically suppresses background sea clutter generated by wind and waves, maximizing the <strong>signal-to-noise ratio</strong> of metallic vessels. This contrast makes the subsequent AI detection pipeline mathematically viable.</p>
+
+                    <h3>Integrating the Copernicus Data Space Ecosystem</h3>
+                    <p>The project utilizes the <strong>Copernicus Data Space Ecosystem</strong> as its primary data engineering pipeline. Diverse maritime datasets are extracted, audited, and converted into YOLO-compatible training assets — ensuring the AI learns from diverse sea states, viewing angles, and radar noise profiles.</p>
+
+                    <div class="feature-pills">
+                        <span class="pill">☁️ All-Weather</span>
+                        <span class="pill">🌙 Night-Capable</span>
+                        <span class="pill">📡 Active Sensor</span>
+                        <span class="pill">🌊 VH Polarization</span>
+                        <span class="pill">🔄 5 Pipelines</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== SECTION 3: EDGE AI ===== -->
+    <section class="section section-dark" id="edge-ai">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">03 — Innovation</span>
+                <h2>Edge AI for Maritime Surveillance</h2>
+                <p class="section-subtitle">Instead of downloading data, the platform uploads the intelligence. The most significant architectural innovation is where the computation happens.</p>
+            </div>
+
+            <!-- Orbital Edge Computing diagram -->
+            <div class="image-placeholder image-wide" id="img-architecture">
+                <img src="images/ksf-space-maritime-edge-ai-intel-platform-architecture.svg"
+                     alt="System architecture showing 6 microservices, Redis cache, and external API integrations"
+                     onerror="this.parentElement.classList.add('missing'); this.style.display='none';">
+                <div class="placeholder-label">System Architecture — 6 Microservices + Redis</div>
+                <div class="placeholder-fallback">
+                    <span class="placeholder-icon">🏗️</span>
+                    <span>ksf-space-maritime-edge-ai-intel-platform-architecture.svg</span>
+                </div>
+            </div>
+
+            <div class="constraints-grid">
+                <div class="constraint-card">
+                    <div class="constraint-icon">🌡️</div>
+                    <h4>Thermal</h4>
+                    <p>Without atmosphere to dissipate heat, heavy computation can overheat the satellite.</p>
+                </div>
+                <div class="constraint-card">
+                    <div class="constraint-icon">🔋</div>
+                    <h4>Power</h4>
+                    <p>Small solar panels impose tight power budgets, prohibiting power-hungry GPUs.</p>
+                </div>
+                <div class="constraint-card">
+                    <div class="constraint-icon">💻</div>
+                    <h4>Compute</h4>
+                    <p>Onboard processors are typically low-power, CPU-only systems.</p>
+                </div>
+                <div class="constraint-card">
+                    <div class="constraint-icon">📶</div>
+                    <h4>Bandwidth</h4>
+                    <p>The system must extract intelligence from GBs of imagery and transmit only KBs of metadata.</p>
+                </div>
+            </div>
+
+            <div class="content-grid">
+                <div class="content-text">
+                    <h3>The Paradigm Shift to Orbital Edge Computing</h3>
+                    <p><strong>Edge AI for maritime surveillance</strong> means executing machine learning inference directly on the satellite rather than on terrestrial servers. The AI extracts intelligence from gigabytes of SAR imagery and deletes the raw image, transmitting only a few kilobytes of metadata.</p>
+
+                    <h3>Microservices Architecture</h3>
+                    <p>The platform utilizes a microservices pipeline consisting of <strong>6 containerized stages</strong> running via Docker. These stages communicate asynchronously using a Redis publish/subscribe message broker.</p>
+
+                    <div class="callout callout-info">
+                        <span class="callout-icon">💡</span>
+                        <div>
+                            <strong>Onboard Reasoning</strong>
+                            <p>Low-value events (empty ocean, AIS-compliant vessels) trigger only a tiny metadata ping. High-value events (dark vessels in protected zones) trigger a secondary segmentation model, cropping the region of interest for richer visual payload transmission.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="content-visual">
+                    <!-- Satellite orbit image placeholder -->
+                    <div class="image-placeholder" id="img-satellite">
+                        <img src="images/ksf-space-maritime-edge-ai-intel-platform-satellite-orbit.png"
+                             alt="Sentinel-1A satellite ground track computed via SGP4 propagation"
+                             onerror="this.parentElement.classList.add('missing'); this.style.display='none';">
+                        <div class="placeholder-label">Sentinel-1A Ground Track (SGP4)</div>
+                        <div class="placeholder-fallback">
+                            <span class="placeholder-icon">🛰️</span>
+                            <span>ksf-space-maritime-edge-ai-intel-platform-satellite-orbit.png</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== SECTION 4: ARCHITECTURE (DEEP DIVE) ===== -->
+    <section class="section section-light" id="architecture">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">04 — Architecture</span>
+                <h2>Platform Architecture Deep Dive</h2>
+                <p class="section-subtitle">6 microservices orchestrated via Docker Compose with Redis shared cache and health checks.</p>
+            </div>
+
+            <!-- Data flow diagram -->
+            <div class="image-placeholder image-wide" id="img-dataflow">
+                <img src="images/ksf-space-maritime-edge-ai-intel-platform-data-flow.svg"
+                     alt="End-to-end data flow from satellite data ingestion through preprocessing, detection, enrichment, to dashboard display"
+                     onerror="this.parentElement.classList.add('missing'); this.style.display='none';">
+                <div class="placeholder-label">End-to-End Data Flow Pipeline</div>
+                <div class="placeholder-fallback">
+                    <span class="placeholder-icon">🔄</span>
+                    <span>ksf-space-maritime-edge-ai-intel-platform-data-flow.svg</span>
+                </div>
+            </div>
+
+            <div class="services-grid">
+                <div class="service-card">
+                    <div class="service-port">:8001</div>
+                    <h4>Data Ingestor</h4>
+                    <p>Searches and downloads Sentinel-1 products from the Copernicus Data Space Ecosystem.</p>
+                    <div class="service-endpoints">
+                        <code>GET /products</code>
+                        <code>POST /ingest</code>
+                    </div>
+                </div>
+                <div class="service-card">
+                    <div class="service-port">:8000</div>
+                    <h4>Sentinel Preprocessor</h4>
+                    <p>Radiometric calibration, speckle filtering, dB conversion, tiling, and GCP georeferencing.</p>
+                    <div class="service-endpoints">
+                        <code>POST /preprocess</code>
+                        <code>GET /pipelines</code>
+                    </div>
+                </div>
+                <div class="service-card">
+                    <div class="service-port">:8003</div>
+                    <h4>Detector</h4>
+                    <p>INT8-quantized YOLOv8 ONNX inference on preprocessed 512×512 .npy tiles.</p>
+                    <div class="service-endpoints">
+                        <code>POST /detect</code>
+                        <code>GET /health</code>
+                    </div>
+                </div>
+                <div class="service-card">
+                    <div class="service-port">:8004</div>
+                    <h4>Satellite Monitor</h4>
+                    <p>TLE caching and SGP4 satellite position computation with graceful fallback.</p>
+                    <div class="service-endpoints">
+                        <code>GET /tle/{id}</code>
+                        <code>GET /position</code>
+                    </div>
+                </div>
+                <div class="service-card">
+                    <div class="service-port">:8002</div>
+                    <h4>Aggregator</h4>
+                    <p>Zone classification, GFW AIS matching, event persistence, and statistics.</p>
+                    <div class="service-endpoints">
+                        <code>POST /events</code>
+                        <code>GET /stats</code>
+                    </div>
+                </div>
+                <div class="service-card">
+                    <div class="service-port">:8501</div>
+                    <h4>Ground Dashboard</h4>
+                    <p>Streamlit UI with 3 operational modes: Upload, Satellite Query, Monitoring.</p>
+                    <div class="service-endpoints">
+                        <code>Mode 1: Upload</code>
+                        <code>Mode 2: Query</code>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Zone classification diagram -->
+            <div class="image-placeholder image-wide" id="img-zones" style="margin-top: 3rem;">
+                <img src="images/ksf-space-maritime-edge-ai-intel-platform-zone-classification.svg"
+                     alt="Maritime zone classification — Z1 territorial waters, Z2 EEZ, Z3 high seas"
+                     onerror="this.parentElement.classList.add('missing'); this.style.display='none';">
+                <div class="placeholder-label">Maritime Zone Classification (Z1 / Z2 / Z3)</div>
+                <div class="placeholder-fallback">
+                    <span class="placeholder-icon">🌊</span>
+                    <span>ksf-space-maritime-edge-ai-intel-platform-zone-classification.svg</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== SECTION 5: DETECTION ENGINE ===== -->
+    <section class="section section-dark" id="detection">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">05 — Neural Engine</span>
+                <h2>YOLOv8 INT8 ONNX Inference</h2>
+                <p class="section-subtitle">The mathematical heart of the platform — extreme optimization for CPU-bound inference on CubeSat hardware.</p>
+            </div>
+
+            <div class="content-grid">
+                <div class="content-text">
+                    <h3>Maritime Vessel Detection with YOLOv8n</h3>
+                    <p>The platform utilizes <strong>YOLOv8n</strong> (You Only Look Once, version 8, nano) — an "anchor-free" architecture that predicts object centers directly, highly advantageous for satellite imagery where ships appear at any orientation and size.</p>
+
+                    <h3>The Physics of INT8 Quantization</h3>
+                    <div class="comparison-table">
+                        <div class="comparison-row comparison-header">
+                            <div>Property</div>
+                            <div>FP32 (Standard)</div>
+                            <div>INT8 (Optimized)</div>
+                        </div>
+                        <div class="comparison-row">
+                            <div>Bits per weight</div>
+                            <div>32 bits</div>
+                            <div class="highlight-green">8 bits</div>
+                        </div>
+                        <div class="comparison-row">
+                            <div>Memory footprint</div>
+                            <div>100%</div>
+                            <div class="highlight-green">25% (75% reduction)</div>
+                        </div>
+                        <div class="comparison-row">
+                            <div>Compute unit</div>
+                            <div>FPU (floating-point)</div>
+                            <div class="highlight-green">ALU (integer)</div>
+                        </div>
+                        <div class="comparison-row">
+                            <div>Runtime</div>
+                            <div>PyTorch (heavy)</div>
+                            <div class="highlight-green">ONNX Runtime (lightweight C++)</div>
+                        </div>
+                    </div>
+
+                    <div class="callout callout-success">
+                        <span class="callout-icon">✅</span>
+                        <div>
+                            <strong>Result</strong>
+                            <p>Despite compressing mathematical precision, the model retains high Mean Average Precision (mAP) for ship detection — proving INT8 ONNX inference is optimal for mission-oriented space edge computing.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="content-visual">
+                    <!-- Detection overlay image placeholder -->
+                    <div class="image-placeholder" id="img-detection">
+                        <img src="images/ksf-space-maritime-edge-ai-intel-platform-detection-overlay.png"
+                             alt="YOLOv8 detection overlay showing bounding boxes and confidence scores on SAR tile"
+                             onerror="this.parentElement.classList.add('missing'); this.style.display='none';">
+                        <div class="placeholder-label">Detection Overlay — Bounding Boxes + Confidence</div>
+                        <div class="placeholder-fallback">
+                            <span class="placeholder-icon">🔍</span>
+                            <span>ksf-space-maritime-edge-ai-intel-platform-detection-overlay.png</span>
+                        </div>
+                    </div>
+
+                    <!-- TLE fallback diagram -->
+                    <div class="image-placeholder" id="img-tle" style="margin-top: 1.5rem;">
+                        <img src="images/ksf-space-maritime-edge-ai-intel-platform-tle-fallback.svg"
+                             alt="TLE data source fallback chain — SatNOGS to Celestrak to stale cache with graceful degradation"
+                             onerror="this.parentElement.classList.add('missing'); this.style.display='none';">
+                        <div class="placeholder-label">TLE Fallback Chain — Graceful Degradation</div>
+                        <div class="placeholder-fallback">
+                            <span class="placeholder-icon">🛰️</span>
+                            <span>ksf-space-maritime-edge-ai-intel-platform-tle-fallback.svg</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== SECTION 6: DASHBOARD ===== -->
+    <section class="section section-light" id="dashboard">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">06 — Ground Station</span>
+                <h2>Ground Station Analytics & Dashboard</h2>
+                <p class="section-subtitle">Because the CubeSat has already done the heavy cognitive lifting, the ground station doesn't need supercomputers — just a Streamlit dashboard.</p>
+            </div>
+
+            <div class="dashboard-modes">
+                <div class="mode-card">
+                    <div class="mode-number">1</div>
+                    <h4>Upload Mode</h4>
+                    <p>Upload .npy tiles or raw .SAFE/.tiff SAR products. Pipeline selection (A–E). Direct detection or preprocess-then-detect.</p>
+                    <!-- Dashboard upload screenshot placeholder -->
+                    <div class="image-placeholder image-small">
+                        <img src="images/ksf-space-maritime-edge-ai-intel-platform-dashboard-upload.png"
+                             alt="Ground dashboard upload mode with file uploader and pipeline selector"
+                             onerror="this.parentElement.classList.add('missing'); this.style.display='none';">
+                        <div class="placeholder-fallback">
+                            <span class="placeholder-icon">📤</span>
+                            <span>dashboard-upload.png</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="mode-card">
+                    <div class="mode-number">2</div>
+                    <h4>Satellite Query</h4>
+                    <p>Query satellite position by NORAD ID (e.g. Sentinel-1A: 39634). Real-time SGP4 computation with TLE caching.</p>
+                    <!-- Dashboard satellite query screenshot placeholder -->
+                    <div class="image-placeholder image-small">
+                        <img src="images/ksf-space-maritime-edge-ai-intel-platform-dashboard-satellite-query.png"
+                             alt="Ground dashboard satellite query mode showing position results"
+                             onerror="this.parentElement.classList.add('missing'); this.style.display='none';">
+                        <div class="placeholder-fallback">
+                            <span class="placeholder-icon">🛰️</span>
+                            <span>dashboard-satellite-query.png</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="mode-card">
+                    <div class="mode-number">3</div>
+                    <h4>Continuous Monitoring</h4>
+                    <p>Real-time event list with zone and priority filters. Aggregated statistics by zone and priority level.</p>
+                    <!-- Dashboard monitoring screenshot placeholder -->
+                    <div class="image-placeholder image-small">
+                        <img src="images/ksf-space-maritime-edge-ai-intel-platform-dashboard-monitoring-events.png"
+                             alt="Ground dashboard continuous monitoring mode with filtered event list"
+                             onerror="this.parentElement.classList.add('missing'); this.style.display='none';">
+                        <div class="placeholder-fallback">
+                            <span class="placeholder-icon">📊</span>
+                            <span>dashboard-monitoring.png</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="callout callout-info" style="margin-top: 2rem;">
+                <span class="callout-icon">⚡</span>
+                <div>
+                    <strong>Latency: Days → Minutes</strong>
+                    <p>An analyst no longer spends hours squinting at raw Sentinel-1 SAR imagery. The dashboard immediately presents mission analytics: vessel coordinates, AIS correlation, dark vessel alerts, and segmented visual crops. A coast guard unit can dispatch interception immediately.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== SECTION 7: CI/CD & TESTING ===== -->
+    <section class="section section-dark" id="testing">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">07 — Quality</span>
+                <h2>Testing & CI/CD Pipeline</h2>
+                <p class="section-subtitle">122 tests across 9 suites, automated linting, SAST scanning, and 60% coverage threshold.</p>
+            </div>
+
+            <!-- CI/CD diagram -->
+            <div class="image-placeholder image-wide" id="img-cicd">
+                <img src="images/ksf-space-maritime-edge-ai-intel-platform-ci-pipeline.svg"
+                     alt="GitHub Actions CI/CD pipeline with 4 job stages — lint, structure, test matrix, coverage"
+                     onerror="this.parentElement.classList.add('missing'); this.style.display='none';">
+                <div class="placeholder-label">CI/CD Pipeline — GitHub Actions</div>
+                <div class="placeholder-fallback">
+                    <span class="placeholder-icon">🔧</span>
+                    <span>ksf-space-maritime-edge-ai-intel-platform-ci-pipeline.svg</span>
+                </div>
+            </div>
+
+            <div class="testing-grid">
+                <div class="test-stat-card">
+                    <div class="test-number">115</div>
+                    <div class="test-label">Tests Passed</div>
+                </div>
+                <div class="test-stat-card">
+                    <div class="test-number">7</div>
+                    <div class="test-label">Skipped (network)</div>
+                </div>
+                <div class="test-stat-card">
+                    <div class="test-number">0</div>
+                    <div class="test-label">Failed</div>
+                </div>
+                <div class="test-stat-card">
+                    <div class="test-number">60%</div>
+                    <div class="test-label">Min Coverage</div>
+                </div>
+            </div>
+
+            <!-- Test results screenshot placeholder -->
+            <div class="image-placeholder image-wide" id="img-tests" style="margin-top: 2rem;">
+                <img src="images/ksf-space-maritime-edge-ai-intel-platform-test-results.png"
+                     alt="Test results showing 115 passed tests across 9 suites"
+                     onerror="this.parentElement.classList.add('missing'); this.style.display='none';">
+                <div class="placeholder-label">Test Results — make test-all Output</div>
+                <div class="placeholder-fallback">
+                    <span class="placeholder-icon">🧪</span>
+                    <span>ksf-space-maritime-edge-ai-intel-platform-test-results.png</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== SECTION 8: CONCLUSION ===== -->
+    <section class="section section-light" id="conclusion">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">08 — Conclusion</span>
+                <h2>The Future of Maritime Edge AI Intelligence</h2>
+                <p class="section-subtitle">A profound leap in space-based surveillance — from data gathering to onboard reasoning.</p>
+            </div>
+
+            <div class="conclusion-content">
+                <p>The collaboration of the <strong>KSF Space Foundation</strong> and the architectural vision of the <strong>Maritime Edge AI Intelligence Platform</strong> demonstrates a profound leap in space-based surveillance.</p>
+
+                <p>By systematically addressing the bottlenecks of orbital observation — using SAR to bypass weather, engineering a microservices architecture for resilience, and utilizing INT8 quantization for CPU-bound inference — the platform solves the fundamental challenge of latency in the maritime domain.</p>
+
+                <div class="key-takeaways">
+                    <div class="takeaway">
+                        <span class="takeaway-icon">📡</span>
+                        <h4>SAR for All-Weather Detection</h4>
+                        <p>Microwaves penetrate clouds, fog, and darkness — guaranteed operational reliability.</p>
+                    </div>
+                    <div class="takeaway">
+                        <span class="takeaway-icon">🏗️</span>
+                        <h4>Microservices Resilience</h4>
+                        <p>6 containerized stages with Redis pub/sub ensure fault isolation and scalability.</p>
+                    </div>
+                    <div class="takeaway">
+                        <span class="takeaway-icon">⚡</span>
+                        <h4>INT8 Quantization</h4>
+                        <p>75% memory reduction with maintained accuracy — CPU-only inference on CubeSats.</p>
+                    </div>
+                    <div class="takeaway">
+                        <span class="takeaway-icon">🚢</span>
+                        <h4>Dark Vessel Detection</h4>
+                        <p>Physical detection cross-referenced with AIS — flagging non-cooperative vessels instantly.</p>
+                    </div>
+                </div>
+
+                <p class="conclusion-final">The focus is no longer on how much raw data a satellite can download, but on how much structural understanding it can synthesize in orbit. This shift from data-gathering to <strong>onboard reasoning</strong> is what will ultimately secure the oceans.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== DOWNLOAD SECTION ===== -->
+    <section class="section section-download" id="download">
+        <div class="container">
+            <div class="download-card">
+                <div class="download-icon">📄</div>
+                <h2>Download Full Report</h2>
+                <p>Get the complete written report as a PDF — covering architecture, implementation, testing, and findings.</p>
+                <a href="images/rapport_stage.pdf" class="btn btn-primary btn-large" download>
+                    📥 Download PDF Report
+                </a>
+                <p class="download-filename">ksf-space-maritime-edge-ai-intel-platform-report.pdf</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== FOOTER ===== -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <span class="footer-logo">🛰️</span>
+                    <div>
+                        <strong>KSF Space Foundation</strong>
+                        <p>Maritime Edge AI Intelligence Platform v2.1.0</p>
+                    </div>
+                </div>
+                <div class="footer-links">
+                    <a href="https://github.com/FrancKINANI/maritime-edge-ai-intel-platform" target="_blank">GitHub Repository</a>
+                    <a href="https://dataspace.copernicus.eu/" target="_blank">Copernicus Data Space</a>
+                    <a href="https://globalfishingwatch.org/" target="_blank">Global Fishing Watch</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>© 2026 KSF Space Foundation. Built by FrancKINANI. MIT License.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Mobile nav toggle
+        document.getElementById('navToggle').addEventListener('click', function() {
+            document.getElementById('navLinks').classList.toggle('active');
+        });
+
+        // Smooth scroll for nav links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function(e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    document.getElementById('navLinks').classList.remove('active');
+                }
+            });
+        });
+
+        // Navbar background on scroll
+        window.addEventListener('scroll', function() {
+            const navbar = document.getElementById('navbar');
+            if (window.scrollY > 50) {
+                navbar.classList.add('scrolled');
+            } else {
+                navbar.classList.remove('scrolled');
+            }
+        });
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 600" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <linearGradient id="bg3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a1628;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1a2744;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="land" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#65a30d;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4d7c0f;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="z1g" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#dc2626;stop-opacity:0.8" />
+      <stop offset="100%" style="stop-color:#b91c1c;stop-opacity:0.6" />
+    </linearGradient>
+    <linearGradient id="z2g" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#d97706;stop-opacity:0.6" />
+      <stop offset="100%" style="stop-color:#b45309;stop-opacity:0.4" />
+    </linearGradient>
+    <linearGradient id="z3g" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#2563eb;stop-opacity:0.4" />
+      <stop offset="100%" style="stop-color:#1d4ed8;stop-opacity:0.2" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1000" height="600" fill="url(#bg3)" rx="12"/>
+
+  <!-- Title -->
+  <text x="500" y="42" text-anchor="middle" fill="#f1f5f9" font-size="20" font-weight="bold">Maritime Zone Classification</text>
+  <text x="500" y="64" text-anchor="middle" fill="#94a3b8" font-size="12">Z1 (Territorial Waters) · Z2 (EEZ) · Z3 (High Seas)</text>
+
+  <!-- ===== COASTLINE (left side) ===== -->
+  <path d="M 80 100 Q 100 150, 90 200 Q 85 250, 100 300 Q 115 350, 95 400 Q 80 450, 90 500 L 80 500 L 80 100 Z" fill="url(#land)" stroke="#84cc16" stroke-width="2"/>
+  <text x="60" y="300" text-anchor="middle" fill="#ecfccb" font-size="14" font-weight="bold" transform="rotate(-90, 60, 300)">COASTLINE</text>
+
+  <!-- ZONE 3: High Seas (outermost) -->
+  <path d="M 100 80 Q 300 100, 500 80 L 500 520 Q 300 500, 100 520 Z" fill="url(#z3g)" stroke="#3b82f6" stroke-width="2" stroke-dasharray="8,4" opacity="0.7"/>
+  <text x="350" y="140" text-anchor="middle" fill="#93c5fd" font-size="16" font-weight="bold">Z3 — High Seas</text>
+  <text x="350" y="162" text-anchor="middle" fill="#60a5fa" font-size="12">Beyond 200 NM from coast</text>
+  <text x="350" y="180" text-anchor="middle" fill="#60a5fa" font-size="11">International waters — no national jurisdiction</text>
+
+  <!-- ZONE 2: EEZ (middle) -->
+  <path d="M 100 80 Q 220 100, 350 80 L 350 520 Q 220 500, 100 520 Z" fill="url(#z2g)" stroke="#f59e0b" stroke-width="2" stroke-dasharray="6,3" opacity="0.7"/>
+  <text x="215" y="260" text-anchor="middle" fill="#fcd34d" font-size="15" font-weight="bold">Z2 — EEZ</text>
+  <text x="215" y="282" text-anchor="middle" fill="#fbbf24" font-size="12">12–200 NM</text>
+  <text x="215" y="300" text-anchor="middle" fill="#fbbf24" font-size="11">Exclusive Economic Zone</text>
+  <text x="215" y="318" text-anchor="middle" fill="#fbbf24" font-size="10">Resource rights, fishing regulation</text>
+
+  <!-- ZONE 1: Territorial (innermost) -->
+  <path d="M 100 150 Q 145 170, 170 150 L 170 450 Q 145 430, 100 450 Z" fill="url(#z1g)" stroke="#ef4444" stroke-width="2.5" opacity="0.8"/>
+  <text x="135" y="340" text-anchor="middle" fill="#fecaca" font-size="14" font-weight="bold">Z1</text>
+  <text x="135" y="358" text-anchor="middle" fill="#fca5a5" font-size="11">Territorial</text>
+  <text x="135" y="374" text-anchor="middle" fill="#fca5a5" font-size="10">0–12 NM</text>
+
+  <!-- ===== DISTANCE MARKERS ===== -->
+  <!-- 12 NM marker -->
+  <line x1="170" y1="470" x2="170" y2="500" stroke="#ef4444" stroke-width="2"/>
+  <line x1="100" y1="500" x2="170" y2="500" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,2"/>
+  <text x="135" y="518" text-anchor="middle" fill="#fca5a5" font-size="10">12 NM</text>
+
+  <!-- 200 NM marker -->
+  <line x1="350" y1="470" x2="350" y2="500" stroke="#f59e0b" stroke-width="2"/>
+  <line x1="100" y1="500" x2="350" y2="500" stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="4,2"/>
+  <text x="225" y="518" text-anchor="middle" fill="#fbbf24" font-size="10">200 NM</text>
+
+  <!-- ===== RIGHT PANEL: Zone Details ===== -->
+  <rect x="560" y="90" width="420" height="470" rx="10" fill="#0f172a" fill-opacity="0.8" stroke="#334155" stroke-width="1"/>
+  <text x="770" y="120" text-anchor="middle" fill="#e2e8f0" font-size="16" font-weight="bold">Zone Properties</text>
+
+  <!-- Z1 details -->
+  <rect x="580" y="140" width="380" height="110" rx="8" fill="#7f1d1d" fill-opacity="0.5" stroke="#ef4444" stroke-width="1"/>
+  <circle cx="600" cy="165" r="12" fill="#ef4444"/>
+  <text x="600" y="170" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">1</text>
+  <text x="625" y="170" fill="#fecaca" font-size="13" font-weight="bold">Z1 — Territorial Waters</text>
+  <text x="600" y="194" fill="#fca5a5" font-size="11">Extent: 0–12 Nautical Miles from baseline</text>
+  <text x="600" y="212" fill="#fca5a5" font-size="11">Jurisdiction: Full national sovereignty</text>
+  <text x="600" y="230" fill="#fca5a5" font-size="11">Priority: HIGH / CRITICAL (border security)</text>
+  <text x="600" y="248" fill="#fca5a5" font-size="11">Enforcement: Coastal patrol, navy intercept</text>
+
+  <!-- Z2 details -->
+  <rect x="580" y="265" width="380" height="110" rx="8" fill="#78350f" fill-opacity="0.5" stroke="#f59e0b" stroke-width="1"/>
+  <circle cx="600" cy="290" r="12" fill="#f59e0b"/>
+  <text x="600" y="295" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">2</text>
+  <text x="625" y="295" fill="#fef3c7" font-size="13" font-weight="bold">Z2 — Exclusive Economic Zone</text>
+  <text x="600" y="319" fill="#fcd34d" font-size="11">Extent: 12–200 Nautical Miles from baseline</text>
+  <text x="600" y="337" fill="#fcd34d" font-size="11">Jurisdiction: Economic resource rights only</text>
+  <text x="600" y="355" fill="#fcd34d" font-size="11">Priority: MEDIUM (fishing regulation)</text>
+  <text x="600" y="373" fill="#fcd34d" font-size="11">Enforcement: Coast guard, fisheries patrol</text>
+
+  <!-- Z3 details -->
+  <rect x="580" y="390" width="380" height="110" rx="8" fill="#172554" fill-opacity="0.5" stroke="#3b82f6" stroke-width="1"/>
+  <circle cx="600" cy="415" r="12" fill="#3b82f6"/>
+  <text x="600" y="420" text-anchor="middle" fill="#fff" font-size="12" font-weight="bold">3</text>
+  <text x="625" y="420" fill="#dbeafe" font-size="13" font-weight="bold">Z3 — High Seas</text>
+  <text x="600" y="444" fill="#93c5fd" font-size="11">Extent: Beyond 200 NM from any baseline</text>
+  <text x="600" y="462" fill="#93c5fd" font-size="11">Jurisdiction: International law (UNCLOS)</text>
+  <text x="600" y="480" fill="#93c5fd" font-size="11">Priority: LOW / MEDIUM (monitoring)</text>
+  <text x="600" y="498" fill="#93c5fd" font-size="11">Enforcement: International cooperation</text>
+
+  <!-- Footer -->
+  <text x="500" y="588" text-anchor="middle" fill="#64748b" font-size="10">KSF Space Foundation · Maritime Edge AI Intelligence Platform v2.1.0</text>
+</svg>

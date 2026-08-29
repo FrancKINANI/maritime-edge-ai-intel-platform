@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="2026-08-29T00:00:00.000Z" agent="5.0" etag="" version="24.0.0" type="device">
+  <diagram id="dataflow" name="Data Flow Pipeline">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- ==================== TITLE ==================== -->
+        <mxCell id="title1" value="Data Flow — End-to-End Pipeline" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=20;fontStyle=1;fontColor=#f1f5f9;" vertex="1" parent="1">
+          <mxGeometry x="350" y="10" width="500" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="title2" value="Sentinel-1 SAR Imagery → Vessel Detection → Operator Dashboard" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=12;fontColor=#94a3b8;" vertex="1" parent="1">
+          <mxGeometry x="370" y="40" width="460" height="25" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== STEP 1: INGEST ==================== -->
+        <mxCell id="step1" value="&lt;b style=&quot;font-size:16px&quot;&gt;1&lt;/b&gt;&lt;br&gt;&lt;b&gt;INGEST&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#ddd6fe&quot;&gt;data-ingestor&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#c4b5fd&quot;&gt;:8001&lt;/font&gt;&lt;hr size=&quot;1&quot; color=&quot;#ffffff30&quot;&gt;&lt;font style=&quot;font-size:10px&quot;&gt;CDSE catalogue&lt;br&gt;search &amp; download&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#7c3aed;fontColor=#fff;strokeColor=#6d28d9;arcSize=15;fontSize=12;shadow=1;verticalAlign=top;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="30" y="90" width="180" height="160" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== STEP 2: PREPROCESS ==================== -->
+        <mxCell id="step2" value="&lt;b style=&quot;font-size:16px&quot;&gt;2&lt;/b&gt;&lt;br&gt;&lt;b&gt;PREPROCESS&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#bfdbfe&quot;&gt;sentinel-preprocessor&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#93c5fd&quot;&gt;:8000&lt;/font&gt;&lt;hr size=&quot;1&quot; color=&quot;#ffffff30&quot;&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Calibrate · Filter · dB&lt;br&gt;Tile · Georeference&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2563eb;fontColor=#fff;strokeColor=#1d4ed8;arcSize=15;fontSize=12;shadow=1;verticalAlign=top;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="280" y="90" width="200" height="160" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== STEP 3: DETECT ==================== -->
+        <mxCell id="step3" value="&lt;b style=&quot;font-size:16px&quot;&gt;3&lt;/b&gt;&lt;br&gt;&lt;b&gt;DETECT&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#a5f3fc&quot;&gt;detector&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#67e8f9&quot;&gt;:8003&lt;/font&gt;&lt;hr size=&quot;1&quot; color=&quot;#ffffff30&quot;&gt;&lt;font style=&quot;font-size:10px&quot;&gt;YOLOv8 INT8 ONNX&lt;br&gt;NMS · Bounding Boxes&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0891b2;fontColor=#fff;strokeColor=#0e7490;arcSize=15;fontSize=12;shadow=1;verticalAlign=top;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="550" y="90" width="200" height="160" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== STEP 4: ENRICH ==================== -->
+        <mxCell id="step4" value="&lt;b style=&quot;font-size:16px&quot;&gt;4&lt;/b&gt;&lt;br&gt;&lt;b&gt;ENRICH&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#a7f3d0&quot;&gt;aggregator&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#6ee7b7&quot;&gt;:8002&lt;/font&gt;&lt;hr size=&quot;1&quot; color=&quot;#ffffff30&quot;&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Zone · AIS · Priority&lt;br&gt;SQLite persistence&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#059669;fontColor=#fff;strokeColor=#047857;arcSize=15;fontSize=12;shadow=1;verticalAlign=top;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="820" y="90" width="200" height="160" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== STEP 5: DISPLAY ==================== -->
+        <mxCell id="step5" value="&lt;b style=&quot;font-size:16px&quot;&gt;5&lt;/b&gt;&lt;br&gt;&lt;b&gt;DISPLAY&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#fde68a&quot;&gt;ground-dashboard&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#fcd34d&quot;&gt;:8501 · Streamlit&lt;/font&gt;&lt;hr size=&quot;1&quot; color=&quot;#ffffff30&quot;&gt;&lt;font style=&quot;font-size:10px&quot;&gt;3 Operational Modes&lt;br&gt;JSON + UI rendering&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d97706;fontColor=#fff;strokeColor=#b45309;arcSize=15;fontSize=12;shadow=1;verticalAlign=top;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="1090" y="90" width="200" height="160" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== ARROWS ==================== -->
+        <mxCell id="a1" value=".SAFE" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#e2e8f0;strokeWidth=2;fontColor=#94a3b8;fontSize=9;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="step1" target="step2" parent="1"/>
+        <mxCell id="a2" value="512×512 .npy" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#e2e8f0;strokeWidth=2;fontColor=#94a3b8;fontSize=9;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="step2" target="step3" parent="1"/>
+        <mxCell id="a3" value="DetectionEvent" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#e2e8f0;strokeWidth=2;fontColor=#94a3b8;fontSize=9;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="step3" target="step4" parent="1"/>
+        <mxCell id="a4" value="enriched event" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#e2e8f0;strokeWidth=2;fontColor=#94a3b8;fontSize=9;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="step4" target="step5" parent="1"/>
+
+        <!-- ==================== DATA PRODUCTS TABLE ==================== -->
+        <mxCell id="tableBg" value="" style="rounded=1;fillColor=#0f172a;fillOpacity=80;strokeColor=#334155;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="30" y="310" width="1260" height="320" as="geometry"/>
+        </mxCell>
+        <mxCell id="tableTitle" value="Data Products at Each Stage" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=14;fontStyle=1;fontColor=#e2e8f0;" vertex="1" parent="1">
+          <mxGeometry x="500" y="320" width="300" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- Stage 1 column -->
+        <mxCell id="col1" value="" style="rounded=1;fillColor=#1e1b4b;fillOpacity=80;strokeColor=#6d28d9;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="50" y="360" width="200" height="250" as="geometry"/>
+        </mxCell>
+        <mxCell id="col1t" value="&lt;b&gt;Stage 1 — Ingest&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=11;fontColor=#a78bfa;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="370" width="180" height="25" as="geometry"/>
+        </mxCell>
+        <mxCell id="col1a" value="• Sentinel-1 IW GRDH&lt;br&gt;• .SAFE format archive&lt;br&gt;• ~2 GB per scene&lt;br&gt;• Bbox + date range&lt;br&gt;• Metadata JSON" style="text;html=1;align=left;verticalAlign=top;strokeColor=none;fillColor=none;fontSize=10;fontColor=#c4b5fd;" vertex="1" parent="1">
+          <mxGeometry x="60" y="400" width="180" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="col1b" value="&lt;i&gt;GET /products?bbox=...&lt;/i&gt;" style="text;html=1;align=left;verticalAlign=top;strokeColor=none;fillColor=none;fontSize=9;fontColor=#7c3aed;" vertex="1" parent="1">
+          <mxGeometry x="60" y="510" width="180" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Stage 2 column -->
+        <mxCell id="col2" value="" style="rounded=1;fillColor=#172554;fillOpacity=80;strokeColor=#1d4ed8;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="280" y="360" width="220" height="250" as="geometry"/>
+        </mxCell>
+        <mxCell id="col2t" value="&lt;b&gt;Stage 2 — Preprocess&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=11;fontColor=#60a5fa;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="290" y="370" width="200" height="25" as="geometry"/>
+        </mxCell>
+        <mxCell id="col2a" value="• 512×512 .npy tiles&lt;br&gt;• Radiometric calibration&lt;br&gt;• Lee speckle filter&lt;br&gt;• dB conversion&lt;br&gt;• GCP georeferencing&lt;br&gt;• MVSSD enhancement" style="text;html=1;align=left;verticalAlign=top;strokeColor=none;fillColor=none;fontSize=10;fontColor=#93c5fd;" vertex="1" parent="1">
+          <mxGeometry x="290" y="400" width="200" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="col2b" value="5 Pipelines: A B C D E" style="text;html=1;align=left;verticalAlign=top;strokeColor=none;fillColor=none;fontSize=9;fontColor=#2563eb;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="290" y="520" width="200" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Stage 3 column -->
+        <mxCell id="col3" value="" style="rounded=1;fillColor=#0c4a6e;fillOpacity=80;strokeColor=#0e7490;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="530" y="360" width="220" height="250" as="geometry"/>
+        </mxCell>
+        <mxCell id="col3t" value="&lt;b&gt;Stage 3 — Detect&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=11;fontColor=#22d3ee;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="540" y="370" width="200" height="25" as="geometry"/>
+        </mxCell>
+        <mxCell id="col3a" value="• DetectionEvent JSON&lt;br&gt;• Bounding boxes (x1,y1,x2,y2)&lt;br&gt;• Confidence scores&lt;br&gt;• Vessel count&lt;br&gt;• Processing time (ms)&lt;br&gt;• Scene + tile IDs" style="text;html=1;align=left;verticalAlign=top;strokeColor=none;fillColor=none;fontSize=10;fontColor=#67e8f9;" vertex="1" parent="1">
+          <mxGeometry x="540" y="400" width="200" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="col3b" value="yolov8n_mrssd_int8.onnx" style="text;html=1;align=left;verticalAlign=top;strokeColor=none;fillColor=none;fontSize=9;fontColor=#0891b2;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="540" y="520" width="200" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Stage 4 column -->
+        <mxCell id="col4" value="" style="rounded=1;fillColor=#064e3b;fillOpacity=80;strokeColor=#047857;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="780" y="360" width="220" height="250" as="geometry"/>
+        </mxCell>
+        <mxCell id="col4t" value="&lt;b&gt;Stage 4 — Enrich&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=11;fontColor=#34d399;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="790" y="370" width="200" height="25" as="geometry"/>
+        </mxCell>
+        <mxCell id="col4a" value="• Zone: Z1 / Z2 / Z3&lt;br&gt;• AIS match (GFW)&lt;br&gt;• Dark vessel flag&lt;br&gt;• Priority level&lt;br&gt;• Satellite position&lt;br&gt;• Persisted to SQLite" style="text;html=1;align=left;verticalAlign=top;strokeColor=none;fillColor=none;fontSize=10;fontColor=#6ee7b7;" vertex="1" parent="1">
+          <mxGeometry x="790" y="400" width="200" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="col4b" value="LOW MEDIUM HIGH CRITICAL" style="text;html=1;align=left;verticalAlign=top;strokeColor=none;fillColor=none;fontSize=9;fontColor=#059669;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="790" y="520" width="200" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Stage 5 column -->
+        <mxCell id="col5" value="" style="rounded=1;fillColor=#78350f;fillOpacity=80;strokeColor=#b45309;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="1030" y="360" width="220" height="250" as="geometry"/>
+        </mxCell>
+        <mxCell id="col5t" value="&lt;b&gt;Stage 5 — Display&lt;/b&gt;" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=11;fontColor=#fbbf24;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="370" width="200" height="25" as="geometry"/>
+        </mxCell>
+        <mxCell id="col5a" value="• JSON payloads&lt;br&gt;• Interactive tables&lt;br&gt;• Zone breakdown&lt;br&gt;• Priority stats&lt;br&gt;• Event timeline&lt;br&gt;• File upload UI" style="text;html=1;align=left;verticalAlign=top;strokeColor=none;fillColor=none;fontSize=10;fontColor=#fcd34d;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="400" width="200" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="col5b" value="3 modes: Upload · Query · Monitor" style="text;html=1;align=left;verticalAlign=top;strokeColor=none;fillColor=none;fontSize=9;fontColor=#d97706;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="520" width="200" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Footer -->
+        <mxCell id="footer" value="KSF Space Foundation · Maritime Edge AI Intelligence Platform v2.1.0" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=10;fontColor=#64748b;" vertex="1" parent="1">
+          <mxGeometry x="400" y="650" width="500" height="20" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

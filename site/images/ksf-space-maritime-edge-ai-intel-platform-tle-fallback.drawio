@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="2026-08-29T00:00:00.000Z" agent="5.0" etag="" version="24.0.0" type="device">
+  <diagram id="tle" name="TLE Fallback Chain">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="600" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- ==================== TITLE ==================== -->
+        <mxCell id="title1" value="TLE Data Source Fallback Chain" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=20;fontStyle=1;fontColor=#f1f5f9;" vertex="1" parent="1">
+          <mxGeometry x="400" y="10" width="400" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="title2" value="satellite-monitor service (:8004) — Graceful degradation strategy" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=12;fontColor=#94a3b8;" vertex="1" parent="1">
+          <mxGeometry x="380" y="40" width="440" height="25" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== REQUEST FLOW ==================== -->
+        <!-- Step 1: Request -->
+        <mxCell id="request" value="&lt;b&gt;Request&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;GET /tle/{norad_id}&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;or GET /position&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#a78bfa&quot; style=&quot;font-size:9px&quot;&gt;NORAD ID: 39634&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#7c3aed;fontColor=#fff;strokeColor=#6d28d9;arcSize=15;fontSize=12;shadow=1;verticalAlign=top;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="30" y="100" width="170" height="110" as="geometry"/>
+        </mxCell>
+
+        <!-- Arrow: Request → Cache Check -->
+        <mxCell id="a1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#fbbf24;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="request" target="cache" parent="1"/>
+
+        <!-- Step 2: Cache Check -->
+        <mxCell id="cache" value="&lt;b&gt;Cache Check&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;Redis / In-memory&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;TTL: 24 hours&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#64748b&quot; style=&quot;font-size:9px&quot;&gt;key: tle:{norad_id}&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1e293b;fontColor=#e2e8f0;strokeColor=#475569;strokeWidth=1;arcSize=15;fontSize=12;shadow=1;verticalAlign=top;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="260" y="100" width="180" height="110" as="geometry"/>
+        </mxCell>
+
+        <!-- Cache HIT → Output -->
+        <mxCell id="hitLabel" value="HIT" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=10;fontStyle=1;fontColor=#34d399;" vertex="1" parent="1">
+          <mxGeometry x="270" y="220" width="40" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_hit" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#34d399;strokeWidth=2;dashed=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="cache" target="cacheReturn" parent="1"/>
+        <mxCell id="cacheReturn" value="&lt;b&gt;Return Cached&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;tle_fresh: false&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#059669;fontColor=#fff;strokeColor=#047857;arcSize=15;fontSize=11;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="230" y="280" width="140" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- Arrow: Cache MISS → SatNOGS -->
+        <mxCell id="missLabel" value="MISS" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=10;fontStyle=1;fontColor=#f87171;" vertex="1" parent="1">
+          <mxGeometry x="430" y="90" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="a2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#fbbf24;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="cache" target="satnogs" parent="1"/>
+
+        <!-- Step 3: SatNOGS -->
+        <mxCell id="satnogs" value="&lt;b&gt;SatNOGS DB&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;Primary Source&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;db.satnogs.org/api&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#a78bfa&quot; style=&quot;font-size:9px&quot;&gt;Free · Open · Community&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#7c3aed;fontColor=#fff;strokeColor=#6d28d9;arcSize=15;fontSize=12;shadow=1;verticalAlign=top;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="500" y="100" width="180" height="110" as="geometry"/>
+        </mxCell>
+
+        <!-- SatNOGS success → Cache + Output -->
+        <mxCell id="okLabel1" value="200 OK" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=10;fontStyle=1;fontColor=#34d399;" vertex="1" parent="1">
+          <mxGeometry x="510" y="220" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_ok1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#34d399;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="satnogs" target="satnogsReturn" parent="1"/>
+        <mxCell id="satnogsReturn" value="&lt;b&gt;Cache &amp; Return&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;tle_source: satnogs&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d97706;fontColor=#fff;strokeColor=#b45309;arcSize=15;fontSize=11;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="460" y="280" width="160" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- Arrow: SatNOGS fail → Celestrak -->
+        <mxCell id="failLabel1" value="FAIL" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=10;fontStyle=1;fontColor=#f87171;" vertex="1" parent="1">
+          <mxGeometry x="680" y="90" width="40" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="a3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#fbbf24;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="satnogs" target="celestrak" parent="1"/>
+
+        <!-- Step 4: Celestrak -->
+        <mxCell id="celestrak" value="&lt;b&gt;Celestrak&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;Fallback Source&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;celestrak.org/shape&lt;/font&gt;&lt;br&gt;&lt;font color=&quot;#60a5fa&quot; style=&quot;font-size:9px&quot;&gt;NASA · High Reliability&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2563eb;fontColor=#fff;strokeColor=#1d4ed8;arcSize=15;fontSize=12;shadow=1;verticalAlign=top;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="760" y="100" width="180" height="110" as="geometry"/>
+        </mxCell>
+
+        <!-- Celestrak success → Cache + Output -->
+        <mxCell id="okLabel2" value="200 OK" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=10;fontStyle=1;fontColor=#34d399;" vertex="1" parent="1">
+          <mxGeometry x="770" y="220" width="50" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="a_ok2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#34d399;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="celestrak" target="celestrakReturn" parent="1"/>
+        <mxCell id="celestrakReturn" value="&lt;b&gt;Cache &amp; Return&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;tle_source: celestrak&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d97706;fontColor=#fff;strokeColor=#b45309;arcSize=15;fontSize=11;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="720" y="280" width="160" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- Arrow: Celestrak fail → Stale Cache -->
+        <mxCell id="failLabel2" value="FAIL" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=10;fontStyle=1;fontColor=#f87171;" vertex="1" parent="1">
+          <mxGeometry x="940" y="90" width="40" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="a4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#f87171;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="celestrak" target="staleCache" parent="1"/>
+
+        <!-- Step 5: Stale Cache -->
+        <mxCell id="staleCache" value="&lt;b&gt;Stale&lt;br&gt;Cache&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Expiry relaxed&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#059669;fontColor=#fff;strokeColor=#047857;arcSize=15;fontSize=11;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="100" width="120" height="110" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="a_stale" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#34d399;strokeWidth=2;dashed=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="staleCache" target="staleReturn" parent="1"/>
+        <mxCell id="staleReturn" value="&lt;b&gt;Return&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;tle_fresh: false&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#059669;fontColor=#fff;strokeColor=#047857;arcSize=15;fontSize=11;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="280" width="120" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== FINAL OUTPUT ==================== -->
+        <mxCell id="output" value="&lt;b&gt;SGP4 Position&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:11px&quot;&gt;lat · lon · altitude&lt;/font&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;computed from TLE&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d97706;fontColor=#fff;strokeColor=#b45309;arcSize=15;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="1160" y="100" width="180" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- Arrows to output -->
+        <mxCell id="a_out1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#fbbf24;strokeWidth=1.5;dashed=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="cacheReturn" target="output" parent="1"/>
+        <mxCell id="a_out2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#fbbf24;strokeWidth=1.5;dashed=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;" edge="1" source="satnogsReturn" target="output" parent="1"/>
+        <mxCell id="a_out3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#fbbf24;strokeWidth=1.5;dashed=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.7;entryDx=0;entryDy=0;" edge="1" source="celestrakReturn" target="output" parent="1"/>
+        <mxCell id="a_out4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#34d399;strokeWidth=1.5;dashed=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" source="staleReturn" target="output" parent="1"/>
+
+        <!-- ==================== BOTTOM INFO ==================== -->
+        <mxCell id="noradBg" value="" style="rounded=1;fillColor=#0f172a;fillOpacity=70;strokeColor=#334155;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="30" y="400" width="600" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="noradTitle" value="Common NORAD IDs:" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=11;fontStyle=1;fontColor=#94a3b8;" vertex="1" parent="1">
+          <mxGeometry x="50" y="410" width="130" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="noradIds" value="Sentinel-1A: &lt;b&gt;39634&lt;/b&gt;   Sentinel-1B: &lt;b&gt;41456&lt;/b&gt;   ISS: &lt;b&gt;25544&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=11;fontColor=#e2e8f0;" vertex="1" parent="1">
+          <mxGeometry x="50" y="435" width="400" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="noradDesc" value="Satellite position computed via SGP4 propagator with Two-Line Element sets" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=10;fontColor=#94a3b8;" vertex="1" parent="1">
+          <mxGeometry x="50" y="455" width="500" height="15" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="legBg" value="" style="rounded=1;fillColor=#0f172a;fillOpacity=70;strokeColor=#334155;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="680" y="400" width="400" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="legTitle" value="Legend:" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=11;fontStyle=1;fontColor=#94a3b8;" vertex="1" parent="1">
+          <mxGeometry x="700" y="410" width="60" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg1" value="" style="rounded=1;fillColor=#7c3aed;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="700" y="438" width="14" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg1t" value="Primary Source" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=10;fontColor=#cbd5e1;" vertex="1" parent="1">
+          <mxGeometry x="720" y="435" width="90" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg2" value="" style="rounded=1;fillColor=#2563eb;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="820" y="438" width="14" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg2t" value="Fallback Source" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=10;fontColor=#cbd5e1;" vertex="1" parent="1">
+          <mxGeometry x="840" y="435" width="90" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg3" value="" style="rounded=1;fillColor=#059669;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="940" y="438" width="14" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg3t" value="Graceful Degradation" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=10;fontColor=#cbd5e1;" vertex="1" parent="1">
+          <mxGeometry x="960" y="435" width="110" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- Footer -->
+        <mxCell id="footer" value="KSF Space Foundation · Maritime Edge AI Intelligence Platform v2.1.0" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=10;fontColor=#64748b;" vertex="1" parent="1">
+          <mxGeometry x="400" y="500" width="400" height="20" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

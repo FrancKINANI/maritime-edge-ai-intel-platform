@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="2026-08-29T00:00:00.000Z" agent="5.0" etag="" version="24.0.0" type="device">
+  <diagram id="zones" name="Zone Classification">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1200" pageHeight="700" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- ==================== TITLE ==================== -->
+        <mxCell id="title1" value="Maritime Zone Classification" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=20;fontStyle=1;fontColor=#f1f5f9;" vertex="1" parent="1">
+          <mxGeometry x="300" y="10" width="400" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="title2" value="Z1 (Territorial Waters) · Z2 (EEZ) · Z3 (High Seas)" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=12;fontColor=#94a3b8;" vertex="1" parent="1">
+          <mxGeometry x="320" y="40" width="360" height="25" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== LEFT: Visual Map ==================== -->
+        <!-- Coastline -->
+        <mxCell id="coastline" value="COASTLINE" style="shape=mxgraph.basic.rect;fillColor=#65a30d;strokeColor=#84cc16;strokeWidth=2;rounded=1;arcSize=10;rotation=0;labelPosition=center;verticalLabelPosition=middle;align=center;verticalAlign=middle;fontColor=#ecfccb;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="30" y="80" width="40" height="480" as="geometry"/>
+        </mxCell>
+
+        <!-- Zone 3: High Seas -->
+        <mxCell id="z3visual" value="&lt;b&gt;Z3 — High Seas&lt;/b&gt;&lt;br&gt;Beyond 200 NM&lt;br&gt;International waters" style="rounded=1;fillColor=#2563eb;fillOpacity=30;strokeColor=#3b82f6;strokeWidth=2;dashed=1;dashPattern=8 4;whiteSpace=wrap;html=1;fontColor=#93c5fd;fontSize=12;verticalAlign=top;spacingTop=10;" vertex="1" parent="1">
+          <mxGeometry x="80" y="60" width="300" height="520" as="geometry"/>
+        </mxCell>
+
+        <!-- Zone 2: EEZ -->
+        <mxCell id="z2visual" value="&lt;b&gt;Z2 — EEZ&lt;/b&gt;&lt;br&gt;12–200 NM&lt;br&gt;Exclusive Economic Zone" style="rounded=1;fillColor=#d97706;fillOpacity=40;strokeColor=#f59e0b;strokeWidth=2;dashed=1;dashPattern=6 3;whiteSpace=wrap;html=1;fontColor=#fcd34d;fontSize=12;verticalAlign=top;spacingTop=10;" vertex="1" parent="1">
+          <mxGeometry x="80" y="100" width="200" height="440" as="geometry"/>
+        </mxCell>
+
+        <!-- Zone 1: Territorial -->
+        <mxCell id="z1visual" value="&lt;b&gt;Z1&lt;/b&gt;&lt;br&gt;Territorial&lt;br&gt;0–12 NM" style="rounded=1;fillColor=#dc2626;fillOpacity=50;strokeColor=#ef4444;strokeWidth=2;whiteSpace=wrap;html=1;fontColor=#fecaca;fontSize=12;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="80" y="170" width="100" height="300" as="geometry"/>
+        </mxCell>
+
+        <!-- Distance markers -->
+        <mxCell id="marker12" value="12 NM" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=10;fontColor=#fca5a5;" vertex="1" parent="1">
+          <mxGeometry x="90" y="530" width="60" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="marker200" value="200 NM" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=10;fontColor=#fbbf24;" vertex="1" parent="1">
+          <mxGeometry x="150" y="530" width="60" height="20" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== RIGHT: Zone Details Panel ==================== -->
+        <mxCell id="panelBg" value="" style="rounded=1;fillColor=#0f172a;fillOpacity=80;strokeColor=#334155;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="440" y="60" width="440" height="520" as="geometry"/>
+        </mxCell>
+        <mxCell id="panelTitle" value="Zone Properties" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=16;fontStyle=1;fontColor=#e2e8f0;" vertex="1" parent="1">
+          <mxGeometry x="540" y="70" width="240" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- Z1 Details -->
+        <mxCell id="z1card" value="" style="rounded=1;fillColor=#7f1d1d;fillOpacity=50;strokeColor=#ef4444;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="460" y="110" width="400" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="z1num" value="1" style="ellipse;fillColor=#ef4444;strokeColor=none;fontColor=#fff;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="475" y="125" width="24" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="z1label" value="Z1 — Territorial Waters" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=13;fontStyle=1;fontColor=#fecaca;" vertex="1" parent="1">
+          <mxGeometry x="510" y="125" width="200" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="z1details" value="Extent: 0–12 Nautical Miles from baseline&lt;br&gt;Jurisdiction: Full national sovereignty&lt;br&gt;Priority: HIGH / CRITICAL (border security)&lt;br&gt;Enforcement: Coastal patrol, navy intercept" style="text;html=1;align=left;verticalAlign=top;strokeColor=none;fillColor=none;fontSize=11;fontColor=#fca5a5;" vertex="1" parent="1">
+          <mxGeometry x="475" y="155" width="370" height="70" as="geometry"/>
+        </mxCell>
+
+        <!-- Z2 Details -->
+        <mxCell id="z2card" value="" style="rounded=1;fillColor=#78350f;fillOpacity=50;strokeColor=#f59e0b;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="460" y="250" width="400" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="z2num" value="2" style="ellipse;fillColor=#f59e0b;strokeColor=none;fontColor=#fff;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="475" y="265" width="24" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="z2label" value="Z2 — Exclusive Economic Zone" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=13;fontStyle=1;fontColor=#fef3c7;" vertex="1" parent="1">
+          <mxGeometry x="510" y="265" width="240" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="z2details" value="Extent: 12–200 Nautical Miles from baseline&lt;br&gt;Jurisdiction: Economic resource rights only&lt;br&gt;Priority: MEDIUM (fishing regulation)&lt;br&gt;Enforcement: Coast guard, fisheries patrol" style="text;html=1;align=left;verticalAlign=top;strokeColor=none;fillColor=none;fontSize=11;fontColor=#fcd34d;" vertex="1" parent="1">
+          <mxGeometry x="475" y="295" width="370" height="70" as="geometry"/>
+        </mxCell>
+
+        <!-- Z3 Details -->
+        <mxCell id="z3card" value="" style="rounded=1;fillColor=#172554;fillOpacity=50;strokeColor=#3b82f6;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="460" y="390" width="400" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="z3num" value="3" style="ellipse;fillColor=#3b82f6;strokeColor=none;fontColor=#fff;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="475" y="405" width="24" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="z3label" value="Z3 — High Seas" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=13;fontStyle=1;fontColor=#dbeafe;" vertex="1" parent="1">
+          <mxGeometry x="510" y="405" width="160" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="z3details" value="Extent: Beyond 200 NM from any baseline&lt;br&gt;Jurisdiction: International law (UNCLOS)&lt;br&gt;Priority: LOW / MEDIUM (monitoring)&lt;br&gt;Enforcement: International cooperation" style="text;html=1;align=left;verticalAlign=top;strokeColor=none;fillColor=none;fontSize=11;fontColor=#93c5fd;" vertex="1" parent="1">
+          <mxGeometry x="475" y="435" width="370" height="70" as="geometry"/>
+        </mxCell>
+
+        <!-- Footer -->
+        <mxCell id="footer" value="KSF Space Foundation · Maritime Edge AI Intelligence Platform v2.1.0" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=10;fontColor=#64748b;" vertex="1" parent="1">
+          <mxGeometry x="300" y="600" width="400" height="20" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

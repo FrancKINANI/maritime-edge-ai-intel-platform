@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="2026-08-29T00:00:00.000Z" agent="5.0" etag="" version="24.0.0" type="device">
+  <diagram id="architecture" name="System Architecture">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- ==================== TITLE ==================== -->
+        <mxCell id="title1" value="Maritime Edge AI Intelligence Platform — System Architecture" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=22;fontStyle=1;fontColor=#f1f5f9;" vertex="1" parent="1">
+          <mxGeometry x="300" y="10" width="600" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="title2" value="KSF Space Foundation · Phase II · 6 Microservices + Redis" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;fontSize=13;fontColor=#94a3b8;" vertex="1" parent="1">
+          <mxGeometry x="420" y="45" width="360" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== EXTERNAL APIS (Top Row) ==================== -->
+        <!-- Copernicus CDSE -->
+        <mxCell id="cdse" value="&lt;b&gt;Copernicus CDSE&lt;/b&gt;&lt;br&gt;Sentinel-1 SAR Data&lt;br&gt;&lt;i style=&quot;font-size:10px&quot;&gt;dataspace.copernicus.eu&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#7c3aed;fontColor=#fff;strokeColor=#6d28d9;arcSize=15;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="100" width="220" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- SatNOGS TLE -->
+        <mxCell id="satnogs" value="&lt;b&gt;SatNOGS TLE API&lt;/b&gt;&lt;br&gt;Primary TLE Source&lt;br&gt;&lt;i style=&quot;font-size:10px&quot;&gt;db.satnogs.org&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#7c3aed;fontColor=#fff;strokeColor=#6d28d9;arcSize=15;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="310" y="100" width="200" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- Celestrak TLE -->
+        <mxCell id="celestrak" value="&lt;b&gt;Celestrak TLE&lt;/b&gt;&lt;br&gt;Fallback TLE Source&lt;br&gt;&lt;i style=&quot;font-size:10px&quot;&gt;celestrak.org&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#7c3aed;fontColor=#fff;strokeColor=#6d28d9;arcSize=15;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="570" y="100" width="200" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- GFW API -->
+        <mxCell id="gfw" value="&lt;b&gt;Global Fishing Watch API v3&lt;/b&gt;&lt;br&gt;AIS Presence &amp; Dark Vessels&lt;br&gt;&lt;i style=&quot;font-size:10px&quot;&gt;globalfishingwatch.org&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#7c3aed;fontColor=#fff;strokeColor=#6d28d9;arcSize=15;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="830" y="100" width="260" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== SERVICES (Row 1) ==================== -->
+        <!-- data-ingestor :8001 -->
+        <mxCell id="ingestor" value="&lt;b&gt;data-ingestor&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#bfdbfe&quot;&gt;:8001&lt;/font&gt;&lt;br&gt;CDSE Search &amp; Download&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;GET /products · POST /ingest&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2563eb;fontColor=#fff;strokeColor=#1d4ed8;arcSize=15;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="260" width="240" height="90" as="geometry"/>
+        </mxCell>
+
+        <!-- sentinel-preprocessor :8000 -->
+        <mxCell id="preprocessor" value="&lt;b&gt;sentinel-preprocessor&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#bfdbfe&quot;&gt;:8000&lt;/font&gt;&lt;br&gt;Calibration · Filtering · Tiling&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;5 Pipelines: A B C D E&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2563eb;fontColor=#fff;strokeColor=#1d4ed8;arcSize=15;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="350" y="260" width="260" height="90" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== SERVICES (Row 2) ==================== -->
+        <!-- detector :8003 -->
+        <mxCell id="detector" value="&lt;b&gt;detector&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#bfdbfe&quot;&gt;:8003&lt;/font&gt;&lt;br&gt;YOLOv8 INT8 ONNX Inference&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;NMS · Priority Heuristic&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2563eb;fontColor=#fff;strokeColor=#1d4ed8;arcSize=15;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="430" width="240" height="90" as="geometry"/>
+        </mxCell>
+
+        <!-- satellite-monitor :8004 -->
+        <mxCell id="satmonitor" value="&lt;b&gt;satellite-monitor&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#bfdbfe&quot;&gt;:8004&lt;/font&gt;&lt;br&gt;TLE Cache · SGP4 Propagation&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Satellite Position Computation&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2563eb;fontColor=#fff;strokeColor=#1d4ed8;arcSize=15;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="350" y="430" width="260" height="90" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== SERVICES (Row 3) ==================== -->
+        <!-- aggregator :8002 -->
+        <mxCell id="aggregator" value="&lt;b&gt;aggregator&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#bfdbfe&quot;&gt;:8002&lt;/font&gt;&lt;br&gt;Zone Classification · AIS Matching&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Event Persistence · Stats&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2563eb;fontColor=#fff;strokeColor=#1d4ed8;arcSize=15;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="180" y="600" width="260" height="90" as="geometry"/>
+        </mxCell>
+
+        <!-- ground-dashboard :8501 -->
+        <mxCell id="dashboard" value="&lt;b&gt;ground-dashboard&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#fecaca&quot;&gt;:8501 · Streamlit&lt;/font&gt;&lt;br&gt;Upload · Satellite Query&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Continuous Monitoring&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dc2626;fontColor=#fff;strokeColor=#b91c1c;arcSize=15;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="680" y="600" width="260" height="90" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== DATA STORES ==================== -->
+        <!-- Redis -->
+        <mxCell id="redis" value="&lt;b&gt;Redis&lt;/b&gt;&lt;br&gt;Shared Cache&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;TLE · Pub/Sub&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#059669;fontColor=#fff;strokeColor=#047857;arcSize=15;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="680" y="430" width="180" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- SQLite/Postgres -->
+        <mxCell id="database" value="&lt;b&gt;SQLite / Postgres&lt;/b&gt;&lt;br&gt;Event Store&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;DetectionEvents&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#059669;fontColor=#fff;strokeColor=#047857;arcSize=15;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="920" y="430" width="180" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- Shared Volumes -->
+        <mxCell id="volumes" value="&lt;b&gt;Shared Volumes&lt;/b&gt;&lt;br&gt;tiles + scenes&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;.npy · .SAFE&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#059669;fontColor=#fff;strokeColor=#047857;arcSize=15;fontSize=12;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="680" y="260" width="180" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== ARROWS ==================== -->
+        <!-- External APIs → Services -->
+        <mxCell id="arrow1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#a78bfa;strokeWidth=2;dashed=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="cdse" target="ingestor" parent="1"/>
+        <mxCell id="arrow2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#a78bfa;strokeWidth=2;dashed=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="satnogs" target="satmonitor" parent="1"/>
+        <mxCell id="arrow3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#a78bfa;strokeWidth=2;dashed=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="celestrak" target="satmonitor" parent="1"/>
+        <mxCell id="arrow4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#a78bfa;strokeWidth=2;dashed=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.8;entryY=0;entryDx=0;entryDy=0;" edge="1" source="gfw" target="aggregator" parent="1"/>
+
+        <!-- Service → Service -->
+        <mxCell id="arrow5" value=".SAFE" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#60a5fa;strokeWidth=2;fontColor=#93c5fd;fontSize=9;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="ingestor" target="preprocessor" parent="1"/>
+        <mxCell id="arrow6" value=".npy tiles" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#60a5fa;strokeWidth=2;fontColor=#93c5fd;fontSize=9;exitX=0;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="preprocessor" target="detector" parent="1"/>
+        <mxCell id="arrow7" value="DetectionEvent" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#60a5fa;strokeWidth=2;fontColor=#93c5fd;fontSize=9;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.2;entryY=0;entryDx=0;entryDy=0;" edge="1" source="detector" target="aggregator" parent="1"/>
+        <mxCell id="arrow8" value="sat position" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#60a5fa;strokeWidth=2;fontColor=#93c5fd;fontSize=9;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.8;entryY=0;entryDx=0;entryDy=0;" edge="1" source="satmonitor" target="aggregator" parent="1"/>
+        <mxCell id="arrow9" value="events + stats" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#60a5fa;strokeWidth=2;fontColor=#93c5fd;fontSize=9;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="aggregator" target="dashboard" parent="1"/>
+
+        <!-- Services → Data Stores -->
+        <mxCell id="arrow10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#34d399;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="satmonitor" target="redis" parent="1"/>
+        <mxCell id="arrow11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#34d399;strokeWidth=2;dashed=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="aggregator" target="redis" parent="1"/>
+        <mxCell id="arrow12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#34d399;strokeWidth=2;exitX=1;exitY=0.8;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="aggregator" target="database" parent="1"/>
+
+        <!-- ==================== LEGEND ==================== -->
+        <mxCell id="legendBg" value="" style="rounded=1;fillColor=#0f172a;fillOpacity=70;strokeColor=#334155;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="740" width="1120" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg1" value="Legend:" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;fontColor=#94a3b8;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="60" y="750" width="70" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg2" value="" style="rounded=1;fillColor=#2563eb;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="140" y="755" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg3" value="Microservice" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;fontColor=#cbd5e1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="168" y="750" width="80" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg4" value="" style="rounded=1;fillColor=#7c3aed;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="270" y="755" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg5" value="External API" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;fontColor=#cbd5e1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="298" y="750" width="80" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg6" value="" style="rounded=1;fillColor=#059669;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="400" y="755" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg7" value="Data Store" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;fontColor=#cbd5e1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="428" y="750" width="70" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg8" value="" style="rounded=1;fillColor=#dc2626;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="520" y="755" width="20" height="14" as="geometry"/>
+        </mxCell>
+        <mxCell id="leg9" value="User Interface" style="text;html=1;align=left;verticalAlign=middle;strokeColor=none;fillColor=none;fontColor=#cbd5e1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="548" y="750" width="90" height="24" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

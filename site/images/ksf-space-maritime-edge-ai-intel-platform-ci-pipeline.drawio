@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="2026-08-29T00:00:00.000Z" agent="5.0" etag="" version="24.0.0" type="device">
+  <diagram id="cicd" name="CI/CD Pipeline">
+    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="600" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- ==================== TITLE ==================== -->
+        <mxCell id="title1" value="CI/CD Pipeline — GitHub Actions" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=20;fontStyle=1;fontColor=#f1f5f9;" vertex="1" parent="1">
+          <mxGeometry x="400" y="10" width="400" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="title2" value=".github/workflows/ci.yml — 4 Job Stages" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=12;fontColor=#94a3b8;" vertex="1" parent="1">
+          <mxGeometry x="450" y="40" width="300" height="25" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== JOB 1: Lint & SAST ==================== -->
+        <mxCell id="job1" value="&lt;b&gt;Job 1&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#fecaca&quot;&gt;Lint &amp; SAST&lt;/font&gt;&lt;hr size=&quot;1&quot; color=&quot;#ffffff30&quot;&gt;▸ Ruff linter (E, W, F, I,&lt;br&gt;  N, UP, S, B, SIM rules)&lt;br&gt;▸ Bandit SAST scan&lt;br&gt;▸ Security vulnerability check&lt;br&gt;▸ Code style enforcement" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dc2626;fontColor=#fff;strokeColor=#b91c1c;arcSize=15;fontSize=12;shadow=1;verticalAlign=top;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="30" y="90" width="240" height="170" as="geometry"/>
+        </mxCell>
+        <mxCell id="check1" value="✓" style="ellipse;fillColor=#22c55e;strokeColor=none;fontColor=#fff;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="245" y="80" width="24" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- Arrow 1→2 -->
+        <mxCell id="a12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#e2e8f0;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="job1" target="job2" parent="1"/>
+
+        <!-- ==================== JOB 2: Structure ==================== -->
+        <mxCell id="job2" value="&lt;b&gt;Job 2&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#bfdbfe&quot;&gt;Structure Check&lt;/font&gt;&lt;hr size=&quot;1&quot; color=&quot;#ffffff30&quot;&gt;▸ Verify all 6 service&lt;br&gt;  directories exist&lt;br&gt;▸ Validate Dockerfiles&lt;br&gt;▸ Check shared/ schema&lt;br&gt;▸ pyproject.toml integrity" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2563eb;fontColor=#fff;strokeColor=#1d4ed8;arcSize=15;fontSize=12;shadow=1;verticalAlign=top;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="330" y="90" width="240" height="170" as="geometry"/>
+        </mxCell>
+        <mxCell id="check2" value="✓" style="ellipse;fillColor=#22c55e;strokeColor=none;fontColor=#fff;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="545" y="80" width="24" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- Arrow 2→3 -->
+        <mxCell id="a23" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#e2e8f0;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="job2" target="job3" parent="1"/>
+
+        <!-- ==================== JOB 3: Tests (Matrix) ==================== -->
+        <mxCell id="job3" value="&lt;b&gt;Job 3&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#ddd6fe&quot;&gt;Test Matrix (9 suites)&lt;/font&gt;&lt;hr size=&quot;1&quot; color=&quot;#ffffff30&quot;&gt;▸ shared/tests (21)&lt;br&gt;▸ data_ingestor (16)&lt;br&gt;▸ aggregator (8) · detector (7)&lt;br&gt;▸ satellite_monitor (17)&lt;br&gt;▸ preprocessor (13)&lt;br&gt;▸ dashboard (6) · research (21)&lt;br&gt;▸ integration (13)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#7c3aed;fontColor=#fff;strokeColor=#6d28d9;arcSize=15;fontSize=12;shadow=1;verticalAlign=top;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="630" y="90" width="280" height="170" as="geometry"/>
+        </mxCell>
+        <mxCell id="check3" value="✓" style="ellipse;fillColor=#22c55e;strokeColor=none;fontColor=#fff;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="885" y="80" width="24" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- Arrow 3→4 -->
+        <mxCell id="a34" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#e2e8f0;strokeWidth=2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="job3" target="job4" parent="1"/>
+
+        <!-- ==================== JOB 4: Coverage ==================== -->
+        <mxCell id="job4" value="&lt;b&gt;Job 4&lt;/b&gt;&lt;br&gt;&lt;font color=&quot;#a7f3d0&quot;&gt;Coverage Check&lt;/font&gt;&lt;hr size=&quot;1&quot; color=&quot;#ffffff30&quot;&gt;▸ Run coverage report&lt;br&gt;▸ Minimum 60% threshold&lt;br&gt;▸ HTML report output&lt;br&gt;▸ Non-blocking (advisory)&lt;br&gt;▸ 115/122 passed (7 skip)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#059669;fontColor=#fff;strokeColor=#047857;arcSize=15;fontSize=12;shadow=1;verticalAlign=top;spacingTop=5;" vertex="1" parent="1">
+          <mxGeometry x="970" y="90" width="220" height="170" as="geometry"/>
+        </mxCell>
+        <mxCell id="check4" value="✓" style="ellipse;fillColor=#22c55e;strokeColor=none;fontColor=#fff;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1165" y="80" width="24" height="24" as="geometry"/>
+        </mxCell>
+
+        <!-- ==================== TEST SUITES TABLE ==================== -->
+        <mxCell id="tableBg" value="" style="rounded=1;fillColor=#0f172a;fillOpacity=70;strokeColor=#334155;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="30" y="310" width="1160" height="200" as="geometry"/>
+        </mxCell>
+        <mxCell id="tableTitle" value="Test Suite Breakdown — 122 Tests Across 9 Suites" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=14;fontStyle=1;fontColor=#e2e8f0;" vertex="1" parent="1">
+          <mxGeometry x="380" y="325" width="440" height="25" as="geometry"/>
+        </mxCell>
+
+        <!-- Suite cards -->
+        <mxCell id="s1" value="&lt;b&gt;shared/tests&lt;/b&gt;&lt;br&gt;21 tests" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1e1b4b;fillOpacity=80;strokeColor=#6d28d9;strokeWidth=1;fontColor=#c4b5fd;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="50" y="365" width="140" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="s2" value="&lt;b&gt;data_ingestor&lt;/b&gt;&lt;br&gt;16 tests" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#172554;fillOpacity=80;strokeColor=#1d4ed8;strokeWidth=1;fontColor=#93c5fd;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="210" y="365" width="140" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="s3" value="&lt;b&gt;aggregator&lt;/b&gt;&lt;br&gt;8 tests" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#064e3b;fillOpacity=80;strokeColor=#047857;strokeWidth=1;fontColor=#6ee7b7;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="370" y="365" width="120" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="s4" value="&lt;b&gt;detector&lt;/b&gt;&lt;br&gt;7 tests" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0c4a6e;fillOpacity=80;strokeColor=#0e7490;strokeWidth=1;fontColor=#67e8f9;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="510" y="365" width="110" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="s5" value="&lt;b&gt;satellite_monitor&lt;/b&gt;&lt;br&gt;17 tests" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#172554;fillOpacity=80;strokeColor=#2563eb;strokeWidth=1;fontColor=#93c5fd;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="640" y="365" width="150" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="s6" value="&lt;b&gt;preprocessor&lt;/b&gt;&lt;br&gt;13 tests" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1e1b4b;fillOpacity=80;strokeColor=#7c3aed;strokeWidth=1;fontColor=#c4b5fd;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="810" y="365" width="130" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="s7" value="&lt;b&gt;research&lt;/b&gt;&lt;br&gt;21 tests" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#78350f;fillOpacity=80;strokeColor=#b45309;strokeWidth=1;fontColor=#fcd34d;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="960" y="365" width="120" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- Row 2 -->
+        <mxCell id="s8" value="dashboard · 6 tests" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1e293b;fillOpacity=80;strokeColor=#475569;strokeWidth=1;fontColor=#94a3b8;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="50" y="430" width="150" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="s9" value="integration · 13 tests (4 skipped)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1e293b;fillOpacity=80;strokeColor=#475569;strokeWidth=1;fontColor=#94a3b8;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="220" y="430" width="220" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- Summary badge -->
+        <mxCell id="summary" value="&lt;b&gt;115 Passed · 7 Skipped · 0 Failed&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#059669;fillOpacity=20;strokeColor=#22c55e;strokeWidth=1;fontColor=#34d399;fontSize=13;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="480" y="430" width="300" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- CI Trigger info -->
+        <mxCell id="triggers" value="Triggers: push · pull_request · manual" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1e293b;fillOpacity=80;strokeColor=#475569;strokeWidth=1;fontColor=#94a3b8;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="820" y="430" width="260" height="40" as="geometry"/>
+        </mxCell>
+
+        <!-- Footer -->
+        <mxCell id="footer" value="KSF Space Foundation · Maritime Edge AI Intelligence Platform v2.1.0" style="text;html=1;align=center;verticalAlign=middle;strokeColor=none;fillColor=none;fontSize=10;fontColor=#64748b;" vertex="1" parent="1">
+          <mxGeometry x="400" y="530" width="400" height="20" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

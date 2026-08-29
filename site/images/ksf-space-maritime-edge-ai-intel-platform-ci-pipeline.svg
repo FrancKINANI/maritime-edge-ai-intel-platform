@@ -1,0 +1,162 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 500" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <linearGradient id="bg6" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a1628;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1a2744;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="ci1" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#dc2626;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#b91c1c;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="ci2" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#2563eb;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1d4ed8;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="ci3" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#7c3aed;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#6d28d9;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="ci4" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#059669;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#047857;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="pass" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#22c55e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#16a34a;stop-opacity:1" />
+    </linearGradient>
+    <filter id="shadow5" x="-5%" y="-5%" width="110%" height="120%">
+      <feDropShadow dx="2" dy="3" stdDeviation="4" flood-color="#000" flood-opacity="0.4"/>
+    </filter>
+    <marker id="arrowCI" markerWidth="12" markerHeight="8" refX="11" refY="4" orient="auto">
+      <polygon points="0 0, 12 4, 0 8" fill="#e2e8f0"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1000" height="500" fill="url(#bg6)" rx="12"/>
+
+  <!-- Title -->
+  <text x="500" y="42" text-anchor="middle" fill="#f1f5f9" font-size="20" font-weight="bold">CI/CD Pipeline — GitHub Actions</text>
+  <text x="500" y="64" text-anchor="middle" fill="#94a3b8" font-size="12">.github/workflows/ci.yml — 4 Job Stages</text>
+
+  <!-- ===== JOB 1: Lint & SAST ===== -->
+  <rect x="30" y="100" width="210" height="160" rx="12" fill="url(#ci1)" filter="url(#shadow5)"/>
+  <text x="135" y="128" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">Job 1</text>
+  <text x="135" y="150" text-anchor="middle" fill="#fecaca" font-size="12">Lint &amp; SAST</text>
+  <line x1="50" y1="162" x2="220" y2="162" stroke="#fff" stroke-opacity="0.2" stroke-width="1"/>
+  <text x="50" y="182" fill="#fecaca" font-size="10">▸ Ruff linter (E, W, F, I, N,</text>
+  <text x="55" y="198" fill="#fecaca" font-size="10">  UP, S, B, SIM rules)</text>
+  <text x="50" y="218" fill="#fecaca" font-size="10">▸ Bandit SAST scan</text>
+  <text x="50" y="236" fill="#fca5a5" font-size="10">▸ Security vulnerability check</text>
+  <text x="50" y="254" fill="#fca5a5" font-size="10">▸ Code style enforcement</text>
+
+  <!-- Checkmark -->
+  <circle cx="220" cy="108" r="12" fill="url(#pass)"/>
+  <text x="220" y="113" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">✓</text>
+
+  <!-- Arrow 1→2 -->
+  <line x1="240" y1="180" x2="278" y2="180" stroke="#e2e8f0" stroke-width="2.5" marker-end="url(#arrowCI)"/>
+
+  <!-- ===== JOB 2: Structure ===== -->
+  <rect x="280" y="100" width="210" height="160" rx="12" fill="url(#ci2)" filter="url(#shadow5)"/>
+  <text x="385" y="128" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">Job 2</text>
+  <text x="385" y="150" text-anchor="middle" fill="#bfdbfe" font-size="12">Structure Check</text>
+  <line x1="300" y1="162" x2="470" y2="162" stroke="#fff" stroke-opacity="0.2" stroke-width="1"/>
+  <text x="300" y="182" fill="#bfdbfe" font-size="10">▸ Verify all 6 service</text>
+  <text x="305" y="198" fill="#bfdbfe" font-size="10">  directories exist</text>
+  <text x="300" y="218" fill="#bfdbfe" font-size="10">▸ Validate Dockerfiles</text>
+  <text x="300" y="236" fill="#93c5fd" font-size="10">▸ Check shared/ schema</text>
+  <text x="300" y="254" fill="#93c5fd" font-size="10">▸ pyproject.toml integrity</text>
+
+  <!-- Checkmark -->
+  <circle cx="470" cy="108" r="12" fill="url(#pass)"/>
+  <text x="470" y="113" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">✓</text>
+
+  <!-- Arrow 2→3 -->
+  <line x1="490" y1="180" x2="528" y2="180" stroke="#e2e8f0" stroke-width="2.5" marker-end="url(#arrowCI)"/>
+
+  <!-- ===== JOB 3: Tests (Matrix) ===== -->
+  <rect x="530" y="100" width="240" height="160" rx="12" fill="url(#ci3)" filter="url(#shadow5)"/>
+  <text x="650" y="128" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">Job 3</text>
+  <text x="650" y="150" text-anchor="middle" fill="#ddd6fe" font-size="12">Test Matrix (9 suites)</text>
+  <line x1="550" y1="162" x2="750" y2="162" stroke="#fff" stroke-opacity="0.2" stroke-width="1"/>
+  <text x="550" y="182" fill="#ddd6fe" font-size="10">▸ shared/tests (21)</text>
+  <text x="550" y="198" fill="#ddd6fe" font-size="10">▸ data_ingestor (16)</text>
+  <text x="550" y="214" fill="#ddd6fe" font-size="10">▸ aggregator (8) · detector (7)</text>
+  <text x="550" y="230" fill="#ddd6fe" font-size="10">▸ satellite_monitor (17)</text>
+  <text x="550" y="246" fill="#c4b5fd" font-size="10">▸ preprocessor (13)</text>
+  <text x="550" y="258" fill="#c4b5fd" font-size="9">  dashboard (6) · research (21) · integration (13)</text>
+
+  <!-- Checkmark -->
+  <circle cx="750" cy="108" r="12" fill="url(#pass)"/>
+  <text x="750" y="113" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">✓</text>
+
+  <!-- Arrow 3→4 -->
+  <line x1="770" y1="180" x2="808" y2="180" stroke="#e2e8f0" stroke-width="2.5" marker-end="url(#arrowCI)"/>
+
+  <!-- ===== JOB 4: Coverage ===== -->
+  <rect x="810" y="100" width="170" height="160" rx="12" fill="url(#ci4)" filter="url(#shadow5)"/>
+  <text x="895" y="128" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">Job 4</text>
+  <text x="895" y="150" text-anchor="middle" fill="#a7f3d0" font-size="12">Coverage Check</text>
+  <line x1="830" y1="162" x2="960" y2="162" stroke="#fff" stroke-opacity="0.2" stroke-width="1"/>
+  <text x="830" y="182" fill="#a7f3d0" font-size="10">▸ Run coverage report</text>
+  <text x="830" y="200" fill="#a7f3d0" font-size="10">▸ Minimum 60% threshold</text>
+  <text x="830" y="218" fill="#6ee7b7" font-size="10">▸ HTML report output</text>
+  <text x="830" y="236" fill="#6ee7b7" font-size="10">▸ Non-blocking (advisory)</text>
+  <text x="830" y="254" fill="#34d399" font-size="10">▸ 115/122 passed (7 skip)</text>
+
+  <!-- Checkmark -->
+  <circle cx="960" cy="108" r="12" fill="url(#pass)"/>
+  <text x="960" y="113" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">✓</text>
+
+  <!-- ===== TEST SUITE DETAILS (Bottom) ===== -->
+  <rect x="30" y="300" width="940" height="170" rx="10" fill="#0f172a" fill-opacity="0.7" stroke="#334155" stroke-width="1"/>
+  <text x="500" y="328" text-anchor="middle" fill="#e2e8f0" font-size="14" font-weight="bold">Test Suite Breakdown — 122 Tests Across 9 Suites</text>
+
+  <!-- Suite boxes -->
+  <rect x="50" y="345" width="130" height="55" rx="6" fill="#1e1b4b" fill-opacity="0.8" stroke="#6d28d9" stroke-width="1"/>
+  <text x="115" y="366" text-anchor="middle" fill="#c4b5fd" font-size="11" font-weight="bold">shared/tests</text>
+  <text x="115" y="384" text-anchor="middle" fill="#a78bfa" font-size="10">21 tests</text>
+
+  <rect x="195" y="345" width="130" height="55" rx="6" fill="#172554" fill-opacity="0.8" stroke="#1d4ed8" stroke-width="1"/>
+  <text x="260" y="366" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="bold">data_ingestor</text>
+  <text x="260" y="384" text-anchor="middle" fill="#60a5fa" font-size="10">16 tests</text>
+
+  <rect x="340" y="345" width="110" height="55" rx="6" fill="#064e3b" fill-opacity="0.8" stroke="#047857" stroke-width="1"/>
+  <text x="395" y="366" text-anchor="middle" fill="#6ee7b7" font-size="11" font-weight="bold">aggregator</text>
+  <text x="395" y="384" text-anchor="middle" fill="#34d399" font-size="10">8 tests</text>
+
+  <rect x="465" y="345" width="100" height="55" rx="6" fill="#0c4a6e" fill-opacity="0.8" stroke="#0e7490" stroke-width="1"/>
+  <text x="515" y="366" text-anchor="middle" fill="#67e8f9" font-size="11" font-weight="bold">detector</text>
+  <text x="515" y="384" text-anchor="middle" fill="#22d3ee" font-size="10">7 tests</text>
+
+  <rect x="580" y="345" width="130" height="55" rx="6" fill="#172554" fill-opacity="0.8" stroke="#2563eb" stroke-width="1"/>
+  <text x="645" y="366" text-anchor="middle" fill="#93c5fd" font-size="11" font-weight="bold">satellite_monitor</text>
+  <text x="645" y="384" text-anchor="middle" fill="#60a5fa" font-size="10">17 tests</text>
+
+  <rect x="725" y="345" width="110" height="55" rx="6" fill="#1e1b4b" fill-opacity="0.8" stroke="#7c3aed" stroke-width="1"/>
+  <text x="780" y="366" text-anchor="middle" fill="#c4b5fd" font-size="11" font-weight="bold">preprocessor</text>
+  <text x="780" y="384" text-anchor="middle" fill="#a78bfa" font-size="10">13 tests</text>
+
+  <rect x="850" y="345" width="110" height="55" rx="6" fill="#78350f" fill-opacity="0.8" stroke="#b45309" stroke-width="1"/>
+  <text x="905" y="366" text-anchor="middle" fill="#fcd34d" font-size="11" font-weight="bold">research</text>
+  <text x="905" y="384" text-anchor="middle" fill="#fbbf24" font-size="10">21 tests</text>
+
+  <!-- Row 2 -->
+  <rect x="50" y="410" width="130" height="40" rx="6" fill="#1e293b" fill-opacity="0.8" stroke="#475569" stroke-width="1"/>
+  <text x="115" y="435" text-anchor="middle" fill="#94a3b8" font-size="11">dashboard · 6 tests</text>
+
+  <rect x="195" y="410" width="180" height="40" rx="6" fill="#1e293b" fill-opacity="0.8" stroke="#475569" stroke-width="1"/>
+  <text x="285" y="435" text-anchor="middle" fill="#94a3b8" font-size="11">integration · 13 tests (4 skipped)</text>
+
+  <!-- Summary badge -->
+  <rect x="420" y="410" width="260" height="40" rx="6" fill="url(#pass)" fill-opacity="0.2" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="550" y="436" text-anchor="middle" fill="#34d399" font-size="13" font-weight="bold">115 Passed · 7 Skipped · 0 Failed</text>
+
+  <!-- CI Trigger info -->
+  <rect x="720" y="410" width="240" height="40" rx="6" fill="#1e293b" fill-opacity="0.8" stroke="#475569" stroke-width="1"/>
+  <text x="840" y="435" text-anchor="middle" fill="#94a3b8" font-size="11">Triggers: push · pull_request · manual</text>
+
+  <!-- Footer -->
+  <text x="500" y="490" text-anchor="middle" fill="#64748b" font-size="10">KSF Space Foundation · Maritime Edge AI Intelligence Platform v2.1.0</text>
+</svg>

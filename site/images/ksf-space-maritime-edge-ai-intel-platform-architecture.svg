@@ -1,0 +1,210 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" font-family="Segoe UI, Arial, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a1628;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1a2744;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="serviceGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#2563eb;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1d4ed8;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="externalGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#7c3aed;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#6d28d9;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="dataGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#059669;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#047857;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="uiGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#dc2626;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#b91c1c;stop-opacity:1" />
+    </linearGradient>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="120%">
+      <feDropShadow dx="2" dy="3" stdDeviation="4" flood-color="#000" flood-opacity="0.4"/>
+    </filter>
+    <marker id="arrowBlue" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#60a5fa"/>
+    </marker>
+    <marker id="arrowGreen" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#34d399"/>
+    </marker>
+    <marker id="arrowPurple" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#a78bfa"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="800" fill="url(#bg)" rx="12"/>
+
+  <!-- Title -->
+  <text x="600" y="48" text-anchor="middle" fill="#f1f5f9" font-size="22" font-weight="bold">Maritime Edge AI Intelligence Platform — System Architecture</text>
+  <text x="600" y="72" text-anchor="middle" fill="#94a3b8" font-size="13">KSF Space Foundation · Phase II · 6 Microservices + Redis</text>
+
+  <!-- ===== EXTERNAL APIS (Top row) ===== -->
+  <!-- Copernicus CDSE -->
+  <rect x="60" y="110" width="200" height="70" rx="10" fill="url(#externalGrad)" filter="url(#shadow)"/>
+  <text x="160" y="140" text-anchor="middle" fill="#fff" font-size="13" font-weight="bold">Copernicus CDSE</text>
+  <text x="160" y="158" text-anchor="middle" fill="#ddd6fe" font-size="11">Sentinel-1 SAR Data</text>
+  <text x="160" y="173" text-anchor="middle" fill="#c4b5fd" font-size="10">dataspace.copernicus.eu</text>
+
+  <!-- SatNOGS TLE -->
+  <rect x="340" y="110" width="200" height="70" rx="10" fill="url(#externalGrad)" filter="url(#shadow)"/>
+  <text x="440" y="140" text-anchor="middle" fill="#fff" font-size="13" font-weight="bold">SatNOGS TLE API</text>
+  <text x="440" y="158" text-anchor="middle" fill="#ddd6fe" font-size="11">Primary TLE Source</text>
+  <text x="440" y="173" text-anchor="middle" fill="#c4b5fd" font-size="10">db.satnogs.org</text>
+
+  <!-- Celestrak TLE -->
+  <rect x="620" y="110" width="200" height="70" rx="10" fill="url(#externalGrad)" filter="url(#shadow)"/>
+  <text x="720" y="140" text-anchor="middle" fill="#fff" font-size="13" font-weight="bold">Celestrak TLE</text>
+  <text x="720" y="158" text-anchor="middle" fill="#ddd6fe" font-size="11">Fallback TLE Source</text>
+  <text x="720" y="173" text-anchor="middle" fill="#c4b5fd" font-size="10">celestrak.org</text>
+
+  <!-- GFW API -->
+  <rect x="900" y="110" width="240" height="70" rx="10" fill="url(#externalGrad)" filter="url(#shadow)"/>
+  <text x="1020" y="140" text-anchor="middle" fill="#fff" font-size="13" font-weight="bold">Global Fishing Watch API v3</text>
+  <text x="1020" y="158" text-anchor="middle" fill="#ddd6fe" font-size="11">AIS Presence &amp; Dark Vessels</text>
+  <text x="1020" y="173" text-anchor="middle" fill="#c4b5fd" font-size="10">globalfishingwatch.org</text>
+
+  <!-- ===== SERVICES (Middle rows) ===== -->
+  <!-- Row 1: Data Ingestor + Sentinel Preprocessor -->
+  <!-- data-ingestor :8001 -->
+  <rect x="100" y="250" width="240" height="90" rx="10" fill="url(#serviceGrad)" filter="url(#shadow)"/>
+  <text x="220" y="280" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">data-ingestor</text>
+  <text x="220" y="298" text-anchor="middle" fill="#bfdbfe" font-size="11">:8001</text>
+  <text x="220" y="316" text-anchor="middle" fill="#93c5fd" font-size="10">CDSE Search &amp; Download</text>
+  <text x="220" y="330" text-anchor="middle" fill="#93c5fd" font-size="10">GET /products · POST /ingest</text>
+
+  <!-- sentinel-preprocessor :8000 -->
+  <rect x="420" y="250" width="260" height="90" rx="10" fill="url(#serviceGrad)" filter="url(#shadow)"/>
+  <text x="550" y="280" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">sentinel-preprocessor</text>
+  <text x="550" y="298" text-anchor="middle" fill="#bfdbfe" font-size="11">:8000</text>
+  <text x="550" y="316" text-anchor="middle" fill="#93c5fd" font-size="10">Calibration · Filtering · Tiling</text>
+  <text x="550" y="330" text-anchor="middle" fill="#93c5fd" font-size="10">5 Pipelines: A B C D E</text>
+
+  <!-- Row 2: Detector + Satellite Monitor -->
+  <!-- detector :8003 -->
+  <rect x="100" y="410" width="240" height="90" rx="10" fill="url(#serviceGrad)" filter="url(#shadow)"/>
+  <text x="220" y="440" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">detector</text>
+  <text x="220" y="458" text-anchor="middle" fill="#bfdbfe" font-size="11">:8003</text>
+  <text x="220" y="476" text-anchor="middle" fill="#93c5fd" font-size="10">YOLOv8 INT8 ONNX Inference</text>
+  <text x="220" y="490" text-anchor="middle" fill="#93c5fd" font-size="10">NMS · Priority Heuristic</text>
+
+  <!-- satellite-monitor :8004 -->
+  <rect x="420" y="410" width="260" height="90" rx="10" fill="url(#serviceGrad)" filter="url(#shadow)"/>
+  <text x="550" y="440" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">satellite-monitor</text>
+  <text x="550" y="458" text-anchor="middle" fill="#bfdbfe" font-size="11">:8004</text>
+  <text x="550" y="476" text-anchor="middle" fill="#93c5fd" font-size="10">TLE Cache · SGP4 Propagation</text>
+  <text x="550" y="490" text-anchor="middle" fill="#93c5fd" font-size="10">Satellite Position Computation</text>
+
+  <!-- Row 3: Aggregator -->
+  <!-- aggregator :8002 -->
+  <rect x="250" y="570" width="260" height="90" rx="10" fill="url(#serviceGrad)" filter="url(#shadow)"/>
+  <text x="380" y="600" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">aggregator</text>
+  <text x="380" y="618" text-anchor="middle" fill="#bfdbfe" font-size="11">:8002</text>
+  <text x="380" y="636" text-anchor="middle" fill="#93c5fd" font-size="10">Zone Classification · AIS Matching</text>
+  <text x="380" y="650" text-anchor="middle" fill="#93c5fd" font-size="10">Event Persistence · Stats</text>
+
+  <!-- Row 4: Dashboard -->
+  <!-- ground-dashboard :8501 -->
+  <rect x="760" y="570" width="260" height="90" rx="10" fill="url(#uiGrad)" filter="url(#shadow)"/>
+  <text x="890" y="600" text-anchor="middle" fill="#fff" font-size="14" font-weight="bold">ground-dashboard</text>
+  <text x="890" y="618" text-anchor="middle" fill="#fecaca" font-size="11">:8501 · Streamlit</text>
+  <text x="890" y="636" text-anchor="middle" fill="#fca5a5" font-size="10">Upload · Satellite Query</text>
+  <text x="890" y="650" text-anchor="middle" fill="#fca5a5" font-size="10">Continuous Monitoring</text>
+
+  <!-- ===== DATA STORES ===== -->
+  <!-- Redis -->
+  <rect x="760" y="410" width="180" height="70" rx="10" fill="url(#dataGrad)" filter="url(#shadow)"/>
+  <text x="850" y="440" text-anchor="middle" fill="#fff" font-size="13" font-weight="bold">Redis</text>
+  <text x="850" y="458" text-anchor="middle" fill="#a7f3d0" font-size="11">Shared Cache</text>
+  <text x="850" y="473" text-anchor="middle" fill="#6ee7b7" font-size="10">TLE · Pub/Sub</text>
+
+  <!-- SQLite/Postgres -->
+  <rect x="1000" y="410" width="160" height="70" rx="10" fill="url(#dataGrad)" filter="url(#shadow)"/>
+  <text x="1080" y="440" text-anchor="middle" fill="#fff" font-size="13" font-weight="bold">SQLite / Postgres</text>
+  <text x="1080" y="458" text-anchor="middle" fill="#a7f3d0" font-size="11">Event Store</text>
+  <text x="1080" y="473" text-anchor="middle" fill="#6ee7b7" font-size="10">DetectionEvents</text>
+
+  <!-- Shared Volumes -->
+  <rect x="760" y="250" width="180" height="70" rx="10" fill="url(#dataGrad)" filter="url(#shadow)"/>
+  <text x="850" y="280" text-anchor="middle" fill="#fff" font-size="13" font-weight="bold">Shared Volumes</text>
+  <text x="850" y="298" text-anchor="middle" fill="#a7f3d0" font-size="11">tiles + scenes</text>
+  <text x="850" y="313" text-anchor="middle" fill="#6ee7b7" font-size="10">.npy · .SAFE</text>
+
+  <!-- ===== ARROWS: External → Services ===== -->
+  <!-- CDSE → data-ingestor -->
+  <line x1="160" y1="180" x2="160" y2="248" stroke="#a78bfa" stroke-width="2" marker-end="url(#arrowPurple)" stroke-dasharray="6,3"/>
+  <!-- SatNOGS → satellite-monitor -->
+  <line x1="440" y1="180" x2="510" y2="408" stroke="#a78bfa" stroke-width="2" marker-end="url(#arrowPurple)" stroke-dasharray="6,3"/>
+  <!-- Celestrak → satellite-monitor -->
+  <line x1="720" y1="180" x2="600" y2="408" stroke="#a78bfa" stroke-width="2" marker-end="url(#arrowPurple)" stroke-dasharray="6,3"/>
+  <!-- GFW → aggregator -->
+  <line x1="1020" y1="180" x2="500" y2="568" stroke="#a78bfa" stroke-width="2" marker-end="url(#arrowPurple)" stroke-dasharray="6,3"/>
+
+  <!-- ===== ARROWS: Service → Service ===== -->
+  <!-- data-ingestor → sentinel-preprocessor -->
+  <line x1="340" y1="295" x2="418" y2="295" stroke="#60a5fa" stroke-width="2.5" marker-end="url(#arrowBlue)"/>
+  <text x="379" y="288" text-anchor="middle" fill="#93c5fd" font-size="9">.SAFE</text>
+
+  <!-- sentinel-preprocessor → detector -->
+  <line x1="420" y1="340" x2="340" y2="408" stroke="#60a5fa" stroke-width="2.5" marker-end="url(#arrowBlue)"/>
+  <text x="360" y="370" text-anchor="middle" fill="#93c5fd" font-size="9">.npy tiles</text>
+
+  <!-- detector → aggregator -->
+  <line x1="220" y1="500" x2="300" y2="568" stroke="#60a5fa" stroke-width="2.5" marker-end="url(#arrowBlue)"/>
+  <text x="240" y="538" text-anchor="middle" fill="#93c5fd" font-size="9">DetectionEvent</text>
+
+  <!-- satellite-monitor → aggregator -->
+  <line x1="480" y1="500" x2="420" y2="568" stroke="#60a5fa" stroke-width="2.5" marker-end="url(#arrowBlue)"/>
+  <text x="430" y="538" text-anchor="middle" fill="#93c5fd" font-size="9">sat position</text>
+
+  <!-- aggregator → dashboard -->
+  <line x1="510" y1="615" x2="758" y2="615" stroke="#60a5fa" stroke-width="2.5" marker-end="url(#arrowBlue)"/>
+  <text x="634" y="608" text-anchor="middle" fill="#93c5fd" font-size="9">events + stats</text>
+
+  <!-- ===== ARROWS: Services → Data Stores ===== -->
+  <!-- satellite-monitor → Redis -->
+  <line x1="680" y1="445" x2="758" y2="445" stroke="#34d399" stroke-width="2" marker-end="url(#arrowGreen)"/>
+  <!-- aggregator → Redis -->
+  <line x1="510" y1="600" x2="760" y2="470" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrowGreen)" stroke-dasharray="4,3"/>
+  <!-- aggregator → DB -->
+  <line x1="510" y1="630" x2="998" y2="455" stroke="#34d399" stroke-width="2" marker-end="url(#arrowGreen)"/>
+
+  <!-- ===== ARROWS: Data Stores → Dashboard ===== -->
+  <!-- Shared Volumes → preprocessor -->
+  <line x1="760" y1="285" x2="680" y2="285" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrowGreen)" stroke-dasharray="4,3"/>
+
+  <!-- ===== LEGEND ===== -->
+  <rect x="40" y="710" width="1120" height="70" rx="8" fill="#0f172a" fill-opacity="0.7"/>
+  <text x="60" y="735" fill="#94a3b8" font-size="12" font-weight="bold">Legend:</text>
+
+  <!-- Service -->
+  <rect x="140" y="722" width="20" height="14" rx="3" fill="url(#serviceGrad)"/>
+  <text x="168" y="734" fill="#cbd5e1" font-size="11">Microservice</text>
+
+  <!-- External -->
+  <rect x="280" y="722" width="20" height="14" rx="3" fill="url(#externalGrad)"/>
+  <text x="308" y="734" fill="#cbd5e1" font-size="11">External API</text>
+
+  <!-- Data -->
+  <rect x="420" y="722" width="20" height="14" rx="3" fill="url(#dataGrad)"/>
+  <text x="448" y="734" fill="#cbd5e1" font-size="11">Data Store</text>
+
+  <!-- UI -->
+  <rect x="560" y="722" width="20" height="14" rx="3" fill="url(#uiGrad)"/>
+  <text x="588" y="734" fill="#cbd5e1" font-size="11">User Interface</text>
+
+  <!-- Arrows -->
+  <line x1="700" y1="729" x2="740" y2="729" stroke="#60a5fa" stroke-width="2" marker-end="url(#arrowBlue)"/>
+  <text x="752" y="734" fill="#cbd5e1" font-size="11">Data Flow</text>
+
+  <line x1="850" y1="729" x2="890" y2="729" stroke="#a78bfa" stroke-width="2" marker-end="url(#arrowPurple)" stroke-dasharray="6,3"/>
+  <text x="902" y="734" fill="#cbd5e1" font-size="11">External Source</text>
+
+  <line x1="1020" y1="729" x2="1060" y2="729" stroke="#34d399" stroke-width="2" marker-end="url(#arrowGreen)"/>
+  <text x="1072" y="734" fill="#cbd5e1" font-size="11">Storage</text>
+
+  <!-- Footer -->
+  <text x="600" y="768" text-anchor="middle" fill="#64748b" font-size="10">KSF Space Foundation · Maritime Edge AI Intelligence Platform v2.1.0</text>
+</svg>
