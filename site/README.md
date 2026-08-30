@@ -77,7 +77,7 @@ ksf-space-maritime-edge-ai-intel-platform-<descriptive-slug>.<ext>
 | `ksf-space-maritime-edge-ai-intel-platform-dark-vessel-detection.png` | Dark vessel detection screenshot | ⬜ Capture needed |
 | `ksf-space-maritime-edge-ai-intel-platform-sar-raw-scene.png` | Raw Sentinel-1 scene | ⬜ Capture needed |
 | `ksf-space-maritime-edge-ai-intel-platform-detection-overlay.png` | YOLOv8 detection result | ⬜ Capture needed |
-| `ksf-space-maritime-edge-ai-intel-platform-satellite-orbit.png` | Satellite ground track | ⬜ Capture needed |
+
 | `ksf-space-maritime-edge-ai-intel-platform-dashboard-upload.png` | Dashboard upload mode | ⬜ Capture needed |
 | `ksf-space-maritime-edge-ai-intel-platform-dashboard-satellite-query.png` | Dashboard satellite query | ⬜ Capture needed |
 | `ksf-space-maritime-edge-ai-intel-platform-dashboard-monitoring-events.png` | Dashboard monitoring mode | ⬜ Capture needed |

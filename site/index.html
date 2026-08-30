@@ -98,16 +98,11 @@
                 </div>
 
                 <div class="content-visual">
-                    <!-- Dark vessel detection image placeholder -->
+                    <!-- Dark vessel detection image -->
                     <div class="image-placeholder" id="img-dark-vessel">
-                        <img src="images/ksf-space-maritime-edge-ai-intel-platform-dark-vessel-detection.png"
-                             alt="Dark vessel detection — vessel detected by SAR but absent from AIS broadcasts"
-                             onerror="this.parentElement.classList.add('missing'); this.style.display='none';">
-                        <div class="placeholder-label">Dark Vessel Detection</div>
-                        <div class="placeholder-fallback">
-                            <span class="placeholder-icon">🚢</span>
-                            <span>ksf-space-maritime-edge-ai-intel-platform-dark-vessel-detection.png</span>
-                        </div>
+                        <img src="images/ksf-space-maritime-edge-ai-intel-platform-sar-multi-vessel-detection.jpg"
+                             alt="SAR multi-vessel detection — vessels detected by SAR but absent from AIS broadcasts">
+                        <div class="placeholder-label">Dark Vessel Detection — SAR Multi-Vessel</div>
                     </div>
                 </div>
             </div>
@@ -125,16 +120,11 @@
 
             <div class="content-grid content-grid-reverse">
                 <div class="content-visual">
-                    <!-- SAR raw scene image placeholder -->
+                    <!-- SAR raw scene image -->
                     <div class="image-placeholder" id="img-sar-raw">
-                        <img src="images/ksf-space-maritime-edge-ai-intel-platform-sar-raw-scene.png"
-                             alt="Raw Sentinel-1 SAR scene showing ocean surface with vessel reflections"
-                             onerror="this.parentElement.classList.add('missing'); this.style.display='none';">
-                        <div class="placeholder-label">Raw Sentinel-1 SAR Scene</div>
-                        <div class="placeholder-fallback">
-                            <span class="placeholder-icon">📡</span>
-                            <span>ksf-space-maritime-edge-ai-intel-platform-sar-raw-scene.png</span>
-                        </div>
+                        <img src="images/ksf-space-maritime-edge-ai-intel-platform-sar-single-vessel.jpg"
+                             alt="Raw Sentinel-1 SAR scene showing a single vessel on ocean surface">
+                        <div class="placeholder-label">Raw Sentinel-1 SAR — Single Vessel</div>
                     </div>
 
                     <!-- Pipeline comparison image placeholder -->
@@ -234,19 +224,7 @@
                     </div>
                 </div>
 
-                <div class="content-visual">
-                    <!-- Satellite orbit image placeholder -->
-                    <div class="image-placeholder" id="img-satellite">
-                        <img src="images/ksf-space-maritime-edge-ai-intel-platform-satellite-orbit.png"
-                             alt="Sentinel-1A satellite ground track computed via SGP4 propagation"
-                             onerror="this.parentElement.classList.add('missing'); this.style.display='none';">
-                        <div class="placeholder-label">Sentinel-1A Ground Track (SGP4)</div>
-                        <div class="placeholder-fallback">
-                            <span class="placeholder-icon">🛰️</span>
-                            <span>ksf-space-maritime-edge-ai-intel-platform-satellite-orbit.png</span>
-                        </div>
-                    </div>
-                </div>
+
             </div>
         </div>
     </section>
@@ -332,13 +310,15 @@
             <!-- Zone classification diagram -->
             <div class="image-placeholder image-wide" id="img-zones" style="margin-top: 3rem;">
                 <img src="images/ksf-space-maritime-edge-ai-intel-platform-zone-classification.svg"
-                     alt="Maritime zone classification — Z1 territorial waters, Z2 EEZ, Z3 high seas"
-                     onerror="this.parentElement.classList.add('missing'); this.style.display='none';">
+                     alt="Maritime zone classification — Z1 territorial waters, Z2 EEZ, Z3 high seas">
                 <div class="placeholder-label">Maritime Zone Classification (Z1 / Z2 / Z3)</div>
-                <div class="placeholder-fallback">
-                    <span class="placeholder-icon">🌊</span>
-                    <span>ksf-space-maritime-edge-ai-intel-platform-zone-classification.svg</span>
-                </div>
+            </div>
+
+            <!-- Docker monitoring screenshot -->
+            <div class="image-placeholder image-wide" id="img-docker" style="margin-top: 1.5rem;">
+                <img src="images/ksf-space-maritime-edge-ai-intel-platform-docker-monitoring.png"
+                     alt="Docker container monitoring showing all 7 services with health status">
+                <div class="placeholder-label">Docker Container Monitoring — 7 Services Running</div>
             </div>
         </div>
     </section>
@@ -396,16 +376,11 @@
                 </div>
 
                 <div class="content-visual">
-                    <!-- Detection overlay image placeholder -->
+                    <!-- Detection overlay image -->
                     <div class="image-placeholder" id="img-detection">
-                        <img src="images/ksf-space-maritime-edge-ai-intel-platform-detection-overlay.png"
-                             alt="YOLOv8 detection overlay showing bounding boxes and confidence scores on SAR tile"
-                             onerror="this.parentElement.classList.add('missing'); this.style.display='none';">
-                        <div class="placeholder-label">Detection Overlay — Bounding Boxes + Confidence</div>
-                        <div class="placeholder-fallback">
-                            <span class="placeholder-icon">🔍</span>
-                            <span>ksf-space-maritime-edge-ai-intel-platform-detection-overlay.png</span>
-                        </div>
+                        <img src="images/ksf-space-maritime-edge-ai-intel-platform-sar-vessel-detection.jpg"
+                             alt="YOLOv8 detection overlay showing vessel detection on SAR tile">
+                        <div class="placeholder-label">SAR Vessel Detection — YOLOv8 Inference</div>
                     </div>
 
                     <!-- TLE fallback diagram -->
@@ -438,45 +413,30 @@
                     <div class="mode-number">1</div>
                     <h4>Upload Mode</h4>
                     <p>Upload .npy tiles or raw .SAFE/.tiff SAR products. Pipeline selection (A–E). Direct detection or preprocess-then-detect.</p>
-                    <!-- Dashboard upload screenshot placeholder -->
+                    <!-- Dashboard upload screenshot -->
                     <div class="image-placeholder image-small">
                         <img src="images/ksf-space-maritime-edge-ai-intel-platform-dashboard-upload.png"
-                             alt="Ground dashboard upload mode with file uploader and pipeline selector"
-                             onerror="this.parentElement.classList.add('missing'); this.style.display='none';">
-                        <div class="placeholder-fallback">
-                            <span class="placeholder-icon">📤</span>
-                            <span>dashboard-upload.png</span>
-                        </div>
+                             alt="Ground dashboard upload mode with file uploader and pipeline selector">
                     </div>
                 </div>
                 <div class="mode-card">
                     <div class="mode-number">2</div>
                     <h4>Satellite Query</h4>
                     <p>Query satellite position by NORAD ID (e.g. Sentinel-1A: 39634). Real-time SGP4 computation with TLE caching.</p>
-                    <!-- Dashboard satellite query screenshot placeholder -->
+                    <!-- Dashboard satellite query screenshot -->
                     <div class="image-placeholder image-small">
                         <img src="images/ksf-space-maritime-edge-ai-intel-platform-dashboard-satellite-query.png"
-                             alt="Ground dashboard satellite query mode showing position results"
-                             onerror="this.parentElement.classList.add('missing'); this.style.display='none';">
-                        <div class="placeholder-fallback">
-                            <span class="placeholder-icon">🛰️</span>
-                            <span>dashboard-satellite-query.png</span>
-                        </div>
+                             alt="Ground dashboard satellite query mode showing position results">
                     </div>
                 </div>
                 <div class="mode-card">
                     <div class="mode-number">3</div>
                     <h4>Continuous Monitoring</h4>
                     <p>Real-time event list with zone and priority filters. Aggregated statistics by zone and priority level.</p>
-                    <!-- Dashboard monitoring screenshot placeholder -->
+                    <!-- Dashboard monitoring screenshot -->
                     <div class="image-placeholder image-small">
                         <img src="images/ksf-space-maritime-edge-ai-intel-platform-dashboard-monitoring-events.png"
-                             alt="Ground dashboard continuous monitoring mode with filtered event list"
-                             onerror="this.parentElement.classList.add('missing'); this.style.display='none';">
-                        <div class="placeholder-fallback">
-                            <span class="placeholder-icon">📊</span>
-                            <span>dashboard-monitoring.png</span>
-                        </div>
+                             alt="Ground dashboard continuous monitoring mode with filtered event list">
                     </div>
                 </div>
             </div>
@@ -531,17 +491,7 @@
                 </div>
             </div>
 
-            <!-- Test results screenshot placeholder -->
-            <div class="image-placeholder image-wide" id="img-tests" style="margin-top: 2rem;">
-                <img src="images/ksf-space-maritime-edge-ai-intel-platform-test-results.png"
-                     alt="Test results showing 115 passed tests across 9 suites"
-                     onerror="this.parentElement.classList.add('missing'); this.style.display='none';">
-                <div class="placeholder-label">Test Results — make test-all Output</div>
-                <div class="placeholder-fallback">
-                    <span class="placeholder-icon">🧪</span>
-                    <span>ksf-space-maritime-edge-ai-intel-platform-test-results.png</span>
-                </div>
-            </div>
+
         </div>
     </section>
 

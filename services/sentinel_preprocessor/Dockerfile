@@ -20,7 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gdal-bin \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/lib/python3.14/site-packages /usr/local/lib/python3.14/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 COPY services/sentinel_preprocessor/ /app/services/sentinel_preprocessor/
