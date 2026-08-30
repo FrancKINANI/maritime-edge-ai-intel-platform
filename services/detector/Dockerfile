@@ -10,7 +10,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 FROM maritime-intel-base:2.1.0 AS release
 
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/lib/python3.14/site-packages /usr/local/lib/python3.14/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 COPY services/detector/ /app/services/detector/
