@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://franckinani.github.io/maritime-edge-ai-intel-platform/sitemap.xml

@@ -1,120 +1,145 @@
 # Landing Site — Maritime Edge AI Intelligence Platform
 
+Static landing page for the KSF Space Foundation internship project, deployed
+to **GitHub Pages** with zero build step: plain HTML + CSS + vanilla JavaScript.
+
 ## Quick Start
 
-1. Open `index.html` in a browser to preview the site
-2. Add your images to the `images/` folder (see naming convention below)
-3. Add your PDF report as `rapport_stage.pdf` (already included)
-4. Push to GitHub — GitHub Pages deploys automatically
+1. Open `index.html` in a browser to preview the site — or serve locally:
+   ```bash
+   python3 -m http.server 8000 --directory site
+   ```
+2. Add new images to `assets/img/` following the [naming convention](#image-naming-convention)
+3. Replace the report PDF at `assets/doc/rapport_stage.pdf`
+4. Push to GitHub — the GitHub Actions workflow deploys automatically
 
 ## GitHub Pages Deployment
 
-This site is configured for **automatic deployment** via GitHub Actions:
+Automatic deployment via `.github/workflows/deploy-pages.yml`:
 
 1. Push the `site/` folder to your `main` or `master` branch
-2. Go to your repo → **Settings → Pages**
-3. Under **Source**, select **GitHub Actions**
-4. The workflow (`.github/workflows/deploy-pages.yml`) deploys on every push
-5. Your site will be live at: `https://<username>.github.io/<repo-name>/`
+2. Repo → **Settings → Pages** → Source: **GitHub Actions**
+3. The workflow deploys on every push touching `site/**`
+4. Live at: `https://franckinani.github.io/maritime-edge-ai-intel-platform/`
 
-### First-time setup
-- Enable GitHub Pages in repo Settings → Pages → Source: **GitHub Actions**
-- The workflow runs automatically on push to main/master
+### SEO / crawler files
 
-## Editing Diagrams with draw.io (Recommended)
+- `robots.txt` allows crawling and points to the sitemap.
+- `sitemap.xml` lists the page with `<image:image>` entries for every content
+  image. If your GitHub Pages URL differs, update the base URL in
+  `sitemap.xml`, `robots.txt`, and the `<link rel="canonical">` / `og:*` /
+  JSON-LD block in `index.html` — the same base URL is used everywhere.
 
-All 6 diagrams are provided as **`.drawio` files** — fully editable with a free visual editor.
+## Folder Structure
 
-### How to edit
+```text
+site/
+├── index.html              # Single page (all content + SEO metadata)
+├── robots.txt              # Crawl rules + sitemap pointer
+├── sitemap.xml             # Page + image sitemap
+├── .nojekyll               # Prevents Jekyll processing
+├── README.md               # This file
+└── assets/
+    ├── css/                # Styles split by concern (order matters: base → layout → components → responsive)
+    │   ├── base.css        # Reset, design tokens, base element styles
+    │   ├── layout.css      # Nav, hero, sections, grids, footer
+    │   ├── components.css  # Buttons, cards, callouts, tables, image figures
+    │   └── responsive.css  # All media queries (must load last)
+    ├── js/
+    │   └── main.js         # Nav toggle, smooth scroll, scroll background
+    ├── img/
+    │   ├── diagrams/       # 6 SVG diagrams + their editable .drawio sources
+    │   ├── screenshots/    # SAR + dashboard + docker captures (optimized JPEG)
+    │   └── brand/          # KSF Space logo (only naming-convention exception)
+    └── doc/
+        └── rapport_stage.pdf   # Downloadable internship report
+```
 
-1. Go to **[app.diagrams.net](https://app.diagrams.net)** (free, no account needed)
-2. Click **Open Existing Diagram** → select the `.drawio` file
-3. **Drag** boxes to reposition them
-4. **Double-click** any text to edit it
-5. **Resize** boxes by dragging the corners
-6. **Change colors** by selecting a shape → Format panel on the right
-7. **Add/remove** shapes from the toolbar
-8. **Export** as SVG or PNG: File → Export as → SVG/PNG
+Keep the CSS split load order `base → layout → components → responsive`:
+all selectors are namespaced per file, and media-query overrides must stay last.
 
-### Available `.drawio` files
+## Editing Diagrams with draw.io
 
-| File | What it diagrams |
-|------|------------------|
-| `ksf-space-maritime-edge-ai-intel-platform-architecture.drawio` | System architecture — 6 services, Redis, APIs |
-| `ksf-space-maritime-edge-ai-intel-platform-data-flow.drawio` | End-to-end pipeline — 6 stages with data products |
-| `ksf-space-maritime-edge-ai-intel-platform-zone-classification.drawio` | Maritime zones Z1/Z2/Z3 with properties |
-| `ksf-space-maritime-edge-ai-intel-platform-tle-fallback.drawio` | TLE fallback chain — SatNOGS → Celestrak → Cache |
-| `ksf-space-maritime-edge-ai-intel-platform-pipeline-comparison.drawio` | 5 preprocessing pipelines (A–E) comparison |
-| `ksf-space-maritime-edge-ai-intel-platform-ci-pipeline.drawio` | CI/CD pipeline — 4 job stages |
+Each published `.svg` has an editable `.drawio` source in `assets/img/diagrams/`.
 
-### Tips
-- **Move a box:** click and drag it
-- **Resize:** drag the blue handles on the corners/edges
-- **Edit text:** double-click the text inside a box
-- **Change colors:** select shape → right panel → Fill Color
-- **Add arrow:** click a shape edge → drag to another shape
-- **Delete:** select → press Delete key
-- **Undo:** Ctrl+Z
+1. Go to [app.diagrams.net](https://app.diagrams.net) (free, no account needed)
+2. **Open Existing Diagram** → pick the `.drawio` file
+3. Drag/resize shapes, double-click text to edit, recolor in the Format panel
+4. **File → Export as → SVG** and overwrite the matching `.svg` file
+
+### Available diagrams
+
+| Diagram | What it shows |
+|---------|---------------|
+| `ksf-space-maritime-edge-ai-intel-platform-architecture` | System architecture — 6 services, Redis, APIs |
+| `ksf-space-maritime-edge-ai-intel-platform-data-flow` | End-to-end pipeline stages and data products |
+| `ksf-space-maritime-edge-ai-intel-platform-zone-classification` | Maritime zones Z1/Z2/Z3 with properties |
+| `ksf-space-maritime-edge-ai-intel-platform-tle-fallback` | TLE fallback chain — SatNOGS → Celestrak → Cache |
+| `ksf-space-maritime-edge-ai-intel-platform-pipeline-comparison` | 5 preprocessing pipelines (A–E) |
+| `ksf-space-maritime-edge-ai-intel-platform-ci-pipeline` | CI/CD pipeline — 4 job stages |
 
 ## Image Naming Convention
 
-All images must follow this exact naming convention for SEO optimization:
+Every image must follow this exact naming convention for SEO:
 
-```
+```text
 ksf-space-maritime-edge-ai-intel-platform-<descriptive-slug>.<ext>
 ```
 
-### Required Images
+The KSF Space logo in `assets/img/brand/` is the only sanctioned exception.
 
-| File Name | Description | Status |
-|-----------|-------------|--------|
-| `ksf-space-maritime-edge-ai-intel-platform-architecture.svg` | System architecture diagram | ✅ Included |
-| `ksf-space-maritime-edge-ai-intel-platform-data-flow.svg` | End-to-end data flow pipeline | ✅ Included |
-| `ksf-space-maritime-edge-ai-intel-platform-zone-classification.svg` | Maritime zones Z1/Z2/Z3 | ✅ Included |
-| `ksf-space-maritime-edge-ai-intel-platform-tle-fallback.svg` | TLE fallback chain | ✅ Included |
-| `ksf-space-maritime-edge-ai-intel-platform-pipeline-comparison.svg` | 5 preprocessing pipelines | ✅ Included |
-| `ksf-space-maritime-edge-ai-intel-platform-ci-pipeline.svg` | CI/CD pipeline stages | ✅ Included |
-| `ksf-space-maritime-edge-ai-intel-platform-dark-vessel-detection.png` | Dark vessel detection screenshot | ⬜ Capture needed |
-| `ksf-space-maritime-edge-ai-intel-platform-sar-raw-scene.png` | Raw Sentinel-1 scene | ⬜ Capture needed |
-| `ksf-space-maritime-edge-ai-intel-platform-detection-overlay.png` | YOLOv8 detection result | ⬜ Capture needed |
+### Current image inventory
 
-| `ksf-space-maritime-edge-ai-intel-platform-dashboard-upload.png` | Dashboard upload mode | ⬜ Capture needed |
-| `ksf-space-maritime-edge-ai-intel-platform-dashboard-satellite-query.png` | Dashboard satellite query | ⬜ Capture needed |
-| `ksf-space-maritime-edge-ai-intel-platform-dashboard-monitoring-events.png` | Dashboard monitoring mode | ⬜ Capture needed |
-| `ksf-space-maritime-edge-ai-intel-platform-test-results.png` | Test results output | ⬜ Capture needed |
+Diagrams (`assets/img/diagrams/`, SVG + `.drawio` source pair):
 
-## Adding Images
+| File | Description |
+|------|-------------|
+| `…-architecture.svg` / `.drawio` | System architecture — 6 microservices |
+| `…-data-flow.svg` / `.drawio` | End-to-end data flow pipeline |
+| `…-zone-classification.svg` / `.drawio` | Maritime zones Z1/Z2/Z3 |
+| `…-tle-fallback.svg` / `.drawio` | TLE fallback chain |
+| `…-pipeline-comparison.svg` / `.drawio` | 5 preprocessing pipelines (A–E) |
+| `…-ci-pipeline.svg` / `.drawio` | CI/CD pipeline stages |
 
-1. Take screenshots or export diagrams
-2. Rename files using the convention above
-3. Place them in the `images/` folder
-4. The HTML has fallback placeholders that show the expected filename if an image is missing
+Screenshots (`assets/img/screenshots/`, web-optimized JPEG, all raster files
+kept under ~250 KB):
 
-## PDF Report
+| File | Description |
+|------|-------------|
+| `…-sar-single-vessel.jpg` | Raw Sentinel-1 SAR — single vessel |
+| `…-sar-multi-vessel-detection.jpg` | Dark vessel detection — SAR multi-vessel |
+| `…-sar-vessel-detection.jpg` | YOLOv8 detection overlay on a SAR tile |
+| `…-docker-monitoring.jpg` | Docker container monitoring — 7 services |
+| `…-dashboard-upload.jpg` | Dashboard upload mode |
+| `…-dashboard-satellite-query.jpg` | Dashboard satellite query |
+| `…-dashboard-monitoring-events.jpg` | Dashboard monitoring events |
 
-Place your final report PDF as:
-```
-ksf-space-maritime-edge-ai-intel-platform-report.pdf
-```
+Branding (`assets/img/brand/`):
 
-## Google Sites Deployment
+| File | Description |
+|------|-------------|
+| `ksf.space-logo-high.png` | KSF Space Foundation logo (nav bar) |
 
-If deploying to Google Sites:
-1. Upload all images through the Google Sites editor
-2. Embed the content using Google Sites' text and image blocks
-3. Use the Gemini-generated article text (already structured in the HTML)
-4. Add the PDF as a downloadable link
+Report (`assets/doc/`):
 
-## File Structure
+| File | Description |
+|------|-------------|
+| `rapport_stage.pdf` | Downloadable internship report |
 
-```
-site/
-├── index.html          # Main page (all content)
-├── style.css           # All styles
-├── .nojekyll           # Prevents Jekyll processing
-├── README.md           # This file
-└── images/             # All images and diagrams
-    ├── *.svg           # 6 SVG diagrams (included)
-    ├── *.png           # Screenshots
-    └── rapport_stage.pdf  # Downloadable report
-```
+## Adding a New Image
+
+1. Take the screenshot or export the diagram
+2. Name it using the convention above and place it in the matching folder
+3. Reference it in `index.html` as a `<figure class="image-placeholder">` with:
+   - descriptive `alt` text stating what the image shows,
+   - `width`/`height` matching the file's intrinsic pixels (prevents layout shift),
+   - `loading="lazy"` + `decoding="async"` (except above-the-fold images),
+   - a `<figcaption>` label under the image
+4. Make the image clickable: wrap the `<img>` in
+   `<a class="lightbox-link" href="...same src...">` (skip the nav logo) —
+   `assets/js/main.js` turns these into the lightbox viewer automatically.
+   If the image has an `onerror` fallback, target the figure with
+   `this.closest('figure')` so it still works through the wrapper
+5. Add it to this README's inventory and, if it is a content image, to
+   `sitemap.xml`
+6. Verify locally (`python3 -m http.server 8000 --directory site`) before pushing

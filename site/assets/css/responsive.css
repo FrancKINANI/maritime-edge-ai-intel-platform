@@ -1,0 +1,221 @@
+/* ===== RESPONSIVE ===== */
+@media (max-width: 1024px) {
+    .hero h1 {
+        font-size: 2.8rem;
+    }
+
+    .hero-image-placeholder {
+        width: 45%;
+        opacity: 0.1;
+    }
+
+    .constraints-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .services-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .nav-links {
+        display: none;
+        position: absolute;
+        top: 64px;
+        left: 0;
+        right: 0;
+        background: rgba(6, 15, 31, 0.98);
+        backdrop-filter: blur(12px);
+        flex-direction: column;
+        padding: 1rem;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .nav-links.active {
+        display: flex;
+    }
+
+    .nav-toggle {
+        display: block;
+    }
+
+    .hero {
+        min-height: auto;
+        padding: 6rem 0 4rem;
+    }
+
+    .hero h1 {
+        font-size: 2.2rem;
+    }
+
+    .hero-image-placeholder {
+        display: none;
+    }
+
+    .hero-stats {
+        flex-wrap: wrap;
+        gap: 1.5rem;
+    }
+
+    .content-grid,
+    .content-grid-reverse {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+        direction: ltr;
+    }
+
+    .section-header h2 {
+        font-size: 1.8rem;
+    }
+
+    .constraints-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .services-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .dashboard-modes {
+        grid-template-columns: 1fr;
+    }
+
+    .testing-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .key-takeaways {
+        grid-template-columns: 1fr;
+    }
+
+    .footer-content {
+        flex-direction: column;
+        gap: 1.5rem;
+        text-align: center;
+    }
+
+    .footer-links {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .container {
+        padding: 0 1rem;
+    }
+
+    .hero h1 {
+        font-size: 1.8rem;
+    }
+
+    .section {
+        padding: 4rem 0;
+    }
+
+    .stat-number {
+        font-size: 1.5rem;
+    }
+
+    .testing-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* =============================================
+   UI REFRESH — motion & small-screen handling
+   ============================================= */
+
+/* keep decorative layers inside the hero (no horizontal overflow) */
+.hero {
+    overflow: hidden;
+}
+
+/* fluid mobile nav open */
+@media (max-width: 768px) {
+    .nav-links.active {
+        animation: nav-open 0.28s var(--ease-out);
+    }
+
+    .nav-links.active li {
+        animation: link-in 0.3s var(--ease-out) both;
+    }
+
+    .nav-links.active li:nth-child(2) { animation-delay: 0.05s; }
+    .nav-links.active li:nth-child(3) { animation-delay: 0.1s; }
+    .nav-links.active li:nth-child(4) { animation-delay: 0.15s; }
+    .nav-links.active li:nth-child(5) { animation-delay: 0.2s; }
+    .nav-links.active li:nth-child(6) { animation-delay: 0.25s; }
+    .nav-links.active li:nth-child(7) { animation-delay: 0.3s; }
+    .nav-links.active li:nth-child(8) { animation-delay: 0.35s; }
+}
+
+/* scale the radar disc down on smaller viewports */
+@media (max-width: 768px) {
+    .hero::after {
+        width: 420px;
+        height: 420px;
+        right: -140px;
+        top: -140px;
+        opacity: 0.4;
+    }
+}
+
+@media (max-width: 480px) {
+    .hero::after {
+        width: 300px;
+        height: 300px;
+        right: -120px;
+        top: -90px;
+        opacity: 0.35;
+    }
+
+    .back-to-top {
+        right: 0.75rem;
+        bottom: 0.75rem;
+        width: 40px;
+        height: 40px;
+    }
+}
+
+/* ===== LIGHTBOX — small-screen handling ===== */
+@media (max-width: 768px) {
+    .lightbox {
+        padding: 0.75rem;
+    }
+
+    .lightbox-nav.prev { left: 0.5rem; }
+    .lightbox-nav.next { right: 0.5rem; }
+
+    .lightbox-nav {
+        width: 38px;
+        height: 38px;
+        top: auto;
+        bottom: 1rem;
+        transform: none;
+    }
+
+    .lightbox-close {
+        top: 0.6rem;
+        right: 0.6rem;
+    }
+}
+
+/* ===== REDUCED MOTION — kill all animation, show final state ===== */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    .js .reveal,
+    .js .reveal-stagger > * {
+        opacity: 1 !important;
+        transform: none !important;
+    }
+}

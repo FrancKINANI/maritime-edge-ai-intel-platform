@@ -63,6 +63,9 @@ temp/
 *.log
 logs/
 
+# --- Spec Kit agent skills (machine-local; may hold credentials) ---
+.agents/
+
 # --- Docker ---
 .docker/
 
